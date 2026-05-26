@@ -52,6 +52,19 @@ body {
   }
 }
 
+/* When installed as PWA on a phone, hide the fake status bar (the real OS one
+   takes its place) and let content respect the device's safe-area insets. */
+@media (max-width: 499px) and (display-mode: standalone) {
+  .phone-shell { width: 100%; }
+  .status-bar { display: none; }
+  .app-header { padding-top: calc(8px + env(safe-area-inset-top)); }
+  .scroll-area { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+  .bottom-nav {
+    height: calc(80px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
 /* Status Bar */
 .status-bar {
   height: 44px;
