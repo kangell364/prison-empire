@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { BATTLE_ENEMIES, PLAYER, RARITY_COLORS } from '../data/gameData'
+import { BATTLE_ENEMIES, PLAYER } from '../data/gameData'
 
 const STAMINA_MAX = 100
 const STAMINA_COST = 5
@@ -10,7 +10,6 @@ export default function Battle() {
   const [selectedEnemy, setSelectedEnemy] = useState(null)
   const [battleState, setBattleState] = useState(null) // null | 'fighting' | 'won' | 'lost'
   const [battleLog, setBattleLog] = useState([])
-  const [xp, setXp] = useState(PLAYER.xp)
 
   const areaEnemies = BATTLE_ENEMIES.filter(e => e.area === currentArea)
 
@@ -39,7 +38,6 @@ export default function Battle() {
       setBattleLog(log)
       setBattleState(won ? 'won' : 'lost')
       setStamina(s => Math.max(0, s - STAMINA_COST))
-      if (won) setXp(x => x + enemy.reward_xp)
     }, 1500)
   }
 
