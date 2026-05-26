@@ -254,3 +254,57 @@ body {
   0%   { transform: scale(1);    opacity: 1; }
   100% { transform: scale(2.2);  opacity: 0; }
 }
+
+/* Card battle animations */
+@keyframes battleCardInLeft {
+  from { transform: translateX(-50px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+@keyframes battleCardInRight {
+  from { transform: translateX(50px);  opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+@keyframes vsFlash {
+  0%   { transform: scale(2.6) rotate(-10deg); opacity: 0; text-shadow: 0 0 0 transparent; }
+  55%  { transform: scale(0.85) rotate(3deg);  opacity: 1; text-shadow: 0 0 16px #e74c3c; }
+  80%  { transform: scale(1.08) rotate(-2deg); opacity: 1; }
+  100% { transform: scale(1)    rotate(0);     opacity: 1; text-shadow: 0 0 8px #e74c3c88; }
+}
+@keyframes vsPulse {
+  0%, 100% { transform: scale(1);    text-shadow: 0 0 6px #e74c3c66; }
+  50%      { transform: scale(1.12); text-shadow: 0 0 14px #e74c3c; }
+}
+@keyframes cardClash {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-4px); }
+  75%      { transform: translateX(4px); }
+}
+@keyframes stampIn {
+  0%   { transform: scale(3.2) rotate(-14deg); opacity: 0; letter-spacing: 12px; }
+  55%  { transform: scale(0.9)  rotate(4deg);  opacity: 1; letter-spacing: 2px; }
+  78%  { transform: scale(1.08) rotate(-2deg); opacity: 1; letter-spacing: 3px; }
+  100% { transform: scale(1)    rotate(0);     opacity: 1; letter-spacing: 4px; }
+}
+@keyframes rewardFloat {
+  0%   { transform: translate(-50%, 0) scale(0.6);     opacity: 0; }
+  15%  { transform: translate(-50%, -8px) scale(1.15); opacity: 1; }
+  35%  { transform: translate(-50%, -22px) scale(1);   opacity: 1; }
+  100% { transform: translate(-50%, -90px) scale(0.95);opacity: 0; }
+}
+@keyframes winnerGlow {
+  0%, 100% { box-shadow: 0 0 0 transparent;                          filter: brightness(1.1); }
+  50%      { box-shadow: 0 0 24px #c9a84c99, 0 0 48px #c9a84c44;     filter: brightness(1.25); }
+}
+@keyframes loserDim {
+  from { filter: brightness(1) grayscale(0); opacity: 1;   }
+  to   { filter: brightness(0.4) grayscale(0.85); opacity: 0.55; }
+}
+@keyframes logLineIn {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+@keyframes flashWhite {
+  0%   { background: rgba(255,255,255,0); }
+  20%  { background: rgba(255,255,255,0.18); }
+  100% { background: rgba(255,255,255,0); }
+}
