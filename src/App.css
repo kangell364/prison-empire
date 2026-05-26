@@ -308,3 +308,57 @@ body {
   20%  { background: rgba(255,255,255,0.18); }
   100% { background: rgba(255,255,255,0); }
 }
+
+/* Pack opening — uses --rarity custom property for color */
+@keyframes packIdle {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-8px) scale(1.02); }
+}
+@keyframes packShakeBuildup {
+  0%   { transform: rotate(0)    translateX(0); }
+  10%  { transform: rotate(-2deg) translateX(-1px); }
+  20%  { transform: rotate(2deg)  translateX(1px); }
+  30%  { transform: rotate(-3deg) translateX(-2px); }
+  40%  { transform: rotate(3deg)  translateX(2px); }
+  50%  { transform: rotate(-4deg) translateX(-3px); }
+  60%  { transform: rotate(4deg)  translateX(3px); }
+  70%  { transform: rotate(-5deg) translateX(-4px); }
+  80%  { transform: rotate(5deg)  translateX(4px); }
+  90%  { transform: rotate(-6deg) translateX(-5px); }
+  100% { transform: rotate(6deg)  translateX(5px); }
+}
+@keyframes packCharge {
+  0%   { transform: scale(1);   filter: brightness(1); }
+  100% { transform: scale(1.45);
+         filter: drop-shadow(0 0 40px var(--rarity, #c9a84c)) brightness(1.8); }
+}
+@keyframes packBurst {
+  0%   { transform: scale(1.45); opacity: 1;
+         filter: drop-shadow(0 0 40px var(--rarity, #c9a84c)) brightness(1.8); }
+  100% { transform: scale(4);    opacity: 0;
+         filter: drop-shadow(0 0 120px #ffffff) brightness(4); }
+}
+@keyframes rarityFlash {
+  0%   { opacity: 0; }
+  30%  { opacity: 0.55; }
+  100% { opacity: 0; }
+}
+@keyframes cardRevealBounce {
+  0%   { transform: scale(0)    rotate(180deg); opacity: 0; }
+  55%  { transform: scale(1.25) rotate(-12deg); opacity: 1; }
+  78%  { transform: scale(0.92) rotate(4deg);   opacity: 1; }
+  100% { transform: scale(1)    rotate(0);      opacity: 1; }
+}
+@keyframes rarityRingExpand {
+  0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 1;   border-width: 3px; }
+  100% { transform: translate(-50%, -50%) scale(3);   opacity: 0;   border-width: 1px; }
+}
+@keyframes sparkleFloat {
+  0%   { transform: translate(0, 0) scale(0); opacity: 0; }
+  20%  { transform: translate(var(--dx, 0), var(--dy, 0)) scale(1.2); opacity: 1; }
+  100% { transform: translate(calc(var(--dx, 0) * 3.2), calc(var(--dy, 0) * 3.2)) scale(0.2); opacity: 0; }
+}
+@keyframes labelGlow {
+  0%, 100% { text-shadow: 0 0 6px var(--rarity, #c9a84c); }
+  50%      { text-shadow: 0 0 16px var(--rarity, #c9a84c), 0 0 24px var(--rarity, #c9a84c); }
+}

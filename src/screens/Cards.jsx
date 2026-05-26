@@ -1,24 +1,42 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { CARDS_COLLECTION, RARITY_COLORS } from '../data/gameData'
 
+const RARITY_TIER = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 }
+const PACK_OPEN_DURATION_MS = 1600  // total time of shake → charge → burst
+
 export default function Cards() {
-  const [selectedCard, setSelectedCard] = useState(null)
-  const [showPack, setShowPack] = useState(false)
-  const [packOpened, setPackOpened] = useState(false)
-  const [revealedCard, setRevealedCard] = useState(null)
+  const [selectedCard, setSelectedCard]   = useState(null)
+  const [showPack, setShowPack]           = useState(false)
+  // 'idle' (user prompted to open) | 'opening' (shake/charge/burst) | 'revealed'
+  const [packState, setPackState]         = useState('idle')
+  const [revealedCard, setRevealedCard]   = useState(null)
 
   const openPack = () => {
     setShowPack(true)
-    setPackOpened(false)
+    setPackState('idle')
     setRevealedCard(null)
   }
 
-  const revealPack = () => {
+  const closePack = () => {
+    setShowPack(false)
+    setPackState('idle')
+    setRevealedCard(null)
+  }
+
+  const startOpening = () => {
+    // Pick the card now so the burst animation can use its rarity color.
     const locked = CARDS_COLLECTION.filter(c => !c.owned)
     const card = locked[Math.floor(Math.random() * locked.length)] || CARDS_COLLECTION[4]
     setRevealedCard(card)
-    setPackOpened(true)
+    setPackState('opening')
   }
+
+  // Transition opening → revealed after the burst animation completes.
+  useEffect(() => {
+    if (packState !== 'opening') return
+    const id = setTimeout(() => setPackState('revealed'), PACK_OPEN_DURATION_MS)
+    return () => clearTimeout(id)
+  }, [packState])
 
   return (
     <div className="scroll-area animate-in">
@@ -127,34 +145,167 @@ export default function Cards() {
 
       {/* Pack Opening Modal */}
       {showPack && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
-          <div style={{ textAlign: 'center', padding: 24, width: '100%', maxWidth: 340 }}>
-            {!packOpened ? (
-              <>
-                <div style={{ fontSize: 80, marginBottom: 20, animation: 'pulse 1s infinite' }}>🎴</div>
-                <div style={{ color: '#c9a84c', fontSize: 20, fontWeight: 500, marginBottom: 8 }}>Commissary Pack</div>
-                <div style={{ color: '#888', fontSize: 14, marginBottom: 32 }}>Tap to reveal your cards</div>
-                <button className="btn btn-primary btn-full" style={{ padding: 16, fontSize: 15, marginBottom: 12 }} onClick={revealPack}>
-                  Open Pack!
-                </button>
-                <button className="btn btn-dark btn-full" style={{ padding: 14 }} onClick={() => setShowPack(false)}>Cancel</button>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize: 80, marginBottom: 8 }}>{revealedCard?.emoji}</div>
-                <div style={{ height: 3, background: RARITY_COLORS[revealedCard?.rarity], borderRadius: 2, margin: '0 auto 16px', width: 80 }} />
-                <div style={{ color: '#fff', fontSize: 22, fontWeight: 500, marginBottom: 4 }}>{revealedCard?.name}</div>
-                <div style={{ color: RARITY_COLORS[revealedCard?.rarity], fontSize: 14, textTransform: 'capitalize', marginBottom: 8 }}>{revealedCard?.rarity}</div>
-                <div style={{ color: '#c9a84c', fontSize: 13, background: '#c9a84c18', border: '0.5px solid #c9a84c44', borderRadius: 12, padding: '6px 16px', display: 'inline-block', marginBottom: 24 }}>{revealedCard?.special}</div>
-                <button className="btn btn-primary btn-full" style={{ padding: 14, marginBottom: 10 }} onClick={() => setShowPack(false)}>
-                  Add to Collection
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+        <PackOpenModal
+          state={packState}
+          card={revealedCard}
+          onOpen={startOpening}
+          onCancel={closePack}
+          onAccept={closePack}
+        />
       )}
 
+    </div>
+  )
+}
+
+function PackOpenModal({ state, card, onOpen, onCancel, onAccept }) {
+  // When opening, use the about-to-be-revealed card's rarity color so the
+  // burst feels coherent with the result. When idle, use gold.
+  const rarityColor = card ? RARITY_COLORS[card.rarity] : '#c9a84c'
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0,
+      background: 'rgba(0,0,0,0.95)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 300,
+      // Drive --rarity for all keyframes inside.
+      ['--rarity']: rarityColor,
+    }}>
+      {/* Rarity-colored full-screen flash at the burst moment. */}
+      {state === 'opening' && (
+        <div aria-hidden="true" style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: rarityColor,
+          opacity: 0,
+          animation: 'rarityFlash 0.9s ease-out 1.1s forwards',
+        }} />
+      )}
+
+      <div style={{
+        textAlign: 'center', padding: 24, width: '100%', maxWidth: 340,
+        position: 'relative',
+      }}>
+        {state === 'idle' && (
+          <>
+            <div style={{
+              fontSize: 84, marginBottom: 20,
+              animation: 'packIdle 2s ease-in-out infinite',
+              filter: 'drop-shadow(0 0 16px rgba(201,168,76,0.4))',
+            }}>🎴</div>
+            <div style={{ color: '#c9a84c', fontSize: 20, fontWeight: 500, marginBottom: 8 }}>Commissary Pack</div>
+            <div style={{ color: '#888', fontSize: 14, marginBottom: 32 }}>Tap to reveal your cards</div>
+            <button className="btn btn-primary btn-full" style={{ padding: 16, fontSize: 15, marginBottom: 12 }} onClick={onOpen}>
+              Open Pack!
+            </button>
+            <button className="btn btn-dark btn-full" style={{ padding: 14 }} onClick={onCancel}>Cancel</button>
+          </>
+        )}
+
+        {state === 'opening' && (
+          <>
+            {/* Pack chains 3 animations: shake (0.9s) → charge (0.4s @0.9s) → burst (0.3s @1.3s) */}
+            <div style={{
+              fontSize: 90, marginBottom: 20,
+              animation: 'packShakeBuildup 0.9s ease-in-out forwards, packCharge 0.4s ease-in 0.9s forwards, packBurst 0.3s ease-out 1.3s forwards',
+            }}>🎴</div>
+            <div style={{ color: rarityColor, fontSize: 14, letterSpacing: 2, opacity: 0.8 }}>OPENING...</div>
+            {/* Reserve space so layout doesn't jump when buttons appear later */}
+            <div style={{ height: 110 }} />
+          </>
+        )}
+
+        {state === 'revealed' && card && (
+          <RevealedCard card={card} rarityColor={rarityColor} onAccept={onAccept} />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function RevealedCard({ card, rarityColor, onAccept }) {
+  const tier         = RARITY_TIER[card.rarity] ?? 0
+  const sparkleCount = 4 + tier * 2          // 4, 6, 8, 10, 12
+  const ringCount    = tier >= 4 ? 3 : tier >= 2 ? 2 : 1
+
+  return (
+    <div style={{ position: 'relative' }}>
+      {/* Expanding rarity rings — staggered for higher tiers */}
+      {Array.from({ length: ringCount }).map((_, i) => (
+        <div key={`ring-${i}`} aria-hidden="true" style={{
+          position: 'absolute',
+          left: '50%', top: 60,
+          width: 100, height: 100,
+          borderRadius: '50%',
+          border: `2px solid ${rarityColor}`,
+          pointerEvents: 'none',
+          animation: `rarityRingExpand 1.2s ease-out ${i * 0.18}s forwards`,
+          opacity: 0,
+        }} />
+      ))}
+
+      {/* Sparkle particles radiating outward */}
+      {Array.from({ length: sparkleCount }).map((_, i) => {
+        const angle    = (i / sparkleCount) * Math.PI * 2
+        const distance = 70 + ((i * 13) % 35)   // deterministic-but-varied
+        return (
+          <div key={`spark-${i}`} aria-hidden="true" style={{
+            position: 'absolute',
+            left: 'calc(50% - 3px)', top: 'calc(60px - 3px)',
+            width: 6, height: 6, borderRadius: '50%',
+            background: rarityColor,
+            boxShadow: `0 0 6px ${rarityColor}`,
+            pointerEvents: 'none',
+            opacity: 0,
+            animation: `sparkleFloat 1.4s ease-out ${0.1 + (i * 0.03)}s forwards`,
+            ['--dx']: `${Math.cos(angle) * distance}px`,
+            ['--dy']: `${Math.sin(angle) * distance}px`,
+          }} />
+        )
+      })}
+
+      {/* Card emoji — bounces in */}
+      <div style={{
+        fontSize: 84,
+        marginTop: 16,
+        marginBottom: 8,
+        animation: 'cardRevealBounce 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+        filter: `drop-shadow(0 0 14px ${rarityColor})`,
+      }}>{card.emoji}</div>
+
+      {/* Rarity bar */}
+      <div style={{
+        height: 3, background: rarityColor,
+        borderRadius: 2, margin: '8px auto 16px', width: 80,
+        opacity: 0, animation: 'logLineIn 0.4s ease 0.5s forwards',
+      }} />
+
+      <div style={{
+        color: '#fff', fontSize: 22, fontWeight: 500, marginBottom: 4,
+        opacity: 0, animation: 'logLineIn 0.4s ease 0.55s forwards',
+      }}>{card.name}</div>
+
+      <div style={{
+        color: rarityColor, fontSize: 14, textTransform: 'capitalize', marginBottom: 12,
+        fontWeight: 600, letterSpacing: 2,
+        opacity: 0,
+        animation: `logLineIn 0.4s ease 0.65s forwards${tier >= 3 ? ', labelGlow 1.6s ease-in-out 1s infinite' : ''}`,
+      }}>{card.rarity}</div>
+
+      <div style={{
+        color: '#c9a84c', fontSize: 13,
+        background: '#c9a84c18',
+        border: '0.5px solid #c9a84c44',
+        borderRadius: 12, padding: '6px 16px',
+        display: 'inline-block', marginBottom: 24,
+        opacity: 0, animation: 'logLineIn 0.4s ease 0.8s forwards',
+      }}>{card.special}</div>
+
+      <button className="btn btn-primary btn-full"
+        style={{ padding: 14, marginBottom: 10, opacity: 0, animation: 'logLineIn 0.4s ease 1s forwards' }}
+        onClick={onAccept}>
+        Add to Collection
+      </button>
     </div>
   )
 }
