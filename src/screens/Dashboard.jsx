@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { PLAYER, RESOURCES, CITY, INCOMING_ATTACK, CREW, LEADERBOARD, RARITY_COLORS } from '../data/gameData'
+import { CountdownRing } from '../components/CountdownRing'
 
 export default function Dashboard({ onNavigate }) {
   const [timer, setTimer] = useState(INCOMING_ATTACK.timer_seconds)
@@ -12,12 +13,6 @@ export default function Dashboard({ onNavigate }) {
     return () => clearInterval(interval)
   }, [timer, snitchUsed])
 
-  const formatTimer = (secs) => {
-    const m = Math.floor(secs / 60)
-    const s = secs % 60
-    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
-  }
-
   const xpPct = Math.round((PLAYER.xp / PLAYER.xpNext) * 100)
 
   return (
@@ -25,7 +20,7 @@ export default function Dashboard({ onNavigate }) {
 
       {/* Attack Alert */}
       {!snitchUsed && (
-        <div className="attack-alert" style={{ animation: 'pulse 2s infinite' }}>
+        <div className="attack-alert">
           <div className="alert-icon">
             <i className="ti ti-alert-triangle" />
           </div>
@@ -33,7 +28,13 @@ export default function Dashboard({ onNavigate }) {
             <div className="alert-title">INCOMING ATTACK</div>
             <div className="alert-sub">{INCOMING_ATTACK.attacker} moving on {INCOMING_ATTACK.city}</div>
           </div>
-          <div className="timer-pill">{formatTimer(timer)}</div>
+          <CountdownRing
+            remaining={timer}
+            total={INCOMING_ATTACK.timer_seconds}
+            size={60}
+            strokeWidth={4}
+            variant="incoming"
+          />
         </div>
       )}
 

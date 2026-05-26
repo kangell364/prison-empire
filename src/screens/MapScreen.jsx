@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { US_STATES, ALL_CITIES, GRID_COLS, GRID_ROWS, PLAYER } from '../data/gameData'
+import { CountdownRing } from '../components/CountdownRing'
 
 const GOLD = '#c9a84c'
 const RED  = '#e74c3c'
@@ -53,13 +54,6 @@ export default function MapScreen() {
     }, 1000)
   }
 
-  const formatTimer = (secs) => {
-    if (secs == null) return '00:00'
-    const m = Math.floor(secs / 60)
-    const s = secs % 60
-    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
-  }
-
   // Build the tile-grid cells (row-major, with empties for unmapped cells)
   const gridCells = useMemo(() => {
     const byPos = {}
@@ -79,7 +73,7 @@ export default function MapScreen() {
     return (
       <div className="scroll-area animate-in">
         {/* Attack in Progress */}
-        {attacking && <AttackBanner attacking={attacking} timer={attackTimer} formatTimer={formatTimer} />}
+        {attacking && <AttackBanner attacking={attacking} timer={attackTimer} />}
 
         {/* State header */}
         <div style={{ padding: '14px 16px 0' }}>
@@ -148,7 +142,7 @@ export default function MapScreen() {
   return (
     <div className="scroll-area animate-in">
       {/* Attack in Progress */}
-      {attacking && <AttackBanner attacking={attacking} timer={attackTimer} formatTimer={formatTimer} />}
+      {attacking && <AttackBanner attacking={attacking} timer={attackTimer} />}
 
       {/* Empire summary */}
       <div style={{ padding: '14px 16px 0' }}>
@@ -457,22 +451,73 @@ function CityDetailModal({ city, onClose, onAttack }) {
   )
 }
 
-function AttackBanner({ attacking, timer, formatTimer }) {
-  const pct = Math.round((1 - timer / (15 * 60)) * 100)
+function AttackBanner({ attacking, timer }) {
+  const total = 15 * 60
+  const travelPct = Math.min(1, Math.max(0, 1 - timer / total))
   return (
-    <div style={{ margin: '14px 16px 0', background: '#1a0d00', border: `1px solid ${GOLD}44`, borderRadius: 16, padding: 14 }}>
-      <div style={{ color: GOLD, fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
-        <i className="ti ti-sword" style={{ marginRight: 6 }} />
-        Attack En Route to {attacking.name}
+    <div style={{
+      margin: '14px 16px 0',
+      background: 'linear-gradient(135deg, #1a0d00 0%, #100a02 100%)',
+      border: `1px solid ${GOLD}44`,
+      borderRadius: 16,
+      padding: 14,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 14,
+    }}>
+      <CountdownRing remaining={timer} total={total} size={72} strokeWidth={4} variant="outbound" />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ color: GOLD, fontSize: 13, fontWeight: 600, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <i className="ti ti-sword" /> Attack En Route
+        </div>
+        <div style={{ color: '#fff', fontSize: 13, marginBottom: 2 }}>→ {attacking.name}</div>
+        <div style={{ color: DIM, fontSize: 10, marginBottom: 6 }}>Your crew is moving — cannot cancel</div>
+        <AttackPath pct={travelPct} />
       </div>
-      <div style={{ color: '#888', fontSize: 11, marginBottom: 8 }}>Your crew is moving — cannot cancel</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ flex: 1, height: 6, background: '#1e1e2a', borderRadius: 3, overflow: 'hidden' }}>
-          <div style={{ height: '100%', background: GOLD, borderRadius: 3, width: `${pct}%`, transition: 'width 1s linear' }} />
-        </div>
-        <div style={{ color: GOLD, fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-          {formatTimer(timer)}
-        </div>
+    </div>
+  )
+}
+
+function AttackPath({ pct }) {
+  return (
+    <div style={{ position: 'relative', height: 16, width: '100%' }}>
+      {/* Dashed track */}
+      <div style={{
+        position: 'absolute', top: '50%', left: 4, right: 4,
+        height: 1,
+        backgroundImage: `linear-gradient(90deg, ${GOLD} 50%, transparent 50%)`,
+        backgroundSize: '6px 1px',
+        backgroundRepeat: 'repeat-x',
+        opacity: 0.35,
+      }} />
+      {/* Origin (you) */}
+      <div style={{
+        position: 'absolute', top: '50%', left: 0,
+        width: 8, height: 8, borderRadius: '50%',
+        background: GOLD, transform: 'translateY(-50%)',
+        boxShadow: `0 0 6px ${GOLD}`,
+      }} />
+      {/* Target (city) — pulsing ping */}
+      <div style={{
+        position: 'absolute', top: '50%', right: 0,
+        width: 10, height: 10, borderRadius: '50%',
+        transform: 'translateY(-50%)',
+      }}>
+        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: RED, opacity: 0.8 }} />
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: '50%',
+          border: `1.5px solid ${RED}`,
+          animation: 'targetPing 1.2s ease-out infinite',
+        }} />
+      </div>
+      {/* Sword traveling along the path */}
+      <div style={{
+        position: 'absolute', top: '50%', left: `calc(${pct * 100}% - 8px)`,
+        transform: 'translateY(-50%)',
+        transition: 'left 1s linear',
+        filter: `drop-shadow(0 0 4px ${GOLD})`,
+      }}>
+        <i className="ti ti-sword" style={{ color: GOLD, fontSize: 16 }} />
       </div>
     </div>
   )
