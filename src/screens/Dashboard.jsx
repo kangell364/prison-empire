@@ -31,8 +31,8 @@ export default function Dashboard({ onNavigate }) {
           <CountdownRing
             remaining={timer}
             total={INCOMING_ATTACK.timer_seconds}
-            size={60}
-            strokeWidth={4}
+            size={48}
+            strokeWidth={3.5}
             variant="incoming"
           />
         </div>
@@ -56,18 +56,18 @@ export default function Dashboard({ onNavigate }) {
         <div className="card card-pad" style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
           {/* Card Art */}
           <div style={{
-            width: 84, height: 108,
+            width: 70, height: 92,
             background: '#1a1a2e',
-            borderRadius: 12,
+            borderRadius: 10,
             border: `1px solid ${RARITY_COLORS[PLAYER.card.rarity]}44`,
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
             flexShrink: 0, position: 'relative', overflow: 'hidden'
           }}>
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: RARITY_COLORS[PLAYER.card.rarity] }} />
-            <div style={{ fontSize: 36, marginBottom: 6 }}>{PLAYER.card.emoji}</div>
-            <div style={{ color: RARITY_COLORS[PLAYER.card.rarity], fontSize: 9, fontWeight: 600, letterSpacing: 0.5, textAlign: 'center', padding: '0 4px' }}>{PLAYER.card.name.toUpperCase()}</div>
-            <div style={{ color: '#555', fontSize: 9, marginTop: 2 }}>LVL {PLAYER.level}</div>
+            <div style={{ fontSize: 30, marginBottom: 4 }}>{PLAYER.card.emoji}</div>
+            <div style={{ color: RARITY_COLORS[PLAYER.card.rarity], fontSize: 8, fontWeight: 600, letterSpacing: 0.5, textAlign: 'center', padding: '0 4px' }}>{PLAYER.card.name.toUpperCase()}</div>
+            <div style={{ color: '#555', fontSize: 8, marginTop: 2 }}>LVL {PLAYER.level}</div>
           </div>
 
           {/* Player Info */}
@@ -136,7 +136,7 @@ export default function Dashboard({ onNavigate }) {
         <div className="section-label">Your City</div>
         <div className="card">
           {/* Mini Map */}
-          <div style={{ height: 120, background: '#0d1520', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          <div style={{ height: 96, background: '#0d1520', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', inset: 0, opacity: 0.12, backgroundImage: 'linear-gradient(#c9a84c 1px, transparent 1px), linear-gradient(90deg, #c9a84c 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
             <div style={{ position: 'absolute', top: 8, left: 12, color: '#c9a84c', fontSize: 10, letterSpacing: 1, fontWeight: 500 }}>TEXAS — ACTIVE</div>
             {[

@@ -65,11 +65,17 @@ body {
   }
 }
 
-/* When installed as PWA, hide the fake status bar (real OS bar shows
-   through) and respect safe-area insets. Applies regardless of width
-   so landscape and large phones get the same treatment. */
-@media (display-mode: standalone) {
+/* Hide the fake "9:41" status bar on ANY touch device — it's a desktop-only
+   design preview element. Real phones either show the OS status bar (in
+   standalone PWA) or the browser chrome (in-browser), so the fake bar is
+   wasted vertical space and was making the home screen feel oversized. */
+@media (pointer: coarse) {
   .status-bar { display: none; }
+}
+
+/* When installed as PWA, respect safe-area insets so content isn't clipped
+   by the notch / home indicator. */
+@media (display-mode: standalone) {
   .app-header { padding-top: calc(8px + env(safe-area-inset-top)); }
   .scroll-area { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
   .bottom-nav {
@@ -153,14 +159,14 @@ body {
 
 /* Attack Alert */
 .attack-alert {
-  margin: 12px 16px 4px;
+  margin: 10px 16px 4px;
   background: #1a0808;
   border: 1px solid #8b1a1a;
-  border-radius: 16px;
-  padding: 12px 16px;
+  border-radius: 14px;
+  padding: 10px 12px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 .alert-icon {
   width: 40px; height: 40px;
