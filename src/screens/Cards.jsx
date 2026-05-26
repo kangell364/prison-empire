@@ -170,7 +170,7 @@ function PackOpenModal({ state, card, onOpen, onCancel, onAccept }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       zIndex: 300,
       // Drive --rarity for all keyframes inside.
-      ['--rarity']: rarityColor,
+      '--rarity': rarityColor,
     }}>
       {/* Rarity-colored full-screen flash at the burst moment. */}
       {state === 'opening' && (
@@ -258,8 +258,8 @@ function RevealedCard({ card, rarityColor, onAccept }) {
             pointerEvents: 'none',
             opacity: 0,
             animation: `sparkleFloat 1.4s ease-out ${0.1 + (i * 0.03)}s forwards`,
-            ['--dx']: `${Math.cos(angle) * distance}px`,
-            ['--dy']: `${Math.sin(angle) * distance}px`,
+            '--dx': `${Math.cos(angle) * distance}px`,
+            '--dy': `${Math.sin(angle) * distance}px`,
           }} />
         )
       })}
