@@ -8,49 +8,88 @@ import Crew from './Crew'
 const RARITY_TIER = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 }
 const PACK_OPEN_DURATION_MS = 1600  // total time of shake → charge → burst
 const PACK_BURST_AT_MS      = 1300  // when the burst animation kicks in
+const CARDS_PER_PACK        = 3
+
+// Pulls 3 distinct cards. Falls back to the full collection if there aren't
+// enough unowned ones. Guarantees at least one Uncommon+, then sorts so the
+// rarest reveals last (the big payoff card).
+function pickPackCards() {
+  const unowned = CARDS_COLLECTION.filter(c => !c.owned)
+  const pool = unowned.length >= CARDS_PER_PACK ? unowned : CARDS_COLLECTION
+  const picks = []
+  const used = new Set()
+  while (picks.length < CARDS_PER_PACK && used.size < pool.length) {
+    const c = pool[Math.floor(Math.random() * pool.length)]
+    if (used.has(c.id)) continue
+    used.add(c.id)
+    picks.push(c)
+  }
+  // "Guaranteed 1 Uncommon" — if everyone rolled common, upgrade the last slot.
+  if (!picks.some(c => (RARITY_TIER[c.rarity] ?? 0) >= 1)) {
+    const better = pool.filter(c => (RARITY_TIER[c.rarity] ?? 0) >= 1 && !used.has(c.id))
+    if (better.length > 0) picks[picks.length - 1] = better[Math.floor(Math.random() * better.length)]
+  }
+  return picks.sort((a, b) => (RARITY_TIER[a.rarity] ?? 0) - (RARITY_TIER[b.rarity] ?? 0))
+}
 
 export default function Cards() {
   const [tab, setTab] = useState('collection')   // 'collection' | 'crew'
   const [selectedCard, setSelectedCard]   = useState(null)
   const [showPack, setShowPack]           = useState(false)
-  // 'idle' (user prompted to open) | 'opening' (shake/charge/burst) | 'revealed'
+  // 'idle' → 'opening' (shake/charge/burst) → 'revealing' (one card at a time, tap to advance) → 'revealed' (accept)
   const [packState, setPackState]         = useState('idle')
-  const [revealedCard, setRevealedCard]   = useState(null)
+  const [revealedCards, setRevealedCards] = useState([])
+  const [revealIndex,   setRevealIndex]   = useState(0)
+
+  // The burst flash uses the rarest card's color so the big moment feels coherent
+  // with the payoff card the player is about to see at the end of the sequence.
+  const headlineCard = revealedCards[revealedCards.length - 1] || null
 
   const openPack = () => {
     setShowPack(true)
     setPackState('idle')
-    setRevealedCard(null)
+    setRevealedCards([])
+    setRevealIndex(0)
   }
 
   const closePack = () => {
     setShowPack(false)
     setPackState('idle')
-    setRevealedCard(null)
+    setRevealedCards([])
+    setRevealIndex(0)
   }
 
   const startOpening = () => {
-    // Pick the card now so the burst animation can use its rarity color.
-    const locked = CARDS_COLLECTION.filter(c => !c.owned)
-    const card = locked[Math.floor(Math.random() * locked.length)] || CARDS_COLLECTION[4]
-    setRevealedCard(card)
+    setRevealedCards(pickPackCards())
+    setRevealIndex(0)
     setPackState('opening')
     sfx.shake()
   }
 
-  // Transition opening → revealed after the burst animation completes.
-  // Also fires the burst sound on the matching frame and the reveal ping
-  // (pitched by rarity tier) on transition.
+  const advanceReveal = () => {
+    if (packState !== 'revealing') return
+    if (revealIndex < revealedCards.length - 1) {
+      const nextIdx = revealIndex + 1
+      setRevealIndex(nextIdx)
+      const tier = RARITY_TIER[revealedCards[nextIdx].rarity] ?? 0
+      sfx.reveal(tier)
+    } else {
+      setPackState('revealed')
+    }
+  }
+
+  // Transition opening → revealing after the burst completes. Burst sound
+  // fires on the matching frame, then the first card's reveal ping.
   useEffect(() => {
     if (packState !== 'opening') return
-    const tier = revealedCard ? RARITY_TIER[revealedCard.rarity] ?? 0 : 0
+    const firstTier = revealedCards[0] ? RARITY_TIER[revealedCards[0].rarity] ?? 0 : 0
     const burstId  = setTimeout(() => sfx.burst(), PACK_BURST_AT_MS)
     const revealId = setTimeout(() => {
-      setPackState('revealed')
-      sfx.reveal(tier)
+      setPackState('revealing')
+      sfx.reveal(firstTier)
     }, PACK_OPEN_DURATION_MS)
     return () => { clearTimeout(burstId); clearTimeout(revealId) }
-  }, [packState, revealedCard])
+  }, [packState, revealedCards])
 
   // Crew tab swaps in the standalone Crew screen so all of its layout
   // (header stats, slot grid, slot editor) renders without the pack banner
@@ -156,8 +195,11 @@ export default function Cards() {
       {showPack && (
         <PackOpenModal
           state={packState}
-          card={revealedCard}
+          cards={revealedCards}
+          revealIndex={revealIndex}
+          headlineCard={headlineCard}
           onOpen={startOpening}
+          onAdvance={advanceReveal}
           onCancel={closePack}
           onAccept={closePack}
         />
@@ -203,10 +245,13 @@ function TabSwitcher({ tab, onTab }) {
   )
 }
 
-function PackOpenModal({ state, card, onOpen, onCancel, onAccept }) {
-  // When opening, use the about-to-be-revealed card's rarity color so the
-  // burst feels coherent with the result. When idle, use gold.
-  const rarityColor = card ? RARITY_COLORS[card.rarity] : '#c9a84c'
+function PackOpenModal({ state, cards, revealIndex, headlineCard, onOpen, onAdvance, onCancel, onAccept }) {
+  // The burst flash uses the rarest card's color so the big moment feels
+  // coherent with the headline reveal at the end of the sequence.
+  const burstColor = headlineCard ? RARITY_COLORS[headlineCard.rarity] : '#c9a84c'
+  const currentCard = state === 'revealing' && cards[revealIndex] ? cards[revealIndex] : null
+  const currentColor = currentCard ? RARITY_COLORS[currentCard.rarity] : burstColor
+  const isLast = revealIndex === cards.length - 1
 
   return (
     <div style={{
@@ -217,13 +262,13 @@ function PackOpenModal({ state, card, onOpen, onCancel, onAccept }) {
       justifyContent: 'center',   // centered horizontally
       zIndex: 300,
       // Drive --rarity for all keyframes inside.
-      '--rarity': rarityColor,
+      '--rarity': state === 'revealing' ? currentColor : burstColor,
     }}>
       {/* Rarity-colored full-screen flash at the burst moment. */}
       {state === 'opening' && (
         <div aria-hidden="true" style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: rarityColor,
+          background: burstColor,
           opacity: 0,
           animation: 'rarityFlash 0.9s ease-out 1.1s forwards',
         }} />
@@ -247,7 +292,7 @@ function PackOpenModal({ state, card, onOpen, onCancel, onAccept }) {
               filter: 'drop-shadow(0 0 16px rgba(201,168,76,0.4))',
             }}>🎴</div>
             <div style={{ color: '#c9a84c', fontSize: 20, fontWeight: 500, marginBottom: 8 }}>Commissary Pack</div>
-            <div style={{ color: '#888', fontSize: 14, marginBottom: 32 }}>Tap to reveal your cards</div>
+            <div style={{ color: '#888', fontSize: 14, marginBottom: 32 }}>3 cards · guaranteed 1 Uncommon+</div>
             <button className="btn btn-primary btn-full" style={{ padding: 16, fontSize: 15, marginBottom: 12 }} onClick={onOpen}>
               Open Pack!
             </button>
@@ -262,21 +307,94 @@ function PackOpenModal({ state, card, onOpen, onCancel, onAccept }) {
               fontSize: 90, marginBottom: 20,
               animation: 'packShakeBuildup 0.9s ease-in-out forwards, packCharge 0.4s ease-in 0.9s forwards, packBurst 0.3s ease-out 1.3s forwards',
             }}>🎴</div>
-            <div style={{ color: rarityColor, fontSize: 14, letterSpacing: 2, opacity: 0.8 }}>OPENING...</div>
+            <div style={{ color: burstColor, fontSize: 14, letterSpacing: 2, opacity: 0.8 }}>OPENING...</div>
             {/* Reserve space so layout doesn't jump when buttons appear later */}
             <div style={{ height: 110 }} />
           </>
         )}
 
-        {state === 'revealed' && card && (
-          <RevealedCard card={card} rarityColor={rarityColor} onAccept={onAccept} />
+        {state === 'revealing' && currentCard && (
+          <div
+            // Tap anywhere in this area to advance — easier than hitting the button on mobile.
+            onClick={onAdvance}
+            style={{ cursor: 'pointer' }}
+          >
+            {/* "CARD 2 / 3" progress chip */}
+            <div style={{
+              color: '#888', fontSize: 10, letterSpacing: 2,
+              fontWeight: 700, marginBottom: 4,
+            }}>
+              CARD {revealIndex + 1} / {cards.length}
+            </div>
+            <RevealedCard
+              // Remount on advance so the entrance animations re-fire.
+              key={currentCard.id}
+              card={currentCard}
+              rarityColor={currentColor}
+              cta={isLast ? 'See Your Pack' : 'Next Card'}
+              onAccept={(e) => { e.stopPropagation(); onAdvance() }}
+            />
+            <div style={{
+              color: '#555', fontSize: 11, letterSpacing: 1,
+              marginTop: 4, opacity: 0,
+              animation: 'logLineIn 0.4s ease 1.1s forwards',
+            }}>
+              Tap anywhere to continue
+            </div>
+          </div>
+        )}
+
+        {state === 'revealed' && (
+          <RevealedDeckSummary cards={cards} onAccept={onAccept} />
         )}
       </div>
     </div>
   )
 }
 
-function RevealedCard({ card, rarityColor, onAccept }) {
+function RevealedDeckSummary({ cards, onAccept }) {
+  return (
+    <div style={{ paddingTop: 8 }}>
+      <div style={{
+        color: '#c9a84c', fontSize: 18, fontWeight: 600, letterSpacing: 1,
+        marginBottom: 18,
+        opacity: 0, animation: 'logLineIn 0.4s ease forwards',
+      }}>
+        Pack Opened
+      </div>
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
+        gap: 8, marginBottom: 24,
+      }}>
+        {cards.map((c, i) => {
+          const color = RARITY_COLORS[c.rarity]
+          return (
+            <div key={c.id} style={{
+              background: '#13131f',
+              border: `0.5px solid ${color}44`,
+              borderRadius: 12, padding: 10,
+              opacity: 0, animation: `logLineIn 0.35s ease ${0.1 + i * 0.1}s forwards`,
+            }}>
+              <div style={{ height: 2, background: color, borderRadius: 1, marginBottom: 8 }} />
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
+                <Avatar src={c.avatar} emoji={c.emoji} size={42} radius={6} />
+              </div>
+              <div style={{ color: '#fff', fontSize: 11, fontWeight: 500, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+              <div style={{ color, fontSize: 9, textAlign: 'center', textTransform: 'capitalize', marginTop: 2 }}>{c.rarity}</div>
+            </div>
+          )
+        })}
+      </div>
+      <button className="btn btn-primary btn-full"
+        style={{ padding: 14, opacity: 0, animation: 'logLineIn 0.4s ease 0.45s forwards' }}
+        onClick={onAccept}>
+        Add to Collection
+      </button>
+    </div>
+  )
+}
+
+function RevealedCard({ card, rarityColor, onAccept, cta = 'Add to Collection' }) {
   const tier         = RARITY_TIER[card.rarity] ?? 0
   const sparkleCount = 4 + tier * 2          // 4, 6, 8, 10, 12
   const ringCount    = tier >= 4 ? 3 : tier >= 2 ? 2 : 1
@@ -359,7 +477,7 @@ function RevealedCard({ card, rarityColor, onAccept }) {
       <button className="btn btn-primary btn-full"
         style={{ padding: 14, marginBottom: 10, opacity: 0, animation: 'logLineIn 0.4s ease 1s forwards' }}
         onClick={onAccept}>
-        Add to Collection
+        {cta}
       </button>
     </div>
   )
