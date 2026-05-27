@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { PLAYER, SKILLS, RANKED_PLAYERS, PVP_LEVEL_RANGE, PVP_FIGHT_COST, pvpRewardMultiplier } from '../data/gameData'
 import { sfx } from '../sounds'
 import { Avatar } from '../components/Avatar'
+import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import Battle from './Battle'
 
 const GOLD   = '#c9a84c'
@@ -62,6 +63,7 @@ function PlayersScreen() {
   const [dailyKills, setDailyKills] = useState(PLAYER.dailyKills)
   const [stamina, setStamina]       = useState(78)
   const [target, setTarget]         = useState(null)
+  const [detailPlayer, setDetailPlayer] = useState(null)
   // Track last fight reward to display on the list
   const [lastReward, setLastReward] = useState(null)
 
@@ -174,6 +176,7 @@ function PlayersScreen() {
                 opp={opp}
                 disabled={stamina < PVP_FIGHT_COST}
                 onFight={() => onFightOpened(opp)}
+                onShowDetail={() => setDetailPlayer(opp)}
               />
             ))}
           </div>
@@ -189,20 +192,36 @@ function PlayersScreen() {
           onWin={onWin}
         />
       )}
+
+      {/* Player detail preview */}
+      {detailPlayer && (
+        <CharacterDetailModal
+          character={detailPlayer}
+          onClose={() => setDetailPlayer(null)}
+          actions={stamina >= PVP_FIGHT_COST ? [
+            { label: `FIGHT — ${PVP_FIGHT_COST} STAMINA`, icon: 'ti-sword', onClick: () => onFightOpened(detailPlayer) },
+          ] : [
+            { label: 'NOT ENOUGH STAMINA', icon: 'ti-bolt-off', onClick: () => {}, kind: 'secondary' },
+          ]}
+        />
+      )}
     </div>
   )
 }
 
-function TargetCard({ opp, disabled, onFight }) {
+function TargetCard({ opp, disabled, onFight, onShowDetail }) {
   const mult     = pvpRewardMultiplier(PLAYER.level, opp.level)
   const levelGap = opp.level - PLAYER.level
   const multColor = mult >= 4 ? ORANGE : mult >= 2 ? GOLD : '#888'
 
   return (
-    <div className="card card-pad" style={{
-      padding: 14, display: 'flex', alignItems: 'center', gap: 12,
-      borderColor: '#2a2a3a',
-    }}>
+    <div className="card card-pad"
+      onClick={onShowDetail}
+      style={{
+        padding: 14, display: 'flex', alignItems: 'center', gap: 12,
+        borderColor: '#2a2a3a',
+        cursor: 'pointer',
+      }}>
       <Avatar src={opp.avatar} emoji={opp.emoji} size={52} radius={12}
         style={{ background: '#1e1e2a' }} />
 
@@ -229,7 +248,7 @@ function TargetCard({ opp, disabled, onFight }) {
       </div>
 
       <button
-        onClick={onFight}
+        onClick={(e) => { e.stopPropagation(); onFight() }}
         disabled={disabled}
         style={{
           background: disabled ? '#1e1e2a' : GOLD,

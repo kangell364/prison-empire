@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { BATTLE_ENEMIES, PLAYER } from '../data/gameData'
 import { sfx } from '../sounds'
 import { Avatar } from '../components/Avatar'
+import { CharacterDetailModal } from '../components/CharacterDetailModal'
 
 const STAMINA_MAX = 100
 const STAMINA_COST = 5
@@ -32,6 +33,7 @@ export default function Battle() {
   const [battleState, setBattleState] = useState(null) // null | 'fighting' | 'won' | 'lost'
   const [battleLog, setBattleLog] = useState([])
   const [rolledPower, setRolledPower] = useState({ player: 0, enemy: 0 })
+  const [detailEnemy, setDetailEnemy] = useState(null)
 
   const areaEnemies = BATTLE_ENEMIES.filter(e => e.area === currentArea)
 
@@ -116,11 +118,14 @@ export default function Battle() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {areaEnemies.map(enemy => (
-            <div key={enemy.id} className="card card-pad" style={{
-              display: 'flex', alignItems: 'center', gap: 14,
-              borderColor: enemy.boss ? '#c9a84c44' : '#2a2a3a',
-              background: enemy.boss ? '#1a1510' : '#13131f',
-            }}>
+            <div key={enemy.id}
+              onClick={() => setDetailEnemy(enemy)}
+              className="card card-pad" style={{
+                display: 'flex', alignItems: 'center', gap: 14,
+                borderColor: enemy.boss ? '#c9a84c44' : '#2a2a3a',
+                background: enemy.boss ? '#1a1510' : '#13131f',
+                cursor: 'pointer',
+              }}>
               <Avatar src={enemy.avatar} emoji={enemy.emoji} size={44} radius={10} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
@@ -141,7 +146,7 @@ export default function Battle() {
               <button
                 className="btn btn-gold"
                 style={{ padding: '8px 14px', fontSize: 12 }}
-                onClick={() => startBattle(enemy)}
+                onClick={(e) => { e.stopPropagation(); startBattle(enemy) }}
                 disabled={stamina < STAMINA_COST}
               >
                 Fight
@@ -160,6 +165,19 @@ export default function Battle() {
           log={battleLog}
           onRetry={() => startBattle(selectedEnemy)}
           onReset={resetBattle}
+        />
+      )}
+
+      {/* Enemy detail preview */}
+      {detailEnemy && (
+        <CharacterDetailModal
+          character={detailEnemy}
+          onClose={() => setDetailEnemy(null)}
+          actions={stamina >= STAMINA_COST ? [
+            { label: `FIGHT — ${STAMINA_COST} STAMINA`, icon: 'ti-sword', onClick: () => startBattle(detailEnemy) },
+          ] : [
+            { label: 'NOT ENOUGH STAMINA', icon: 'ti-bolt-off', onClick: () => {}, kind: 'secondary' },
+          ]}
         />
       )}
 
@@ -183,8 +201,10 @@ function BattleModal({ enemy, state, rolledPower, log, onRetry, onReset }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
-      background: 'rgba(0,0,0,0.92)',
-      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      background: '#13131f',
+      display: 'flex',
+      alignItems: 'stretch',
+      justifyContent: 'center',
       zIndex: 200,
     }}>
       {/* Flash overlay at resolution moment — pure white wash through the modal */}
@@ -196,13 +216,13 @@ function BattleModal({ enemy, state, rolledPower, log, onRetry, onReset }) {
       )}
 
       <div style={{
-        background: '#13131f',
-        borderRadius: '24px 24px 0 0',
-        padding: 24,
+        padding: '20px 16px 100px',
         width: '100%',
         maxWidth: 390,
         position: 'relative',
-        overflow: 'hidden',
+        overflow: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
       }}>
         <div style={{ width: 40, height: 4, background: '#2a2a3a', borderRadius: 2, margin: '0 auto 20px' }} />
 

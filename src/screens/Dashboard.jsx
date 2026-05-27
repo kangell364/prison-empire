@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react'
-import { PLAYER, RESOURCES, CITY, INCOMING_ATTACK, CREW, LEADERBOARD, RARITY_COLORS } from '../data/gameData'
+import { PLAYER, RESOURCES, CITY, INCOMING_ATTACK, CREW, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
 import { CountdownRing } from '../components/CountdownRing'
 import { Avatar } from '../components/Avatar'
+import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { sfx } from '../sounds'
 
 export default function Dashboard({ onNavigate }) {
   const [timer, setTimer] = useState(INCOMING_ATTACK.timer_seconds)
   const [snitchUsed, setSnitchUsed] = useState(false)
   const [showSnitchModal, setShowSnitchModal] = useState(false)
+  const [detailChar, setDetailChar] = useState(null)
 
   useEffect(() => {
     if (timer <= 0 || snitchUsed) return
@@ -249,7 +251,8 @@ export default function Dashboard({ onNavigate }) {
               padding: '12px 14px',
               display: 'flex', alignItems: 'center', gap: 12,
               borderColor: p.isYou ? '#c9a84c44' : '#2a2a3a',
-            }}>
+              cursor: 'pointer',
+            }} onClick={() => setDetailChar(RANKED_PLAYERS.find(rp => rp.name === p.name) || p)}>
               <div style={{ color: p.rank === 1 ? '#c9a84c' : p.rank === 2 ? '#888' : p.rank === 3 ? '#8b6914' : '#555', fontSize: 14, fontWeight: 500, width: 20 }}>{p.rank}</div>
               <Avatar src={p.avatar} emoji={p.emoji} size={36} radius={10}
                 style={{ background: '#1e1e2a' }} />
@@ -289,6 +292,10 @@ export default function Dashboard({ onNavigate }) {
             </button>
           </div>
         </div>
+      )}
+
+      {detailChar && (
+        <CharacterDetailModal character={detailChar} onClose={() => setDetailChar(null)} />
       )}
 
     </div>

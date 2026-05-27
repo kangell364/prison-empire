@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { RANKED_PLAYERS, HIT_LIST, streetRep, PLAYER } from '../data/gameData'
 import { Avatar } from '../components/Avatar'
+import { CharacterDetailModal } from '../components/CharacterDetailModal'
 
 const GOLD   = '#c9a84c'
 const SILVER = '#b0b0b0'
@@ -31,6 +32,7 @@ const playerById = (() => {
 
 export default function Yard() {
   const [tab, setTab] = useState('hits')
+  const [detail, setDetail] = useState(null) // { character, actions }
 
   return (
     <div className="scroll-area animate-in">
@@ -46,8 +48,16 @@ export default function Yard() {
         </TabButton>
       </div>
 
-      {tab === 'hits'  && <HitListView  />}
-      {tab === 'kings' && <YardKingsView />}
+      {tab === 'hits'  && <HitListView  openDetail={setDetail} />}
+      {tab === 'kings' && <YardKingsView openDetail={setDetail} />}
+
+      {detail && (
+        <CharacterDetailModal
+          character={detail.character}
+          actions={detail.actions || []}
+          onClose={() => setDetail(null)}
+        />
+      )}
     </div>
   )
 }
@@ -73,7 +83,7 @@ function TabButton({ active, onClick, children }) {
 // Hit List
 // ---------------------------------------------------------------------
 
-function HitListView() {
+function HitListView({ openDetail }) {
   const totalBounty = useMemo(() => HIT_LIST.reduce((sum, h) => sum + h.bountyHustle, 0), [])
 
   return (
@@ -117,7 +127,7 @@ function HitListView() {
             HIT_LIST
               .slice()
               .sort((a, b) => b.bountyHustle - a.bountyHustle)
-              .map(hit => <HitCard key={hit.id} hit={hit} />)
+              .map(hit => <HitCard key={hit.id} hit={hit} openDetail={openDetail} />)
           )}
         </div>
       </div>
@@ -125,16 +135,25 @@ function HitListView() {
   )
 }
 
-function HitCard({ hit }) {
+function HitCard({ hit, openDetail }) {
   const t = playerById[hit.targetId]
   if (!t) return null
+
+  const showDetail = () => openDetail({
+    character: t,
+    actions: [
+      { label: 'Add Bounty',     icon: 'ti-coin',  onClick: () => {}, kind: 'secondary' },
+      { label: 'Move on Target', icon: 'ti-sword', onClick: () => {}, kind: 'danger' },
+    ],
+  })
 
   return (
     <div className="card card-pad" style={{
       padding: 14,
       borderColor: `${RED}44`,
       background: 'linear-gradient(135deg, #15090a 0%, #13131f 60%)',
-    }}>
+      cursor: 'pointer',
+    }} onClick={showDetail}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         {/* Avatar */}
         <Avatar src={t.avatar} emoji={t.emoji} size={56} radius={14}
@@ -159,8 +178,8 @@ function HitCard({ hit }) {
         </div>
       </div>
 
-      {/* Actions */}
-      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+      {/* Actions — stopPropagation so the buttons don't also open the detail */}
+      <div style={{ display: 'flex', gap: 8, marginTop: 12 }} onClick={e => e.stopPropagation()}>
         <button className="btn btn-dark" style={{ flex: 1, padding: '10px 0', fontSize: 12 }}>
           <i className="ti ti-coin" style={{ fontSize: 14 }} /> Add Bounty
         </button>
@@ -176,7 +195,7 @@ function HitCard({ hit }) {
 // Yard Kings
 // ---------------------------------------------------------------------
 
-function YardKingsView() {
+function YardKingsView({ openDetail }) {
   // Top 3 overall by Street Rep
   const podium = useMemo(() => (
     RANKED_PLAYERS
@@ -203,7 +222,7 @@ function YardKingsView() {
       {/* Podium */}
       <div className="section" style={{ marginTop: 14 }}>
         <div className="section-label">Street Rep — Top 3</div>
-        <Podium top3={podium} />
+        <Podium top3={podium} openDetail={openDetail} />
       </div>
 
       {/* Your rank */}
@@ -214,7 +233,8 @@ function YardKingsView() {
           borderRadius: 12,
           padding: '10px 14px',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        }}>
+          cursor: 'pointer',
+        }} onClick={() => openDetail({ character: RANKED_PLAYERS.find(p => p.isYou) })}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Avatar src={PLAYER.card.avatar} emoji={PLAYER.card.emoji} size={28} radius={6} />
             <div>
@@ -228,7 +248,7 @@ function YardKingsView() {
 
       {/* Category leaderboards */}
       {categories.map(cat => (
-        <CategoryLeaderboard key={cat.key} {...cat} />
+        <CategoryLeaderboard key={cat.key} {...cat} openDetail={openDetail} />
       ))}
 
       {/* Footer — formula */}
@@ -254,29 +274,30 @@ function YardKingsView() {
   )
 }
 
-function Podium({ top3 }) {
+function Podium({ top3, openDetail }) {
   if (top3.length < 3) return null
   const [first, second, third] = top3
-  // Heights for the podium blocks
   const h1 = 78, h2 = 60, h3 = 46
   return (
     <div style={{
       display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
       gap: 8, padding: '8px 4px 0',
     }}>
-      <PodiumColumn p={second} place={2} height={h2} color={SILVER} />
-      <PodiumColumn p={first}  place={1} height={h1} color={GOLD}   isWinner />
-      <PodiumColumn p={third}  place={3} height={h3} color={BRONZE} />
+      <PodiumColumn p={second} place={2} height={h2} color={SILVER} openDetail={openDetail} />
+      <PodiumColumn p={first}  place={1} height={h1} color={GOLD}   isWinner openDetail={openDetail} />
+      <PodiumColumn p={third}  place={3} height={h3} color={BRONZE} openDetail={openDetail} />
     </div>
   )
 }
 
-function PodiumColumn({ p, place, height, color, isWinner }) {
+function PodiumColumn({ p, place, height, color, isWinner, openDetail }) {
   return (
-    <div style={{
-      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-      minWidth: 0, maxWidth: 110,
-    }}>
+    <div
+      onClick={() => openDetail({ character: p })}
+      style={{
+        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+        minWidth: 0, maxWidth: 110, cursor: 'pointer',
+      }}>
       {/* Avatar */}
       <Avatar src={p.avatar} emoji={p.emoji}
         size={isWinner ? 60 : 48}
@@ -315,7 +336,7 @@ function PodiumColumn({ p, place, height, color, isWinner }) {
   )
 }
 
-function CategoryLeaderboard({ label, subtitle, metricLabel, metric, icon }) {
+function CategoryLeaderboard({ label, subtitle, metricLabel, metric, icon, openDetail }) {
   const ranked = useMemo(() => (
     RANKED_PLAYERS
       .slice()
@@ -349,12 +370,15 @@ function CategoryLeaderboard({ label, subtitle, metricLabel, metric, icon }) {
 
       <div className="card" style={{ padding: 0 }}>
         {ranked.map((p, i) => (
-          <div key={p.id} style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '8px 12px',
-            borderBottom: i < ranked.length - 1 ? '0.5px solid #1e1e2a' : 'none',
-            background: p.isYou ? `${GOLD}10` : 'transparent',
-          }}>
+          <div key={p.id}
+            onClick={() => openDetail({ character: p })}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '8px 12px',
+              borderBottom: i < ranked.length - 1 ? '0.5px solid #1e1e2a' : 'none',
+              background: p.isYou ? `${GOLD}10` : 'transparent',
+              cursor: 'pointer',
+            }}>
             <div style={{
               color: i === 0 ? GOLD : i === 1 ? SILVER : i === 2 ? BRONZE : DIM,
               fontSize: 12, fontWeight: 600, width: 18, textAlign: 'right',

@@ -138,6 +138,16 @@ export default function Cards() {
               </div>
               <div style={{ color: '#fff', fontSize: 20, fontWeight: 500 }}>{selectedCard.name}</div>
               <div style={{ color: RARITY_COLORS[selectedCard.rarity], fontSize: 13, textTransform: 'capitalize', marginTop: 4, marginBottom: 16 }}>{selectedCard.rarity}</div>
+              {selectedCard.bio && (
+                <div style={{
+                  background: '#13131f',
+                  border: `0.5px solid ${RARITY_COLORS[selectedCard.rarity]}44`,
+                  borderLeft: `3px solid ${RARITY_COLORS[selectedCard.rarity]}`,
+                  borderRadius: 10,
+                  padding: 12, marginBottom: 14, textAlign: 'left',
+                  color: '#bbb', fontSize: 12, lineHeight: 1.55, fontStyle: 'italic',
+                }}>{selectedCard.bio}</div>
+              )}
               <div style={{ background: '#c9a84c18', border: '0.5px solid #c9a84c44', borderRadius: 12, padding: '8px 16px', display: 'inline-block', marginBottom: 20 }}>
                 <span style={{ color: '#c9a84c', fontSize: 13, fontWeight: 500 }}>{selectedCard.special}</span>
               </div>
