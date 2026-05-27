@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { PLAYER, SKILLS, RANKED_PLAYERS, PVP_LEVEL_RANGE, PVP_FIGHT_COST, pvpRewardMultiplier } from '../data/gameData'
 import { sfx } from '../sounds'
+import { Avatar } from '../components/Avatar'
 import Battle from './Battle'
 
 const GOLD   = '#c9a84c'
@@ -202,12 +203,8 @@ function TargetCard({ opp, disabled, onFight }) {
       padding: 14, display: 'flex', alignItems: 'center', gap: 12,
       borderColor: '#2a2a3a',
     }}>
-      <div style={{
-        width: 52, height: 52, borderRadius: 12,
-        background: '#1e1e2a',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 26, flexShrink: 0,
-      }}>{opp.emoji}</div>
+      <Avatar src={opp.avatar} emoji={opp.emoji} size={52} radius={12}
+        style={{ background: '#1e1e2a' }} />
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ color: '#fff', fontSize: 14, fontWeight: 500 }}>{opp.name}</div>
@@ -403,7 +400,7 @@ function BattleDiceModal({ opponent, onClose, onRoll, onWin }) {
 
         {/* VS row: player | dice | opponent */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <FighterBlock name={PLAYER.name} emoji={PLAYER.card.emoji} level={PLAYER.level}
+          <FighterBlock name={PLAYER.name} emoji={PLAYER.card.emoji} avatar={PLAYER.card.avatar} level={PLAYER.level}
             attack={stats.playerBaseAttack} defense={stats.playerBaseDefense}
             hp={playerHp} maxHp={maxPlayerHp} color={BLUE} />
 
@@ -427,7 +424,7 @@ function BattleDiceModal({ opponent, onClose, onRoll, onWin }) {
             )}
           </div>
 
-          <FighterBlock name={opponent.name} emoji={opponent.emoji} level={opponent.level}
+          <FighterBlock name={opponent.name} emoji={opponent.emoji} avatar={opponent.avatar} level={opponent.level}
             attack={stats.oppBaseAttack} defense={stats.oppBaseDefense}
             hp={oppHp} maxHp={maxOppHp} color={RED} />
         </div>
@@ -525,13 +522,15 @@ function BattleDiceModal({ opponent, onClose, onRoll, onWin }) {
   )
 }
 
-function FighterBlock({ name, emoji, level, attack, defense, hp, maxHp, color }) {
+function FighterBlock({ name, emoji, avatar, level, attack, defense, hp, maxHp, color }) {
   const pct = maxHp > 0 ? Math.max(0, Math.min(100, (hp / maxHp) * 100)) : 0
   const hpColor = pct > 60 ? GREEN : pct > 25 ? ORANGE : RED
   const dead = hp <= 0
   return (
     <div style={{ flex: 1, minWidth: 0, textAlign: 'center', opacity: dead ? 0.45 : 1, transition: 'opacity 0.4s' }}>
-      <div style={{ fontSize: 36, filter: dead ? 'grayscale(1)' : 'none' }}>{emoji}</div>
+      <div style={{ display: 'flex', justifyContent: 'center', filter: dead ? 'grayscale(1)' : 'none' }}>
+        <Avatar src={avatar} emoji={emoji} size={56} radius={10} />
+      </div>
       <div style={{ color, fontSize: 11, fontWeight: 600, marginTop: 2,
         overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{name}</div>
       <div style={{ color: '#888', fontSize: 9, marginTop: 1 }}>Lv {level}</div>

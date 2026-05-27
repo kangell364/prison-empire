@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { RANKED_PLAYERS, HIT_LIST, streetRep, PLAYER } from '../data/gameData'
+import { Avatar } from '../components/Avatar'
 
 const GOLD   = '#c9a84c'
 const SILVER = '#b0b0b0'
@@ -136,13 +137,8 @@ function HitCard({ hit }) {
     }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         {/* Avatar */}
-        <div style={{
-          width: 56, height: 56, borderRadius: 14,
-          background: '#1e1e2a',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 30, flexShrink: 0,
-          border: `1px solid ${RED}44`,
-        }}>{t.emoji}</div>
+        <Avatar src={t.avatar} emoji={t.emoji} size={56} radius={14}
+          style={{ background: '#1e1e2a', border: `1px solid ${RED}44` }} />
 
         {/* Target info */}
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -220,7 +216,7 @@ function YardKingsView() {
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ color: GOLD, fontSize: 18 }}>{PLAYER.card.emoji}</div>
+            <Avatar src={PLAYER.card.avatar} emoji={PLAYER.card.emoji} size={28} radius={6} />
             <div>
               <div style={{ color: GOLD, fontSize: 12, fontWeight: 500 }}>You — {PLAYER.name}</div>
               <div style={{ color: DIM, fontSize: 10 }}>Street Rep: {streetRep(RANKED_PLAYERS.find(p => p.isYou)).toLocaleString()}</div>
@@ -282,11 +278,13 @@ function PodiumColumn({ p, place, height, color, isWinner }) {
       minWidth: 0, maxWidth: 110,
     }}>
       {/* Avatar */}
-      <div style={{
-        fontSize: isWinner ? 46 : 36,
-        filter: `drop-shadow(0 0 ${isWinner ? 12 : 6}px ${color}88)`,
-        marginBottom: 4,
-      }}>{p.emoji}</div>
+      <Avatar src={p.avatar} emoji={p.emoji}
+        size={isWinner ? 60 : 48}
+        radius={12}
+        style={{
+          filter: `drop-shadow(0 0 ${isWinner ? 12 : 6}px ${color}88)`,
+          marginBottom: 4,
+        }} />
 
       {/* Name + score */}
       <div style={{
@@ -362,7 +360,7 @@ function CategoryLeaderboard({ label, subtitle, metricLabel, metric, icon }) {
               fontSize: 12, fontWeight: 600, width: 18, textAlign: 'right',
               fontVariantNumeric: 'tabular-nums',
             }}>{i + 1}</div>
-            <div style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>{p.emoji}</div>
+            <Avatar src={p.avatar} emoji={p.emoji} size={28} radius={6} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
                 color: p.isYou ? GOLD : '#fff',

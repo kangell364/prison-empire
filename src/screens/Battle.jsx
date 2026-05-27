@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { BATTLE_ENEMIES, PLAYER } from '../data/gameData'
 import { sfx } from '../sounds'
+import { Avatar } from '../components/Avatar'
 
 const STAMINA_MAX = 100
 const STAMINA_COST = 5
@@ -218,7 +219,9 @@ function BattleModal({ enemy, state, rolledPower, log, onRetry, onReset }) {
             animation: `battleCardInLeft 0.4s ease forwards${state === 'fighting' ? ', cardClash 0.4s ease-in-out 0.4s infinite' : ''}`,
             ...playerSideStyle,
           }}>
-            <div style={{ fontSize: 52, marginBottom: 4 }}>{PLAYER.card.emoji}</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
+              <Avatar src={PLAYER.card.avatar} emoji={PLAYER.card.emoji} size={68} radius={10} />
+            </div>
             <div style={{ color: '#c9a84c', fontSize: 12, fontWeight: 500 }}>{PLAYER.name}</div>
             <div style={{ color: '#888', fontSize: 11, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>
               Power: <CountUp to={rolledPower.player} duration={900} start={state !== null} />
@@ -250,7 +253,9 @@ function BattleModal({ enemy, state, rolledPower, log, onRetry, onReset }) {
             animation: `battleCardInRight 0.4s ease forwards${state === 'fighting' ? ', cardClash 0.4s ease-in-out 0.4s infinite reverse' : ''}`,
             ...enemySideStyle,
           }}>
-            <div style={{ fontSize: 52, marginBottom: 4 }}>{enemy.emoji}</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
+              <Avatar src={enemy.avatar} emoji={enemy.emoji} size={68} radius={10} />
+            </div>
             <div style={{ color: '#e74c3c', fontSize: 12, fontWeight: 500 }}>{enemy.name}</div>
             <div style={{ color: '#888', fontSize: 11, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>
               Power: <CountUp to={rolledPower.enemy} duration={900} start={state !== null} />

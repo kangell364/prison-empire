@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { CARDS_COLLECTION, RARITY_COLORS } from '../data/gameData'
 import { sfx } from '../sounds'
+import { Avatar } from '../components/Avatar'
 
 const RARITY_TIER = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 }
 const PACK_OPEN_DURATION_MS = 1600  // total time of shake → charge → burst
@@ -90,8 +91,13 @@ export default function Cards() {
               {/* Rarity top bar */}
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: RARITY_COLORS[card.rarity] }} />
 
-              {/* Card emoji */}
-              <div style={{ fontSize: 40, textAlign: 'center', margin: '8px 0' }}>{card.owned ? card.emoji : '🔒'}</div>
+              {/* Card art */}
+              <div style={{ display: 'flex', justifyContent: 'center', margin: '8px 0' }}>
+                {card.owned
+                  ? <Avatar src={card.avatar} emoji={card.emoji} size={56} radius={8} />
+                  : <Avatar emoji="🔒" size={48} radius={8} />
+                }
+              </div>
 
               {/* Name */}
               <div style={{ color: card.owned ? '#fff' : '#555', fontSize: 12, fontWeight: 500, textAlign: 'center', marginBottom: 4 }}>{card.name}</div>
@@ -127,7 +133,9 @@ export default function Cards() {
             <div style={{ width: 40, height: 4, background: '#2a2a3a', borderRadius: 2, margin: '0 auto 20px' }} />
             <div style={{ textAlign: 'center' }}>
               <div style={{ height: 3, background: RARITY_COLORS[selectedCard.rarity], borderRadius: 2, marginBottom: 20 }} />
-              <div style={{ fontSize: 64, marginBottom: 8 }}>{selectedCard.emoji}</div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                <Avatar src={selectedCard.avatar} emoji={selectedCard.emoji} size={96} radius={12} />
+              </div>
               <div style={{ color: '#fff', fontSize: 20, fontWeight: 500 }}>{selectedCard.name}</div>
               <div style={{ color: RARITY_COLORS[selectedCard.rarity], fontSize: 13, textTransform: 'capitalize', marginTop: 4, marginBottom: 16 }}>{selectedCard.rarity}</div>
               <div style={{ background: '#c9a84c18', border: '0.5px solid #c9a84c44', borderRadius: 12, padding: '8px 16px', display: 'inline-block', marginBottom: 20 }}>
@@ -282,14 +290,16 @@ function RevealedCard({ card, rarityColor, onAccept }) {
         )
       })}
 
-      {/* Card emoji — bounces in */}
+      {/* Card art — bounces in */}
       <div style={{
-        fontSize: 84,
         marginTop: 16,
         marginBottom: 8,
         animation: 'cardRevealBounce 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
         filter: `drop-shadow(0 0 14px ${rarityColor})`,
-      }}>{card.emoji}</div>
+        display: 'flex', justifyContent: 'center',
+      }}>
+        <Avatar src={card.avatar} emoji={card.emoji} size={120} radius={14} />
+      </div>
 
       {/* Rarity bar */}
       <div style={{

@@ -119,12 +119,12 @@ export const LEADERBOARD = [
   { rank: 1, name: 'IronMike_TX',   emoji: '👑', facility: 'Supermax',     state: 'Texas', power: 892, isYou: false },
   { rank: 2, name: 'YardBoss99',    emoji: '🔥', facility: 'Federal Penn', state: 'Texas', power: 541, isYou: false },
   { rank: 3, name: 'TexasCartel',   emoji: '💎', facility: 'Federal Penn', state: 'Texas', power: 398, isYou: false },
-  { rank: 4, name: 'SlickRico',     emoji: '🤵', facility: 'Federal Penn', state: 'Texas', power: 284, isYou: true  },
+  { rank: 4, name: 'SlickRico',     emoji: '🤵', avatar: '/slickrico.jpg', facility: 'Federal Penn', state: 'Texas', power: 284, isYou: true  },
   { rank: 5, name: 'HoustonKing',   emoji: '🏙️', facility: 'State Prison', state: 'Texas', power: 201, isYou: false },
 ]
 
 export const CARDS_COLLECTION = [
-  { id: 1,  name: 'Slick Rico',      emoji: '🤵', rarity: 'epic',      hustle: 15, muscle: 6,  smarts: 14, cred: 12, owned: true,  special: 'Con Artist'     },
+  { id: 1,  name: 'Slick Rico',      emoji: '🤵', avatar: '/slickrico.jpg', rarity: 'epic',      hustle: 15, muscle: 6,  smarts: 14, cred: 12, owned: true,  special: 'Con Artist'     },
   { id: 2,  name: 'Big T',           emoji: '💪', rarity: 'rare',      hustle: 4,  muscle: 18, smarts: 3,  cred: 9,  owned: true,  special: 'Intimidation'   },
   { id: 3,  name: 'The Professor',   emoji: '🧠', rarity: 'uncommon',  hustle: 6,  muscle: 2,  smarts: 15, cred: 3,  owned: true,  special: 'Legal Eagle'    },
   { id: 4,  name: 'OG Marcus',       emoji: '👴', rarity: 'uncommon',  hustle: 5,  muscle: 7,  smarts: 8,  cred: 12, owned: true,  special: 'Respect'        },
@@ -363,7 +363,7 @@ export const RANKED_PLAYERS = [
   { id: 'p12', name: 'VegasViper',       emoji: '🐍',  facility: 'Federal Penn', state: 'NV', level: 59, power: 405, wins: 188, losses: 67,  kos: 29, defeats: 11, jobs: 340  },
   { id: 'p13', name: 'LaCoyote',         emoji: '🌵',  facility: 'Federal Penn', state: 'CA', level: 64, power: 487, wins: 220, losses: 89,  kos: 18, defeats: 14, jobs: 410  },
   // You
-  { id: 'p_you', name: 'SlickRico',      emoji: '🤵',  facility: 'Federal Penn', state: 'TX', level: 42, power: 284, wins: 47,  losses: 12,  kos: 6,  defeats: 2,  jobs: 320,  isYou: true },
+  { id: 'p_you', name: 'SlickRico',      emoji: '🤵',  avatar: '/slickrico.jpg', facility: 'Federal Penn', state: 'TX', level: 42, power: 284, wins: 47,  losses: 12,  kos: 6,  defeats: 2,  jobs: 320,  isYou: true },
   // Wall of shame — tank the loss-/defeat-leaders
   { id: 'p14', name: '4ShitsAndGiggles', emoji: '😅',  facility: 'County Jail',  state: 'KY', level: 8,  power: 24,  wins: 3,   losses: 294, kos: 0,  defeats: 1,  jobs: 28   },
   { id: 'p15', name: 'Bowser',           emoji: '🐢',  facility: 'County Jail',  state: 'OH', level: 14, power: 48,  wins: 12,  losses: 157, kos: 1,  defeats: 5,  jobs: 88   },

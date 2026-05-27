@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { PLAYER, RESOURCES, CITY, INCOMING_ATTACK, CREW, LEADERBOARD, RARITY_COLORS } from '../data/gameData'
 import { CountdownRing } from '../components/CountdownRing'
+import { Avatar } from '../components/Avatar'
 import { sfx } from '../sounds'
 
 export default function Dashboard({ onNavigate }) {
@@ -250,7 +251,8 @@ export default function Dashboard({ onNavigate }) {
               borderColor: p.isYou ? '#c9a84c44' : '#2a2a3a',
             }}>
               <div style={{ color: p.rank === 1 ? '#c9a84c' : p.rank === 2 ? '#888' : p.rank === 3 ? '#8b6914' : '#555', fontSize: 14, fontWeight: 500, width: 20 }}>{p.rank}</div>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: '#1e1e2a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>{p.emoji}</div>
+              <Avatar src={p.avatar} emoji={p.emoji} size={36} radius={10}
+                style={{ background: '#1e1e2a' }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: p.isYou ? '#c9a84c' : '#fff', fontSize: 13, fontWeight: 500 }}>{p.name}{p.isYou ? ' (You)' : ''}</div>
                 <div style={{ color: '#555', fontSize: 10 }}>{p.facility} — {p.state}</div>
