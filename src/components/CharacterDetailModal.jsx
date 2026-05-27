@@ -178,33 +178,45 @@ export function CharacterDetailModal({ character: c, onClose, actions = [] }) {
         {c.wins != null && c.losses != null && (
           <div style={{ padding: '16px 18px 0' }}>
             <SectionLabel>Combat Record</SectionLabel>
+            {/* Combat — Attack/Defense/Power derive from base power using the
+                same formula as Battle Dice so what you see here matches the
+                numbers under the fighter blocks once the fight starts. */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
+              <StatTile icon="ti-sword"   label="Attack"  value={attackOf(c)}  color={RED}   small />
+              <StatTile icon="ti-shield"  label="Defense" value={defenseOf(c)} color={BLUE}  small />
+              <StatTile icon="ti-bolt"    label="Power"   value={(c.power ?? 0).toLocaleString()} color={GOLD} small />
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-              <StatTile icon="ti-trophy" label="Wins"   value={c.wins.toLocaleString()}   color={GOLD} small />
-              <StatTile icon="ti-x"      label="Losses" value={c.losses.toLocaleString()} color={RED} small />
+              <StatTile icon="ti-trophy" label="Wins"   value={c.wins.toLocaleString()}   color={GOLD}     small />
+              <StatTile icon="ti-x"      label="Losses" value={c.losses.toLocaleString()} color={RED}      small />
               <StatTile icon="ti-skull"  label="KOs"    value={(c.kos ?? 0).toLocaleString()} color="#f0d080" small />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
               <StatTile icon="ti-bus"       label="Defeats" value={(c.defeats ?? 0).toLocaleString()} color="#e0824f" small />
-              <StatTile icon="ti-briefcase" label="Jobs"    value={(c.jobs ?? 0).toLocaleString()}    color={BLUE} small />
-              <StatTile icon="ti-bolt"      label="Power"   value={(c.power ?? 0).toLocaleString()}   color={GOLD} small />
+              <StatTile icon="ti-briefcase" label="Jobs"    value={(c.jobs ?? 0).toLocaleString()}    color={BLUE}    small />
             </div>
           </div>
         )}
 
-        {/* Enemy power + rewards */}
+        {/* Enemy power + rewards (bosses + area enemies) */}
         {c.reward_xp != null && (
           <div style={{ padding: '16px 18px 0' }}>
             <SectionLabel>Threat & Reward</SectionLabel>
+            {/* Threat: attack/defense/power side-by-side */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+              <StatTile icon="ti-sword"  label="Attack"  value={attackOf(c)}  color={RED}  small />
+              <StatTile icon="ti-shield" label="Defense" value={defenseOf(c)} color={BLUE} small />
+              <StatTile icon="ti-bolt"   label="Power"   value={c.power}      color={GOLD} small />
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <StatTile icon="ti-bolt"  label="Power"     value={c.power} color={RED} />
-              <StatTile icon="ti-flame" label="XP Reward" value={`+${c.reward_xp}`} color={GOLD} />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+              <StatTile icon="ti-flame" label="XP Reward"     value={`+${c.reward_xp}`}     color={GOLD} />
               <StatTile icon="ti-coin"  label="Hustle Reward" value={`+${c.reward_hustle}`} color={GOLD} />
-              {c.boss_reward_card && (
-                <StatTile icon="ti-cards" label="Bonus" value="Card drop" color={PURP} />
-              )}
             </div>
+            {c.boss_reward_card && (
+              <div style={{ marginTop: 8 }}>
+                <StatTile icon="ti-cards" label="Bonus on Win" value="Card drop" color={PURP} />
+              </div>
+            )}
           </div>
         )}
 
@@ -278,4 +290,19 @@ export { Avatar }
 
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
+}
+
+// Derives attack/defense from a character. Matches the formula used in
+// BattleDiceModal so the numbers in the detail card match what the player
+// sees once a fight starts. Falls back to muscle/cred when available
+// (e.g. the player's own card).
+function attackOf(c) {
+  if (c.muscle != null) return (c.muscle * 5 + 15).toLocaleString()
+  if (c.power  != null) return (Math.floor(c.power * 0.55) + 10).toLocaleString()
+  return '—'
+}
+function defenseOf(c) {
+  if (c.cred  != null) return (c.cred * 5 + 10).toLocaleString()
+  if (c.power != null) return (Math.floor(c.power * 0.45) + 15).toLocaleString()
+  return '—'
 }
