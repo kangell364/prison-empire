@@ -385,20 +385,16 @@ function BattleDiceModal({ opponent, onClose, onRoll, onWin }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
-      background: 'rgba(0,0,0,0.94)',
-      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      background: '#13131f',
+      display: 'flex',
+      alignItems: 'stretch',
+      justifyContent: 'center',
       zIndex: 200,
     }}>
       <div style={{
-        background: '#13131f',
-        borderRadius: '24px 24px 0 0',
         padding: '20px 16px 100px',
         width: '100%',
         maxWidth: 390,
-        // Fill (almost) the whole viewport — no dim band between the dimmed
-        // background and the sheet — and leave clearance for the bottom nav.
-        minHeight: '85vh',
-        maxHeight: '92vh',
         overflowY: 'auto',
         display: 'flex',
         flexDirection: 'column',

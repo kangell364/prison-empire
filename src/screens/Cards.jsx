@@ -176,8 +176,10 @@ function PackOpenModal({ state, card, onOpen, onCancel, onAccept }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
-      background: 'rgba(0,0,0,0.95)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: '#0a0a0f',
+      display: 'flex',
+      alignItems: 'stretch',      // sheet fills full viewport vertically
+      justifyContent: 'center',   // centered horizontally
       zIndex: 300,
       // Drive --rarity for all keyframes inside.
       '--rarity': rarityColor,
@@ -192,18 +194,15 @@ function PackOpenModal({ state, card, onOpen, onCancel, onAccept }) {
         }} />
       )}
 
-      {/* Sheet fills almost the entire viewport so there's no dim gap above
-          the content — same treatment as the Battle Dice modal. */}
+      {/* Sheet stretches to full viewport. Content sits near the top so
+          there's no dim band above the reveal. */}
       <div style={{
-        textAlign: 'center', padding: '40px 24px 100px',
+        textAlign: 'center', padding: '60px 24px 100px',
         width: '100%', maxWidth: 390,
-        minHeight: '85vh',
         position: 'relative',
-        background: '#0a0a0f',
-        borderRadius: 24,
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
       }}>
         {state === 'idle' && (
           <>
