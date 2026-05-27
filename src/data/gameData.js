@@ -10,6 +10,25 @@ export const PLAYER = {
   rank: 4,
   facility: 'Federal Penn',
   state: 'Texas',
+  archetype: 'Con Artist',          // Cat-Champions "breed" equivalent
+  primaryTrait: 'hustle',           // auto-levels each new level-up
+  traitPoints: 3,                   // unspent points (decoupled from level for v1)
+  // Trait values — the upgradable Stats. Card stats give the starting baseline;
+  // additional points from level-ups and upgrades stack on top.
+  traits: {
+    hustle:    15,
+    toughness: 75,
+    smarts:    14,
+    muscle:    6,
+    cred:      12,
+  },
+  // Current resource pools (current / max). Max is derived from traits in the
+  // Profile screen (e.g., healthMax = toughness × 25).
+  pools: {
+    health:    1484,
+    stamina:   78,
+    knowledge: 0,
+  },
   card: {
     id: 'slick_rico',
     name: 'Slick Rico',
@@ -24,6 +43,32 @@ export const PLAYER = {
     specialDesc: '+20% attack bonus on missions',
   }
 }
+
+// Trait definitions — keyed by trait id. `perPoint` describes what one point
+// of investment yields. `pool` says which pool's max is derived from this trait
+// (null = no pool, just used in combat formulas).
+export const TRAITS = [
+  { id: 'hustle',    label: 'Hustle',    icon: 'ti-flame',    color: '#c9a84c',
+    perPoint: 2,  poolMax: 'stamina',
+    description: 'Each Hustle point increases max Stamina by 2.',
+    detail: 'More stamina lets you push more missions and brawls before resting.' },
+  { id: 'toughness', label: 'Toughness', icon: 'ti-heart',    color: '#e74c3c',
+    perPoint: 25, poolMax: 'health',
+    description: 'Each Toughness point increases max Health by 25.',
+    detail: 'Higher toughness means you absorb beatings without going down.' },
+  { id: 'smarts',    label: 'Smarts',    icon: 'ti-brain',    color: '#4a9eff',
+    perPoint: 5,  poolMax: 'knowledge',
+    description: 'Each Smarts point increases max Knowledge by 5.',
+    detail: 'Knowledge unlocks better skills, schemes, and yard influence.' },
+  { id: 'muscle',    label: 'Muscle',    icon: 'ti-barbell',  color: '#f0d080',
+    perPoint: 10, poolMax: null,
+    description: 'Each Muscle point increases attack damage by 10.',
+    detail: 'Muscle cuts through enemy defense — harder than gear-based bonuses.' },
+  { id: 'cred',      label: 'Cred',      icon: 'ti-star',     color: '#a855f7',
+    perPoint: 10, poolMax: null,
+    description: 'Each Cred point increases defense by 10.',
+    detail: 'Street credibility makes enemies think twice — soaks defense-piercing hits.' },
+]
 
 export const RESOURCES = {
   hustle: { value: 7420, max: 10000, color: '#c9a84c', icon: 'ti-flame' },
