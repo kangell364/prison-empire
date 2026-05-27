@@ -6,7 +6,6 @@ const GOLD = '#c9a84c'
 const RED  = '#e74c3c'
 const BLUE = '#4a9eff'
 const PURP = '#a855f7'
-const DIM  = '#666'
 
 // Universal detail card for any character — works for cards in the
 // collection, ranked players, PvP targets, hit list marks, leaderboard
