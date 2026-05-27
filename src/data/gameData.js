@@ -291,3 +291,44 @@ export const RARITY_COLORS = {
 }
 
 export const FACILITY_ORDER = ['County Jail', 'State Prison', 'Federal Penn', 'Supermax']
+
+// Ranked players (Yard Kings + Hit List). Stats drive the Street Rep formula:
+//   ((Takedowns − Defeats × 10) × 100) + ((Wins − Losses × 5) × 5) + Jobs
+export const RANKED_PLAYERS = [
+  // Tier 1 — top of overall Street Rep
+  { id: 'p1',  name: 'IronMike_TX',      emoji: '👑',  facility: 'Supermax',     state: 'TX', level: 88, power: 892, wins: 312, losses: 8,   kos: 47, defeats: 2,  jobs: 1840 },
+  { id: 'p2',  name: 'CarolinaCrown',    emoji: '🦅',  facility: 'Federal Penn', state: 'NC', level: 66, power: 488, wins: 142, losses: 9,   kos: 28, defeats: 1,  jobs: 1620 },
+  { id: 'p3',  name: 'MiamiPapi',        emoji: '🌴',  facility: 'Federal Penn', state: 'FL', level: 71, power: 521, wins: 218, losses: 12,  kos: 22, defeats: 1,  jobs: 1340 },
+  { id: 'p4',  name: 'YardBoss99',       emoji: '🔥',  facility: 'Federal Penn', state: 'TX', level: 67, power: 541, wins: 198, losses: 17,  kos: 31, defeats: 2,  jobs: 1102 },
+  { id: 'p5',  name: 'ChiTownChino',     emoji: '🌃',  facility: 'Federal Penn', state: 'IL', level: 72, power: 612, wins: 145, losses: 26,  kos: 56, defeats: 4,  jobs: 720  },
+  { id: 'p6',  name: 'BayouBoss',        emoji: '🐊',  facility: 'State Prison', state: 'LA', level: 56, power: 350, wins: 102, losses: 11,  kos: 18, defeats: 1,  jobs: 1180 },
+  { id: 'p7',  name: 'MileHighMack',     emoji: '🏔️', facility: 'Federal Penn', state: 'CO', level: 60, power: 425, wins: 88,  losses: 8,   kos: 15, defeats: 1,  jobs: 1410 },
+  { id: 'p8',  name: 'PeachKingpin',     emoji: '🍑',  facility: 'Federal Penn', state: 'GA', level: 63, power: 470, wins: 134, losses: 14,  kos: 41, defeats: 3,  jobs: 580  },
+  { id: 'p9',  name: 'EastSideKings',    emoji: '🗽',  facility: 'Federal Penn', state: 'NY', level: 70, power: 580, wins: 167, losses: 22,  kos: 24, defeats: 2,  jobs: 920  },
+  { id: 'p10', name: 'TexasCartel',      emoji: '💎',  facility: 'Federal Penn', state: 'TX', level: 61, power: 398, wins: 174, losses: 19,  kos: 22, defeats: 2,  jobs: 980  },
+  { id: 'p11', name: 'HoustonKing',      emoji: '🏙️', facility: 'State Prison', state: 'TX', level: 47, power: 201, wins: 64,  losses: 12,  kos: 11, defeats: 1,  jobs: 1245 },
+  { id: 'p12', name: 'VegasViper',       emoji: '🐍',  facility: 'Federal Penn', state: 'NV', level: 59, power: 405, wins: 188, losses: 67,  kos: 29, defeats: 11, jobs: 340  },
+  { id: 'p13', name: 'LaCoyote',         emoji: '🌵',  facility: 'Federal Penn', state: 'CA', level: 64, power: 487, wins: 220, losses: 89,  kos: 18, defeats: 14, jobs: 410  },
+  // You
+  { id: 'p_you', name: 'SlickRico',      emoji: '🤵',  facility: 'Federal Penn', state: 'TX', level: 42, power: 284, wins: 47,  losses: 12,  kos: 6,  defeats: 2,  jobs: 320,  isYou: true },
+  // Wall of shame — tank the loss-/defeat-leaders
+  { id: 'p14', name: '4ShitsAndGiggles', emoji: '😅',  facility: 'County Jail',  state: 'KY', level: 8,  power: 24,  wins: 3,   losses: 294, kos: 0,  defeats: 1,  jobs: 28   },
+  { id: 'p15', name: 'Bowser',           emoji: '🐢',  facility: 'County Jail',  state: 'OH', level: 14, power: 48,  wins: 12,  losses: 157, kos: 1,  defeats: 5,  jobs: 88   },
+  { id: 'p16', name: 'BurntToast',       emoji: '🍞',  facility: 'County Jail',  state: 'OR', level: 6,  power: 18,  wins: 1,   losses: 89,  kos: 0,  defeats: 8,  jobs: 12   },
+  { id: 'p17', name: 'Catcall77',        emoji: '🐱',  facility: 'County Jail',  state: 'WV', level: 22, power: 78,  wins: 24,  losses: 56,  kos: 2,  defeats: 21, jobs: 110  },
+  { id: 'p18', name: 'MrMeowgi',         emoji: '😼',  facility: 'County Jail',  state: 'AZ', level: 11, power: 35,  wins: 8,   losses: 67,  kos: 0,  defeats: 4,  jobs: 56   },
+  { id: 'p19', name: 'FreshFishFred',    emoji: '😰',  facility: 'County Jail',  state: 'IN', level: 4,  power: 14,  wins: 0,   losses: 47,  kos: 0,  defeats: 12, jobs: 8    },
+]
+
+export function streetRep(p) {
+  return ((p.kos - p.defeats * 10) * 100) + ((p.wins - p.losses * 5) * 5) + p.jobs
+}
+
+// Active Hit List — community-funded bounties. Targets reference RANKED_PLAYERS.id.
+export const HIT_LIST = [
+  { id: 1, targetId: 'p4',  bountyHustle: 2_400_000, contributors: 12, openedDaysAgo: 3, openedHoursAgo: 4  },
+  { id: 2, targetId: 'p13', bountyHustle: 1_850_000, contributors: 9,  openedDaysAgo: 6, openedHoursAgo: 2  },
+  { id: 3, targetId: 'p9',  bountyHustle:   890_000, contributors: 5,  openedDaysAgo: 1, openedHoursAgo: 11 },
+  { id: 4, targetId: 'p8',  bountyHustle:   670_000, contributors: 4,  openedDaysAgo: 2, openedHoursAgo: 0  },
+  { id: 5, targetId: 'p12', bountyHustle:   145_000, contributors: 2,  openedDaysAgo: 0, openedHoursAgo: 8  },
+]

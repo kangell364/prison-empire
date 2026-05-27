@@ -4,6 +4,7 @@ import Dashboard from './screens/Dashboard'
 import Cards from './screens/Cards'
 import Battle from './screens/Battle'
 import MapScreen from './screens/MapScreen'
+import Yard from './screens/Yard'
 import { isMuted, setMuted, subscribeMuted } from './sounds'
 
 const NAV_ITEMS = [
@@ -11,6 +12,7 @@ const NAV_ITEMS = [
   { id: 'map',    icon: 'ti-map',     label: 'Map'    },
   { id: 'battle', icon: 'ti-sword',   label: 'Fight'  },
   { id: 'cards',  icon: 'ti-cards',   label: 'Cards'  },
+  { id: 'yard',   icon: 'ti-trophy',  label: 'Yard'   },
   { id: 'profile',icon: 'ti-user',    label: 'Profile'},
 ]
 
@@ -28,6 +30,7 @@ export default function App() {
       case 'map':     return <MapScreen />
       case 'battle':  return <Battle />
       case 'cards':   return <Cards />
+      case 'yard':    return <Yard />
       case 'profile': return <Profile />
       default:        return <Dashboard onNavigate={setScreen} />
     }
