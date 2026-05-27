@@ -40,6 +40,7 @@ export const PLAYER = {
     id: 'slick_rico',
     name: 'Slick Rico',
     emoji: '🤵',
+    avatar: '/slickrico.jpg',      // optional artwork — falls back to emoji when missing
     rarity: 'epic',
     rarityColor: '#a855f7',
     hustle: 15,

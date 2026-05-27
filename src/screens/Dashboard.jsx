@@ -71,13 +71,24 @@ export default function Dashboard({ onNavigate }) {
             borderRadius: 10,
             border: `1px solid ${RARITY_COLORS[PLAYER.card.rarity]}44`,
             display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
+            alignItems: 'center', justifyContent: 'flex-end',
             flexShrink: 0, position: 'relative', overflow: 'hidden'
           }}>
+            {PLAYER.card.avatar ? (
+              <img src={PLAYER.card.avatar} alt={PLAYER.card.name}
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <div style={{ fontSize: 30, marginBottom: 4 }}>{PLAYER.card.emoji}</div>
+            )}
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: RARITY_COLORS[PLAYER.card.rarity] }} />
-            <div style={{ fontSize: 30, marginBottom: 4 }}>{PLAYER.card.emoji}</div>
-            <div style={{ color: RARITY_COLORS[PLAYER.card.rarity], fontSize: 8, fontWeight: 600, letterSpacing: 0.5, textAlign: 'center', padding: '0 4px' }}>{PLAYER.card.name.toUpperCase()}</div>
-            <div style={{ color: '#555', fontSize: 8, marginTop: 2 }}>LVL {PLAYER.level}</div>
+            <div style={{
+              position: 'relative', zIndex: 1, width: '100%',
+              background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.85) 60%)',
+              padding: '12px 4px 3px',
+            }}>
+              <div style={{ color: RARITY_COLORS[PLAYER.card.rarity], fontSize: 8, fontWeight: 700, letterSpacing: 0.5, textAlign: 'center' }}>{PLAYER.card.name.toUpperCase()}</div>
+              <div style={{ color: '#bbb', fontSize: 8, marginTop: 1, textAlign: 'center' }}>LVL {PLAYER.level}</div>
+            </div>
           </div>
 
           {/* Player Info */}
