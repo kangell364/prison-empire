@@ -274,14 +274,23 @@ function BattleDiceModal({ opponent, onClose, onRoll, onWin }) {
     return { playerBaseAttack, playerBaseDefense, oppBaseAttack, oppBaseDefense }
   }, [opponent])
 
-  const playerHealth = PLAYER.traits.toughness * 25
-  const oppHealth    = Math.floor(opponent.power * 6 + 800)
+  // HP tracked as state — every dice roll is one round, HP decrements until
+  // someone hits 0. Roll Again after resolution resets to full HP.
+  const maxPlayerHp = PLAYER.traits.toughness * 25
+  const maxOppHp    = Math.floor(opponent.power * 6 + 800)
+  const [playerHp, setPlayerHp] = useState(maxPlayerHp)
+  const [oppHp, setOppHp]       = useState(maxOppHp)
 
   const roll = () => {
     if (phase === 'rolling') return
+    // If the fight already ended, start a fresh fight with full HP
+    if (phase === 'resolved') {
+      setPlayerHp(maxPlayerHp)
+      setOppHp(maxOppHp)
+      setLog([])
+      setOutcome(null)
+    }
     setPhase('rolling')
-    setLog([])
-    setOutcome(null)
     onRoll()
     sfx.tick()
 
@@ -328,36 +337,49 @@ function BattleDiceModal({ opponent, onClose, onRoll, onWin }) {
     const youDealt = Math.max(0, playerAttack - oppDefense)
     const oppDealt = Math.max(0, oppAttack - playerDefense)
 
-    const newLog = []
-    if (skillFires) {
-      newLog.push({ side: 'you', text: `You use ${skillDef.shortName}! +${skillBonus} attack`, color: GOLD })
-    } else {
-      newLog.push({ side: 'you', text: `You don't use a skill (slot ${slot} empty)`, color: '#888' })
-    }
-    newLog.push({ side: 'opp', text: `${opponent.name} doesn't use a skill`, color: '#888' })
-    newLog.push({ side: 'you', text: `You deal ${youDealt} damage to ${opponent.name}`, color: BLUE })
-    newLog.push({ side: 'opp', text: `${opponent.name} deals ${oppDealt} damage to you`, color: RED })
+    // Apply damage to both sides — fight continues until one (or both) hits 0.
+    const newOppHp    = Math.max(0, oppHp - youDealt)
+    const newPlayerHp = Math.max(0, playerHp - oppDealt)
+    setOppHp(newOppHp)
+    setPlayerHp(newPlayerHp)
 
-    let result
-    if (youDealt > oppDealt) {
-      result = 'win'
+    const roundLog = []
+    roundLog.push({ side: 'round', text: `— Round (slot ${slot}) —`, color: '#666' })
+    if (skillFires) {
+      roundLog.push({ side: 'you', text: `You use ${skillDef.shortName}! +${skillBonus} attack`, color: GOLD })
+    } else {
+      roundLog.push({ side: 'you', text: `You don't use a skill (slot ${slot} empty)`, color: '#888' })
+    }
+    roundLog.push({ side: 'opp', text: `${opponent.name} doesn't use a skill`, color: '#888' })
+    roundLog.push({ side: 'you', text: `You hit ${opponent.name} for ${youDealt} (HP ${newOppHp.toLocaleString()})`, color: BLUE })
+    roundLog.push({ side: 'opp', text: `${opponent.name} hits you for ${oppDealt} (HP ${newPlayerHp.toLocaleString()})`, color: RED })
+
+    // Determine outcome — based on HP after damage applied
+    let result = null
+    if (newOppHp <= 0 && newPlayerHp <= 0) result = 'draw'
+    else if (newOppHp <= 0)                result = 'win'
+    else if (newPlayerHp <= 0)             result = 'lose'
+
+    if (result === 'win') {
       const mult = pvpRewardMultiplier(PLAYER.level, opponent.level)
-      newLog.push({ side: 'result', text: `Victory! +${50*mult} XP · +${(100*mult).toLocaleString()} Hustle · +${mult} skill token`, color: GREEN })
+      roundLog.push({ side: 'result', text: `★ Victory! +${50*mult} XP · +${(100*mult).toLocaleString()} Hustle · +${mult} skill token`, color: GREEN })
       sfx.win()
       onWin(opponent)
-    } else if (oppDealt > youDealt) {
-      result = 'lose'
-      newLog.push({ side: 'result', text: `${opponent.name} defeats you.`, color: RED })
+    } else if (result === 'lose') {
+      roundLog.push({ side: 'result', text: `${opponent.name} defeats you.`, color: RED })
       sfx.lose()
+    } else if (result === 'draw') {
+      roundLog.push({ side: 'result', text: `Mutual KO — both fighters down.`, color: '#888' })
+      sfx.tick()
     } else {
-      result = 'draw'
-      newLog.push({ side: 'result', text: `The fight ends in a draw.`, color: '#888' })
+      // Fight continues — small tick, re-enable rolling
       sfx.tick()
     }
 
-    setLog(newLog)
+    // Append to log so the full fight history is visible
+    setLog(prev => [...prev, ...roundLog])
     setOutcome(result)
-    setPhase('resolved')
+    setPhase(result ? 'resolved' : 'idle')
   }
 
   return (
@@ -370,18 +392,24 @@ function BattleDiceModal({ opponent, onClose, onRoll, onWin }) {
       <div style={{
         background: '#13131f',
         borderRadius: '24px 24px 0 0',
-        padding: '20px 16px 16px',
+        padding: '20px 16px 100px',
         width: '100%',
         maxWidth: 390,
+        // Fill (almost) the whole viewport — no dim band between the dimmed
+        // background and the sheet — and leave clearance for the bottom nav.
+        minHeight: '85vh',
         maxHeight: '92vh',
         overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
       }}>
         <div style={{ width: 40, height: 4, background: '#2a2a3a', borderRadius: 2, margin: '0 auto 16px' }} />
 
         {/* VS row: player | dice | opponent */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <FighterBlock side="you" name={PLAYER.name} emoji={PLAYER.card.emoji} level={PLAYER.level}
-            attack={stats.playerBaseAttack} defense={stats.playerBaseDefense} health={playerHealth} color={BLUE} />
+          <FighterBlock name={PLAYER.name} emoji={PLAYER.card.emoji} level={PLAYER.level}
+            attack={stats.playerBaseAttack} defense={stats.playerBaseDefense}
+            hp={playerHp} maxHp={maxPlayerHp} color={BLUE} />
 
           {/* Dice block */}
           <div style={{
@@ -403,8 +431,9 @@ function BattleDiceModal({ opponent, onClose, onRoll, onWin }) {
             )}
           </div>
 
-          <FighterBlock side="opp" name={opponent.name} emoji={opponent.emoji} level={opponent.level}
-            attack={stats.oppBaseAttack} defense={stats.oppBaseDefense} health={oppHealth} color={RED} />
+          <FighterBlock name={opponent.name} emoji={opponent.emoji} level={opponent.level}
+            attack={stats.oppBaseAttack} defense={stats.oppBaseDefense}
+            hp={oppHp} maxHp={maxOppHp} color={RED} />
         </div>
 
         {/* Skill slots (player on left, opponent mirrored on right) */}
@@ -413,50 +442,54 @@ function BattleDiceModal({ opponent, onClose, onRoll, onWin }) {
           <SlotGrid side="opp" equipped={{}} learned={{}} highlight={highlight} color={ORANGE} />
         </div>
 
-        {/* Combat log */}
-        <div style={{
-          background: '#0d0d15', borderRadius: 12, padding: 12,
-          minHeight: 90, marginTop: 14,
-        }}>
-          {log.length === 0 && phase === 'idle' && (
-            <div style={{ color: '#666', fontSize: 11, textAlign: 'center', paddingTop: 18 }}>
-              Roll the dice to begin.
-            </div>
-          )}
-          {log.length === 0 && phase === 'rolling' && (
-            <div style={{ color: '#888', fontSize: 12, textAlign: 'center', paddingTop: 18, animation: 'pulse 0.8s infinite' }}>
-              Rolling…
-            </div>
-          )}
-          {log.map((line, i) => (
-            <div key={i} style={{
-              color: line.color, fontSize: 12, marginBottom: 4,
-              opacity: 0, animation: `logLineIn 0.3s ease ${i * 0.12}s forwards`,
-              fontWeight: line.side === 'result' ? 700 : 400,
-            }}>{line.text}</div>
-          ))}
-        </div>
-
-        {/* Action area */}
-        {phase !== 'resolved' ? (
+        {/* Primary action — gold call-to-action right under the dice/skills so
+            the player can't miss it. The combat log appears below once a roll
+            resolves. */}
+        {phase !== 'resolved' && (
           <button
             onClick={roll}
             disabled={phase === 'rolling'}
             style={{
-              marginTop: 14, width: '100%',
+              marginTop: 16, width: '100%',
               background: phase === 'rolling' ? '#1e1e2a' : GOLD,
               color: phase === 'rolling' ? '#555' : '#0a0a0f',
-              border: 'none', borderRadius: 10,
-              padding: 14,
-              fontSize: 14, fontWeight: 800, letterSpacing: 1.5,
+              border: 'none', borderRadius: 12,
+              padding: '16px 12px',
+              fontSize: 16, fontWeight: 800, letterSpacing: 1.5,
               cursor: phase === 'rolling' ? 'wait' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              boxShadow: phase === 'rolling' ? 'none' : `0 0 20px ${GOLD}44`,
+              animation: phase === 'idle' ? 'pulse 2s ease-in-out infinite' : 'none',
             }}
           >
-            <i className="ti ti-dice" style={{ fontSize: 16 }} />
-            {phase === 'rolling' ? 'ROLLING…' : `FIGHT — ${PVP_FIGHT_COST} STAMINA`}
+            <i className="ti ti-dice" style={{ fontSize: 18 }} />
+            {phase === 'rolling' ? 'ROLLING…' : `ROLL THE DICE  ·  ${PVP_FIGHT_COST} STAMINA`}
           </button>
-        ) : (
+        )}
+
+        {/* Combat log */}
+        {(log.length > 0 || phase !== 'idle') && (
+          <div style={{
+            background: '#0d0d15', borderRadius: 12, padding: 12,
+            minHeight: log.length > 0 ? 90 : 0, marginTop: 14,
+          }}>
+            {log.length === 0 && phase === 'rolling' && (
+              <div style={{ color: '#888', fontSize: 12, textAlign: 'center', paddingTop: 18, animation: 'pulse 0.8s infinite' }}>
+                Rolling…
+              </div>
+            )}
+            {log.map((line, i) => (
+              <div key={i} style={{
+                color: line.color, fontSize: 12, marginBottom: 4,
+                opacity: 0, animation: `logLineIn 0.3s ease ${i * 0.12}s forwards`,
+                fontWeight: line.side === 'result' ? 700 : 400,
+              }}>{line.text}</div>
+            ))}
+          </div>
+        )}
+
+        {/* Post-resolve actions */}
+        {phase === 'resolved' && (
           <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
             <button
               onClick={roll}
@@ -496,15 +529,35 @@ function BattleDiceModal({ opponent, onClose, onRoll, onWin }) {
   )
 }
 
-function FighterBlock({ name, emoji, level, attack, defense, health, color }) {
+function FighterBlock({ name, emoji, level, attack, defense, hp, maxHp, color }) {
+  const pct = maxHp > 0 ? Math.max(0, Math.min(100, (hp / maxHp) * 100)) : 0
+  const hpColor = pct > 60 ? GREEN : pct > 25 ? ORANGE : RED
+  const dead = hp <= 0
   return (
-    <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
-      <div style={{ fontSize: 36 }}>{emoji}</div>
+    <div style={{ flex: 1, minWidth: 0, textAlign: 'center', opacity: dead ? 0.45 : 1, transition: 'opacity 0.4s' }}>
+      <div style={{ fontSize: 36, filter: dead ? 'grayscale(1)' : 'none' }}>{emoji}</div>
       <div style={{ color, fontSize: 11, fontWeight: 600, marginTop: 2,
         overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{name}</div>
       <div style={{ color: '#888', fontSize: 9, marginTop: 1 }}>Lv {level}</div>
-      <div style={{ color: '#666', fontSize: 10, marginTop: 4, lineHeight: 1.3 }}>
-        ATK {attack}<br />DEF {defense}<br />HP {health.toLocaleString()}
+      <div style={{ color: '#666', fontSize: 10, marginTop: 4, lineHeight: 1.4 }}>
+        ATK {attack} · DEF {defense}
+      </div>
+      {/* HP bar — updates live each round */}
+      <div style={{ marginTop: 5 }}>
+        <div style={{
+          color: hpColor, fontSize: 10, fontWeight: 600,
+          fontVariantNumeric: 'tabular-nums', marginBottom: 2,
+        }}>
+          {dead ? 'KO' : `${hp.toLocaleString()} / ${maxHp.toLocaleString()}`}
+        </div>
+        <div style={{ height: 4, background: '#1e1e2a', borderRadius: 2, overflow: 'hidden' }}>
+          <div style={{
+            height: '100%', width: `${pct}%`,
+            background: hpColor,
+            borderRadius: 2,
+            transition: 'width 0.5s ease, background 0.3s',
+          }} />
+        </div>
       </div>
     </div>
   )

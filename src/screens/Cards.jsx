@@ -192,9 +192,18 @@ function PackOpenModal({ state, card, onOpen, onCancel, onAccept }) {
         }} />
       )}
 
+      {/* Sheet fills almost the entire viewport so there's no dim gap above
+          the content — same treatment as the Battle Dice modal. */}
       <div style={{
-        textAlign: 'center', padding: 24, width: '100%', maxWidth: 340,
+        textAlign: 'center', padding: '40px 24px 100px',
+        width: '100%', maxWidth: 390,
+        minHeight: '85vh',
         position: 'relative',
+        background: '#0a0a0f',
+        borderRadius: 24,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
       }}>
         {state === 'idle' && (
           <>
