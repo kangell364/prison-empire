@@ -203,9 +203,9 @@ export function CrewBattleModal({ playerCrew, opponent, onClose, onWin, onLose }
       if (onLose) onLose(opponent)
     } else if (result === 'draw') {
       next.push({ kind: 'result', text: `Both crews down — bloody draw.`, color: '#888' })
-      sfx.tick()
+      sfx.clash()
     } else {
-      sfx.tick()
+      sfx.clash()
     }
 
     setLog(prev => [...prev, ...next])

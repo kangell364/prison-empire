@@ -17,10 +17,10 @@ export default function Profile() {
   const [points, setPoints] = useState(PLAYER.traitPoints)
 
   const upgrade = (traitId) => {
-    if (points <= 0) return
+    if (points <= 0) { sfx.deny(); return }
     setTraits(t => ({ ...t, [traitId]: t[traitId] + 1 }))
     setPoints(p => p - 1)
-    sfx.tick()
+    sfx.buy()
   }
 
   // Derived pool max from trait values.
@@ -351,7 +351,7 @@ function TrainingTab() {
     const at = Date.now()
     setLearned(l => ({ ...l, [skill.id]: { level: 1 } }))
     setFeedback({ skillId: skill.id, kind: 'learn', at })
-    sfx.reveal(0)
+    sfx.levelUp()
     setTimeout(() => setFeedback(f => (f && f.at === at) ? null : f), 3500)
   }
 
@@ -364,7 +364,7 @@ function TrainingTab() {
     })
     setLastUpgradeLevel(PLAYER.level)
     setFeedback({ skillId: skill.id, kind: 'upgrade', at })
-    sfx.tick()
+    sfx.buy()
     setTimeout(() => setFeedback(f => (f && f.at === at) ? null : f), 3500)
   }
 

@@ -62,9 +62,9 @@ export default function Crew() {
     const cost = HUSTLE_COST_PER_LEVEL(current)
     if (spendHustle(cost)) {
       upgradeStat(cardId, stat)
-      sfx.tick()
+      sfx.buy()
     } else {
-      sfx.lose()
+      sfx.deny()
     }
   }
 

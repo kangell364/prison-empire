@@ -72,7 +72,7 @@ export default function Property() {
     const at = Date.now()
     setOwned(o => ({ ...o, [p.id]: have + qty }))
     setFlash(f => ({ ...f, [p.id]: { qty, cost, perHrAdded: qty * p.perHr, at } }))
-    sfx.tick()
+    sfx.buy()
     // Clear the flash after a few seconds — unless a newer purchase replaced it
     setTimeout(() => {
       setFlash(f => {

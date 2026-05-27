@@ -7,7 +7,7 @@ import MapScreen from './screens/MapScreen'
 import Yard from './screens/Yard'
 import Profile from './screens/Profile'
 import Property from './screens/Property'
-import { isMuted, setMuted, subscribeMuted } from './sounds'
+import { isMuted, setMuted, subscribeMuted, sfx } from './sounds'
 
 // Profile lives on the header avatar (top-right) so the bottom nav stays at 6.
 const NAV_ITEMS = [
@@ -25,7 +25,17 @@ export default function App() {
 
   useEffect(() => subscribeMuted(setMutedState), [])
 
-  const toggleMute = () => setMuted(!muted)
+  const toggleMute = () => {
+    const next = !muted
+    setMuted(next)
+    // Play the confirmation AFTER unmuting so the user hears the result.
+    if (!next) sfx.tap()
+  }
+
+  const handleNav = (id) => {
+    if (id !== screen) sfx.tap()
+    setScreen(id)
+  }
 
   const renderScreen = () => {
     switch(screen) {
@@ -62,7 +72,7 @@ export default function App() {
             <i className="ti ti-bell" aria-hidden="true" />
             <div className="notif-dot" />
           </button>
-          <div className="user-avatar" onClick={() => setScreen('profile')}>SR</div>
+          <div className="user-avatar" onClick={() => handleNav('profile')}>SR</div>
         </div>
       </div>
 
@@ -75,7 +85,7 @@ export default function App() {
           <button
             key={item.id}
             className={`nav-item ${screen === item.id ? 'active' : ''}`}
-            onClick={() => setScreen(item.id)}
+            onClick={() => handleNav(item.id)}
             aria-label={item.label}
           >
             <i className={`ti ${item.icon}`} aria-hidden="true" />

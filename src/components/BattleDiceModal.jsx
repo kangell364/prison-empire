@@ -186,9 +186,9 @@ export function BattleDiceModal({ opponent, cost, rewards, onClose, onRoll, onWi
       sfx.lose()
     } else if (result === 'draw') {
       roundLog.push({ side: 'result', text: `Mutual KO — both fighters down.`, color: '#888' })
-      sfx.tick()
+      sfx.clash()
     } else {
-      sfx.tick()
+      sfx.clash()
     }
 
     setLog(prev => [...prev, ...roundLog])

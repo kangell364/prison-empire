@@ -133,6 +133,30 @@ export const sfx = {
     }
   },
 
+  // UI feedback
+  tap() {
+    // Subtle confirmation for nav taps, toggles, etc. Quiet on purpose.
+    tone({ freq: 1700, duration: 0.035, type: 'square', volume: 0.07 })
+  },
+  buy() {
+    // Two quick high pings — cash-register chink for successful purchases.
+    tone({ freq: 1200, duration: 0.09, type: 'triangle', volume: 0.18 })
+    tone({ freq: 1800, duration: 0.12, type: 'triangle', volume: 0.16, delay: 0.05 })
+  },
+  deny() {
+    // Short low buzz for blocked actions (insufficient resources, locked, etc.).
+    tone({ freq: 200, duration: 0.16, type: 'sawtooth', volume: 0.18, sweepTo: 120 })
+  },
+  levelUp() {
+    // Triumphant 4-note arpeggio + high sparkle. Bigger payoff than reveal(0).
+    const notes = [523.25, 659.25, 783.99, 1046.50] // C5 E5 G5 C6
+    notes.forEach((f, i) => tone({
+      freq: f, duration: 0.35, type: 'triangle', volume: 0.20, delay: i * 0.07,
+    }))
+    tone({ freq: 1568, duration: 0.55, type: 'sine', volume: 0.12, delay: 0.28 })
+    tone({ freq: 2093, duration: 0.40, type: 'sine', volume: 0.08, delay: 0.34 })
+  },
+
   // Tactical
   tick() {
     tone({ freq: 1400, duration: 0.06, type: 'square', volume: 0.14 })
