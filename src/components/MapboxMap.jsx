@@ -14,6 +14,7 @@ export function MapboxMap({ cities, onCityClick, height = '60vh' }) {
   const containerRef = useRef(null)
   const mapRef       = useRef(null)
   const [error, setError] = useState(null)
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     if (!TOKEN || !containerRef.current || mapRef.current) return
@@ -21,30 +22,46 @@ export function MapboxMap({ cities, onCityClick, height = '60vh' }) {
     const map = new mapboxgl.Map({
       container: containerRef.current,
       style: 'mapbox://styles/mapbox/dark-v11',
-      center: [-98.5795, 39.8283],   // geographic center of contiguous US
+      center: [-98.5795, 39.8283],
       zoom: 3.4,
       minZoom: 3,
       maxZoom: 14,
-      maxBounds: [[-170, 15], [-50, 72]],  // a bit wider than US to allow zoom-out
+      maxBounds: [[-170, 15], [-50, 72]],
       attributionControl: false,
-      cooperativeGestures: false,
+      // Two-finger pan/zoom on mobile so the page can still scroll vertically.
+      cooperativeGestures: true,
     })
     mapRef.current = map
 
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
 
-    // Surface any Mapbox errors visibly — useful for diagnosing token,
-    // style, or tile-fetch failures in production where the user can't
-    // open devtools.
     map.on('error', (e) => {
       const msg = e?.error?.message || e?.error?.toString() || 'Unknown map error'
-      // Filter out routine missing-source warnings that fire before sources load
       if (msg.includes('source') && msg.includes('not exist')) return
       console.error('Mapbox error:', e)
       setError(msg)
     })
 
+    // Force a resize once the container has actually been laid out — fixes
+    // the "all-gray, no tiles" case where Mapbox initialized before the
+    // container had nonzero dimensions (common when rendered inside flex
+    // containers or sheets that animate in).
+    const resizeTimer = setTimeout(() => {
+      try { map.resize() } catch {}
+    }, 200)
+
+    // Fallback: if 6 s pass and we have neither tiles nor an error, surface
+    // a generic "still loading" hint so the user knows something is off.
+    const loadFallbackTimer = setTimeout(() => {
+      if (!loaded && !error) {
+        setError('Tiles never loaded. Likely causes: token URL restriction blocking prison-empire.vercel.app, missing styles:tiles scope, or a network filter.')
+      }
+    }, 6000)
+
     map.on('load', () => {
+      setLoaded(true)
+      clearTimeout(loadFallbackTimer)
+      try { map.resize() } catch {}
       // Tint the base style a touch warmer + darker so it feels like our app.
       try {
         map.setPaintProperty('water', 'fill-color', '#0a0e15')
@@ -150,6 +167,8 @@ export function MapboxMap({ cities, onCityClick, height = '60vh' }) {
     })
 
     return () => {
+      clearTimeout(resizeTimer)
+      clearTimeout(loadFallbackTimer)
       try { map.remove() } catch {}
       mapRef.current = null
     }
