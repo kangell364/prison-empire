@@ -35,7 +35,7 @@ export default function Dashboard({ onNavigate }) {
             <i className="ti ti-alert-triangle" />
           </div>
           <div className="alert-content">
-            <div className="alert-title">INCOMING ATTACK</div>
+            <div className="alert-title">INCOMING DRIVE BY</div>
             <div className="alert-sub">{INCOMING_ATTACK.attacker} moving on {INCOMING_ATTACK.city}</div>
           </div>
           <CountdownRing
@@ -55,7 +55,7 @@ export default function Dashboard({ onNavigate }) {
           </div>
           <div>
             <div style={{ color: '#2ecc71', fontSize: 13, fontWeight: 500 }}>HOUSTON PROTECTED</div>
-            <div style={{ color: '#555', fontSize: 11, marginTop: 2 }}>Cops on alert — attack blocked for 4 hours</div>
+            <div style={{ color: '#555', fontSize: 11, marginTop: 2 }}>Cops on alert — drive by blocked for 4 hours</div>
           </div>
         </div>
       )}
@@ -197,7 +197,7 @@ export default function Dashboard({ onNavigate }) {
               <i className="ti ti-eye-off" style={{ fontSize: 15 }} /> {snitchUsed ? 'Snitched' : 'Snitch'}
             </button>
             <button className="btn btn-gold" style={{ flex: 1 }} onClick={() => onNavigate('map')}>
-              <i className="ti ti-sword" style={{ fontSize: 15 }} /> Attack
+              <i className="ti ti-sword" style={{ fontSize: 15 }} /> Drive By
             </button>
           </div>
         </div>
@@ -258,18 +258,18 @@ export default function Dashboard({ onNavigate }) {
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 40, marginBottom: 8 }}>🚔</div>
               <div style={{ color: '#fff', fontSize: 18, fontWeight: 500, marginBottom: 4 }}>Call the Cops?</div>
-              <div style={{ color: '#888', fontSize: 13, lineHeight: 1.5 }}>Using a snitch will block all incoming attacks for 4 hours — but everyone will know you snitched.</div>
+              <div style={{ color: '#888', fontSize: 13, lineHeight: 1.5 }}>Using a snitch will block all incoming drive bys for 4 hours — but everyone will know you snitched.</div>
             </div>
             <div style={{ background: '#1a0808', border: '0.5px solid #8b1a1a', borderRadius: 12, padding: 12, marginBottom: 16 }}>
               <div style={{ color: '#e74c3c', fontSize: 12, fontWeight: 500, marginBottom: 4 }}>CONSEQUENCES</div>
-              <div style={{ color: '#888', fontSize: 12, lineHeight: 1.6 }}>• -5 Street Cred permanently<br />• "Snitch" badge on your profile<br />• City marked on map for all to see<br />• Attacks resume when protection expires</div>
+              <div style={{ color: '#888', fontSize: 12, lineHeight: 1.6 }}>• -5 Street Cred permanently<br />• "Snitch" badge on your profile<br />• City marked on map for all to see<br />• Drive bys resume when protection expires</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <div style={{ color: '#888', fontSize: 12 }}>Snitches remaining:</div>
               <div style={{ color: '#e74c3c', fontSize: 14, fontWeight: 500 }}>1 / 3 free this week</div>
             </div>
             <button className="btn btn-red btn-full" style={{ marginBottom: 10, padding: 14 }} onClick={() => { setSnitchUsed(true); setShowSnitchModal(false); sfx.snitch() }}>
-              <i className="ti ti-eye-off" /> Snitch — Block Attack (Free)
+              <i className="ti ti-eye-off" /> Snitch — Block Drive By (Free)
             </button>
             <button className="btn btn-dark btn-full" style={{ padding: 14 }} onClick={() => setShowSnitchModal(false)}>
               Hold Off — I'll Defend

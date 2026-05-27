@@ -380,7 +380,7 @@ function CityRow({ city, onSelect }) {
       <div style={{ color: DIM, fontSize: 10 }}>T{city.tier}</div>
       {!city.isYours && (
         <button className="btn btn-gold" style={{ padding: '6px 12px', fontSize: 11 }} onClick={(e) => { e.stopPropagation(); onSelect() }}>
-          Attack
+          Drive By
         </button>
       )}
     </div>
@@ -434,16 +434,16 @@ function CityDetailModal({ city, onClose, onAttack }) {
         {!city.isYours && (
           <>
             <div style={{ background: '#1a0d00', border: `0.5px solid ${GOLD}44`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
-              <div style={{ color: GOLD, fontSize: 12, fontWeight: 500, marginBottom: 4 }}>Attack Info</div>
+              <div style={{ color: GOLD, fontSize: 12, fontWeight: 500, marginBottom: 4 }}>Drive By Info</div>
               <div style={{ color: '#888', fontSize: 12, lineHeight: 1.6 }}>
                 • Travel time: 15 minutes<br />
                 • Defender gets notified immediately<br />
-                • They can snitch to block your attack<br />
+                • They can snitch to block your drive by<br />
                 • Cost: 500 Hustle
               </div>
             </div>
             <button className="btn btn-gold btn-full" style={{ padding: 14, marginBottom: 10 }} onClick={() => onAttack(city)}>
-              <i className="ti ti-sword" /> Launch Attack — 15 min
+              <i className="ti ti-sword" /> Launch Drive By — 15 min
             </button>
           </>
         )}
@@ -470,7 +470,7 @@ function AttackBanner({ attacking, timer }) {
       <CountdownRing remaining={timer} total={total} size={72} strokeWidth={4} variant="outbound" />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ color: GOLD, fontSize: 13, fontWeight: 600, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <i className="ti ti-sword" /> Attack En Route
+          <i className="ti ti-sword" /> Drive By En Route
         </div>
         <div style={{ color: '#fff', fontSize: 13, marginBottom: 2 }}>→ {attacking.name}</div>
         <div style={{ color: DIM, fontSize: 10, marginBottom: 6 }}>Your crew is moving — cannot cancel</div>
