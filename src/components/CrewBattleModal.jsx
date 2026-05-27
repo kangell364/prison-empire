@@ -64,6 +64,12 @@ export function CrewBattleModal({ playerCrew, opponent, onClose, onWin, onLose }
   const [oppHp, setOppHp]       = useState(maxOppHp)
   const [roundNum, setRoundNum] = useState(0)
   const [autoRolling, setAutoRolling] = useState(false)
+  // Floating-damage + hit-shake triggers. Bumping .key remounts the label
+  // so the CSS animation re-fires every round.
+  const [playerHit, setPlayerHit] = useState({ amount: 0, key: 0 })
+  const [oppHit,    setOppHit]    = useState({ amount: 0, key: 0 })
+  // Slot the dice LANDED on (vs the spinning highlight) — drives the slot flash.
+  const [landedSlot, setLandedSlot] = useState(null)
   const tickRef    = useRef(null)
   const chainRef   = useRef(null)   // setTimeout that schedules the next roll
 
@@ -86,6 +92,7 @@ export function CrewBattleModal({ playerCrew, opponent, onClose, onWin, onLose }
   const doRoll = () => {
     setPhase('rolling')
     setHighlight(null)
+    setLandedSlot(null)
     sfx.tick()
 
     const start = Date.now()
@@ -107,6 +114,7 @@ export function CrewBattleModal({ playerCrew, opponent, onClose, onWin, onLose }
         // contribute passively via the crew totals.
         const slot = finalA + finalB
         setHighlight(slot)
+        setLandedSlot(slot)
         resolve(slot, finalA, finalB)
       }
     }, 70)
@@ -160,6 +168,8 @@ export function CrewBattleModal({ playerCrew, opponent, onClose, onWin, onLose }
     playerHpRef.current = newPlayerHp
     setOppHp(newOppHp)
     setPlayerHp(newPlayerHp)
+    if (youDealt > 0) setOppHit(h    => ({ amount: youDealt, key: h.key + 1 }))
+    if (oppDealt > 0) setPlayerHit(h => ({ amount: oppDealt, key: h.key + 1 }))
 
     roundRef.current += 1
     const currentRound = roundRef.current
@@ -251,6 +261,8 @@ export function CrewBattleModal({ playerCrew, opponent, onClose, onWin, onLose }
             totals={playerTotals}
             hp={playerHp} maxHp={maxPlayerHp}
             color={BLUE}
+            hit={playerHit}
+            outcome={outcome === 'win' ? 'winner' : outcome === 'lose' ? 'loser' : null}
           />
 
           <DiceBox phase={phase} diceA={diceA} diceB={diceB} highlight={highlight} />
@@ -262,6 +274,8 @@ export function CrewBattleModal({ playerCrew, opponent, onClose, onWin, onLose }
             hp={oppHp} maxHp={maxOppHp}
             color={RED}
             mirrored
+            hit={oppHit}
+            outcome={outcome === 'win' ? 'loser' : outcome === 'lose' ? 'winner' : null}
           />
         </div>
 
@@ -271,12 +285,14 @@ export function CrewBattleModal({ playerCrew, opponent, onClose, onWin, onLose }
             members={playerMembers}
             upgrades={playerCrew.upgrades || {}}
             highlight={highlight}
+            landed={landedSlot}
             color={BLUE}
           />
           <CrewSlotGrid
             members={oppMembers}
             upgrades={opponent.upgrades || {}}
             highlight={highlight}
+            landed={landedSlot}
             color={RED}
           />
         </div>
@@ -375,25 +391,48 @@ export function CrewBattleModal({ playerCrew, opponent, onClose, onWin, onLose }
 // Subcomponents
 // ---------------------------------------------------------------------
 
-function CrewHeader({ label, leader, totals, hp, maxHp, color, mirrored }) {
+function CrewHeader({ label, leader, totals, hp, maxHp, color, mirrored, hit, outcome }) {
   const pct = maxHp > 0 ? Math.max(0, Math.min(100, (hp / maxHp) * 100)) : 0
   const hpColor = pct > 60 ? GREEN : pct > 25 ? ORANGE : RED
   const dead = hp <= 0
   const ringColor = leader ? RARITY_COLORS[leader.rarity] : color
+  const outerAnim = outcome === 'winner'
+    ? 'winnerGlow 1.8s ease-in-out infinite'
+    : outcome === 'loser'
+      ? 'loserDim 0.7s ease forwards'
+      : 'none'
 
   return (
     <div style={{
       flex: 1, minWidth: 0, textAlign: 'center',
       opacity: dead ? 0.45 : 1, transition: 'opacity 0.4s',
+      animation: outerAnim, borderRadius: 12,
     }}>
       <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
-        <div style={{
-          padding: 2,
-          borderRadius: 12,
-          filter: dead ? 'grayscale(1)' : 'none',
-        }}>
+        <div
+          key={hit ? hit.key : 'avatar'}
+          style={{
+            padding: 2,
+            borderRadius: 12,
+            filter: dead ? 'grayscale(1)' : 'none',
+            animation: hit && hit.key > 0 ? 'hitShake 0.32s ease' : 'none',
+          }}
+        >
           <Avatar src={leader?.avatar} emoji={leader?.emoji || '👤'} size={56} radius={10} />
         </div>
+        {hit && hit.key > 0 && (
+          <span
+            key={`dmg-${hit.key}`}
+            style={{
+              position: 'absolute', top: -2, left: '50%',
+              color, fontSize: 16, fontWeight: 800,
+              textShadow: '0 0 6px #0a0a0f, 0 1px 2px #0a0a0f',
+              pointerEvents: 'none',
+              animation: 'damageFloat 0.9s ease-out forwards',
+              zIndex: 2,
+            }}
+          >-{hit.amount}</span>
+        )}
         <div style={{
           position: 'absolute', top: -4,
           [mirrored ? 'left' : 'right']: -4,
@@ -459,7 +498,7 @@ function DiceBox({ phase, diceA, diceB, highlight }) {
   )
 }
 
-function CrewSlotGrid({ members, upgrades, highlight, color }) {
+function CrewSlotGrid({ members, upgrades, highlight, landed, color }) {
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{
@@ -467,19 +506,25 @@ function CrewSlotGrid({ members, upgrades, highlight, color }) {
       }}>
         {members.map((c, i) => {
           const slot = i + 2  // member slot 0 → dice slot 2
-          const isHl = highlight === slot
+          const isHl     = highlight === slot
+          const isLanded = landed === slot
           const ringColor = c ? RARITY_COLORS[c.rarity] : '#2a2a3a'
           return (
-            <div key={i} style={{
-              aspectRatio: '1',
-              background: isHl ? `${color}33` : '#0d0d15',
-              border: `${isHl ? 2 : 0.5}px solid ${isHl ? color : ringColor + '66'}`,
-              borderRadius: 6,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              position: 'relative', overflow: 'hidden',
-              transition: 'border-color 0.12s, background 0.12s, box-shadow 0.12s',
-              boxShadow: isHl ? `0 0 6px ${color}66` : 'none',
-            }}>
+            <div
+              // Remount on each land so slotActivate keyframe re-fires.
+              key={isLanded ? `landed-${landed}` : i}
+              style={{
+                aspectRatio: '1',
+                background: isHl ? `${color}33` : '#0d0d15',
+                border: `${isHl ? 2 : 0.5}px solid ${isHl ? color : ringColor + '66'}`,
+                borderRadius: 6,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                position: 'relative', overflow: 'hidden',
+                transition: 'border-color 0.12s, background 0.12s, box-shadow 0.12s',
+                boxShadow: isHl ? `0 0 6px ${color}66` : 'none',
+                animation: isLanded ? 'slotActivate 0.5s ease' : 'none',
+                '--flash-color': color,
+              }}>
               {c ? (
                 <Avatar src={c.avatar} emoji={c.emoji} size={28} radius={4} />
               ) : (

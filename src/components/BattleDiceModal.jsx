@@ -87,6 +87,13 @@ export function BattleDiceModal({ opponent, cost, rewards, onClose, onRoll, onWi
   const maxOppHp    = Math.floor(opponent.power * 6 + 800)
   const [playerHp, setPlayerHp] = useState(maxPlayerHp)
   const [oppHp, setOppHp]       = useState(maxOppHp)
+  // Floating-damage triggers: bumping .key remounts the damage label so its CSS
+  // animation re-fires on every hit. `amount` drives the displayed number.
+  const [playerHit, setPlayerHit] = useState({ amount: 0, key: 0 })
+  const [oppHit,    setOppHit]    = useState({ amount: 0, key: 0 })
+  // Slot that the dice LANDED on (not the spinning highlight) — drives the
+  // slot-activate pulse. Reset when a new roll begins.
+  const [landedSlot, setLandedSlot] = useState(null)
 
   const roll = () => {
     if (phase === 'rolling') return
@@ -97,6 +104,7 @@ export function BattleDiceModal({ opponent, cost, rewards, onClose, onRoll, onWi
       setOutcome(null)
     }
     setPhase('rolling')
+    setLandedSlot(null)
     if (onRoll) onRoll()
     sfx.tick()
 
@@ -117,6 +125,7 @@ export function BattleDiceModal({ opponent, cost, rewards, onClose, onRoll, onWi
         setDiceA(finalA); setDiceB(finalB)
         const slot = finalA + finalB
         setHighlight(slot)
+        setLandedSlot(slot)   // triggers the slot-activate flash
         resolve(slot)
       }
     }, 80)
@@ -150,6 +159,9 @@ export function BattleDiceModal({ opponent, cost, rewards, onClose, onRoll, onWi
     const newPlayerHp = Math.max(0, playerHp - oppDealt)
     setOppHp(newOppHp)
     setPlayerHp(newPlayerHp)
+    // Trigger floating damage + hit shake on each fighter
+    if (youDealt > 0) setOppHit(h    => ({ amount: youDealt, key: h.key + 1 }))
+    if (oppDealt > 0) setPlayerHit(h => ({ amount: oppDealt, key: h.key + 1 }))
 
     const roundLog = []
     roundLog.push({ side: 'round', text: `— Round (slot ${slot}) —`, color: '#666' })
@@ -228,7 +240,9 @@ export function BattleDiceModal({ opponent, cost, rewards, onClose, onRoll, onWi
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <FighterBlock name={PLAYER.name} emoji={PLAYER.card.emoji} avatar={PLAYER.card.avatar} level={PLAYER.level}
             attack={stats.playerBaseAttack} defense={stats.playerBaseDefense}
-            hp={playerHp} maxHp={maxPlayerHp} color={BLUE} />
+            hp={playerHp} maxHp={maxPlayerHp} color={BLUE}
+            hit={playerHit}
+            outcome={outcome === 'win' ? 'winner' : outcome === 'lose' ? 'loser' : null} />
 
           <div style={{
             background: '#0d0d15',
@@ -250,13 +264,15 @@ export function BattleDiceModal({ opponent, cost, rewards, onClose, onRoll, onWi
 
           <FighterBlock name={opponent.name} emoji={opponent.emoji} avatar={opponent.avatar} level={opponent.level}
             attack={stats.oppBaseAttack} defense={stats.oppBaseDefense}
-            hp={oppHp} maxHp={maxOppHp} color={RED} />
+            hp={oppHp} maxHp={maxOppHp} color={RED}
+            hit={oppHit}
+            outcome={outcome === 'win' ? 'loser' : outcome === 'lose' ? 'winner' : null} />
         </div>
 
         {/* Skill slot grids — both player and opponent loadouts visible */}
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 14 }}>
-          <SlotGrid side="you" equipped={PLAYER.equippedSkills} learned={PLAYER.learnedSkills} highlight={highlight} color={BLUE} />
-          <SlotGrid side="opp" equipped={oppEquippedMap} learned={oppLearned} highlight={highlight} color={ORANGE} />
+          <SlotGrid side="you" equipped={PLAYER.equippedSkills} learned={PLAYER.learnedSkills} highlight={highlight} landed={landedSlot} color={BLUE} />
+          <SlotGrid side="opp" equipped={oppEquippedMap} learned={oppLearned} highlight={highlight} landed={landedSlot} color={ORANGE} />
         </div>
 
         {/* Primary CTA */}
@@ -342,14 +358,44 @@ export function BattleDiceModal({ opponent, cost, rewards, onClose, onRoll, onWi
   )
 }
 
-function FighterBlock({ name, emoji, avatar, level, attack, defense, hp, maxHp, color }) {
+function FighterBlock({ name, emoji, avatar, level, attack, defense, hp, maxHp, color, hit, outcome }) {
   const pct = maxHp > 0 ? Math.max(0, Math.min(100, (hp / maxHp) * 100)) : 0
   const hpColor = pct > 60 ? GREEN : pct > 25 ? ORANGE : RED
   const dead = hp <= 0
+  // outcome: 'winner' | 'loser' | null
+  const outerAnim = outcome === 'winner'
+    ? 'winnerGlow 1.8s ease-in-out infinite'
+    : outcome === 'loser'
+      ? 'loserDim 0.7s ease forwards'
+      : 'none'
   return (
-    <div style={{ flex: 1, minWidth: 0, textAlign: 'center', opacity: dead ? 0.45 : 1, transition: 'opacity 0.4s' }}>
-      <div style={{ display: 'flex', justifyContent: 'center', filter: dead ? 'grayscale(1)' : 'none' }}>
-        <Avatar src={avatar} emoji={emoji} size={56} radius={10} />
+    <div style={{
+      flex: 1, minWidth: 0, textAlign: 'center',
+      opacity: dead ? 0.45 : 1, transition: 'opacity 0.4s',
+      animation: outerAnim, borderRadius: 12,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
+        <div
+          key={hit ? hit.key : 'avatar'}
+          style={{
+            filter: dead ? 'grayscale(1)' : 'none',
+            animation: hit && hit.key > 0 ? 'hitShake 0.32s ease' : 'none',
+          }}
+        >
+          <Avatar src={avatar} emoji={emoji} size={56} radius={10} />
+        </div>
+        {hit && hit.key > 0 && (
+          <span
+            key={`dmg-${hit.key}`}
+            style={{
+              position: 'absolute', top: -2, left: '50%',
+              color, fontSize: 16, fontWeight: 800,
+              textShadow: '0 0 6px #0a0a0f, 0 1px 2px #0a0a0f',
+              pointerEvents: 'none',
+              animation: 'damageFloat 0.9s ease-out forwards',
+            }}
+          >-{hit.amount}</span>
+        )}
       </div>
       <div style={{ color, fontSize: 11, fontWeight: 600, marginTop: 2,
         overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{name}</div>
@@ -369,7 +415,7 @@ function FighterBlock({ name, emoji, avatar, level, attack, defense, hp, maxHp, 
   )
 }
 
-function SlotGrid({ side, equipped, learned, highlight, color }) {
+function SlotGrid({ side, equipped, learned, highlight, landed, color }) {
   const slots = Array.from({ length: 11 }, (_, i) => i + 2)
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
@@ -378,21 +424,27 @@ function SlotGrid({ side, equipped, learned, highlight, color }) {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
         {slots.map(slot => {
-          const isHl = highlight === slot
+          const isHl     = highlight === slot
+          const isLanded = landed === slot
           const skillId = equipped[slot]
           const learnedSkill = skillId ? learned[skillId] : null
           const emoji = skillId ? (SKILLS.find(s => s.id === skillId)?.emoji || '') : ''
           return (
-            <div key={slot} style={{
-              aspectRatio: '1',
-              background: isHl ? `${color}33` : '#0d0d15',
-              border: `${isHl ? 2 : 0.5}px solid ${isHl ? color : '#2a2a3a'}`,
-              borderRadius: 6,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              position: 'relative',
-              transition: 'border-color 0.12s, background 0.12s',
-              boxShadow: isHl ? `0 0 8px ${color}66` : 'none',
-            }}>
+            <div
+              // Remount on each land so the slotActivate keyframe re-fires.
+              key={isLanded ? `landed-${landed}` : slot}
+              style={{
+                aspectRatio: '1',
+                background: isHl ? `${color}33` : '#0d0d15',
+                border: `${isHl ? 2 : 0.5}px solid ${isHl ? color : '#2a2a3a'}`,
+                borderRadius: 6,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                position: 'relative',
+                transition: 'border-color 0.12s, background 0.12s',
+                boxShadow: isHl ? `0 0 8px ${color}66` : 'none',
+                animation: isLanded ? 'slotActivate 0.5s ease' : 'none',
+                '--flash-color': color,
+              }}>
               {emoji && (
                 <span style={{
                   fontSize: 14,
