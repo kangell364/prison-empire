@@ -23,11 +23,14 @@
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
 html, body {
-  /* Prevent iOS from auto-inflating text when it thinks the column is "too narrow."
-     This was likely causing the standalone PWA to render at the wrong scale. */
+  /* Prevent iOS from auto-inflating text when it thinks the column is "too narrow." */
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  width: 100%;
+  /* HARD-clamp width to the JS-measured visual viewport (set in index.js).
+     This survives Desktop-site mode, browser zoom, and viewport-meta quirks
+     that were letting the page render wider than the device screen on Android. */
+  width: var(--vw, 100vw);
+  max-width: var(--vw, 100vw);
   overflow-x: hidden;
 }
 
@@ -40,12 +43,11 @@ body {
   min-height: 100vh;
 }
 
-/* Phone Shell — fills the viewport on any touch device. Only becomes a
-   framed 390px "device mock" on real desktops (mouse-pointer + ≥800px).
-   The previous min-width:500px breakpoint also caught iPad mini / phones
-   in landscape, which made the UI look like a small floating panel. */
+/* Phone Shell — locked to the measured viewport on phones; becomes a
+   framed 390px mock only on real desktops (mouse + ≥800px). */
 .phone-shell {
-  width: 100%;
+  width: var(--vw, 100vw);
+  max-width: var(--vw, 100vw);
   min-height: 100vh;
   background: var(--bg-primary);
   position: relative;
@@ -130,9 +132,12 @@ body {
 .scroll-area {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   background: var(--bg-secondary);
   scrollbar-width: none;
   padding-bottom: 90px;
+  width: 100%;
+  max-width: 100%;
 }
 .scroll-area::-webkit-scrollbar { display: none; }
 
@@ -190,11 +195,14 @@ body {
   flex-shrink: 0;
 }
 
-/* Bottom Nav — full width on touch / phone, 390px only on desktop frame. */
+/* Bottom Nav — locked to measured viewport width. left:0 explicitly so it
+   anchors to viewport-left even if an ancestor became the containing block. */
 .bottom-nav {
   position: fixed;
   bottom: 0;
-  width: 100%;
+  left: 0;
+  width: var(--vw, 100vw);
+  max-width: var(--vw, 100vw);
   height: 80px;
   background: #0f0f18;
   border-top: 0.5px solid var(--border-dim);
@@ -204,7 +212,12 @@ body {
   z-index: 100;
 }
 @media (pointer: fine) and (min-width: 800px) {
-  .bottom-nav { width: 390px; }
+  .bottom-nav {
+    width: 390px;
+    max-width: 390px;
+    left: 50%;
+    margin-left: -195px;
+  }
 }
 .nav-item {
   flex: 1;
