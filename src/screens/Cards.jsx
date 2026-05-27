@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { CARDS_COLLECTION, RARITY_COLORS } from '../data/gameData'
 import { sfx } from '../sounds'
 import { Avatar } from '../components/Avatar'
+import { CharacterDetailModal } from '../components/CharacterDetailModal'
 
 const RARITY_TIER = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 }
 const PACK_OPEN_DURATION_MS = 1600  // total time of shake → charge → burst
@@ -126,49 +127,13 @@ export default function Cards() {
         </div>
       </div>
 
-      {/* Card Detail Modal */}
+      {/* Card Detail — universal modal so it's consistent with all other
+          character cards (no bottom-sheet gap, big cinematic hero). */}
       {selectedCard && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }} onClick={() => setSelectedCard(null)}>
-          <div style={{ background: '#13131f', borderRadius: '24px 24px 0 0', padding: 24, width: '100%', maxWidth: 390 }} onClick={e => e.stopPropagation()}>
-            <div style={{ width: 40, height: 4, background: '#2a2a3a', borderRadius: 2, margin: '0 auto 20px' }} />
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ height: 3, background: RARITY_COLORS[selectedCard.rarity], borderRadius: 2, marginBottom: 20 }} />
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                <Avatar src={selectedCard.avatar} emoji={selectedCard.emoji} size={96} radius={12} />
-              </div>
-              <div style={{ color: '#fff', fontSize: 20, fontWeight: 500 }}>{selectedCard.name}</div>
-              <div style={{ color: RARITY_COLORS[selectedCard.rarity], fontSize: 13, textTransform: 'capitalize', marginTop: 4, marginBottom: 16 }}>{selectedCard.rarity}</div>
-              {selectedCard.bio && (
-                <div style={{
-                  background: '#13131f',
-                  border: `0.5px solid ${RARITY_COLORS[selectedCard.rarity]}44`,
-                  borderLeft: `3px solid ${RARITY_COLORS[selectedCard.rarity]}`,
-                  borderRadius: 10,
-                  padding: 12, marginBottom: 14, textAlign: 'left',
-                  color: '#bbb', fontSize: 12, lineHeight: 1.55, fontStyle: 'italic',
-                }}>{selectedCard.bio}</div>
-              )}
-              <div style={{ background: '#c9a84c18', border: '0.5px solid #c9a84c44', borderRadius: 12, padding: '8px 16px', display: 'inline-block', marginBottom: 20 }}>
-                <span style={{ color: '#c9a84c', fontSize: 13, fontWeight: 500 }}>{selectedCard.special}</span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
-                {[
-                  { lbl: 'Hustle', val: selectedCard.hustle, color: '#c9a84c', icon: 'ti-flame' },
-                  { lbl: 'Muscle', val: selectedCard.muscle, color: '#e74c3c', icon: 'ti-barbell' },
-                  { lbl: 'Smarts', val: selectedCard.smarts, color: '#4a9eff', icon: 'ti-brain' },
-                  { lbl: 'Cred',   val: selectedCard.cred,   color: '#a855f7', icon: 'ti-star' },
-                ].map(s => (
-                  <div key={s.lbl} style={{ background: '#1e1e2a', borderRadius: 12, padding: 12, textAlign: 'center' }}>
-                    <i className={`ti ${s.icon}`} style={{ color: s.color, fontSize: 20, display: 'block', marginBottom: 4 }} />
-                    <div style={{ color: s.color, fontSize: 22, fontWeight: 500 }}>{s.val}</div>
-                    <div style={{ color: '#555', fontSize: 11 }}>{s.lbl}</div>
-                  </div>
-                ))}
-              </div>
-              <button className="btn btn-dark btn-full" style={{ padding: 14 }} onClick={() => setSelectedCard(null)}>Close</button>
-            </div>
-          </div>
-        </div>
+        <CharacterDetailModal
+          character={selectedCard}
+          onClose={() => setSelectedCard(null)}
+        />
       )}
 
       {/* Pack Opening Modal */}
