@@ -121,7 +121,7 @@ export default function Battle() {
               borderColor: enemy.boss ? '#c9a84c44' : '#2a2a3a',
               background: enemy.boss ? '#1a1510' : '#13131f',
             }}>
-              <div style={{ fontSize: 36, flexShrink: 0 }}>{enemy.emoji}</div>
+              <Avatar src={enemy.avatar} emoji={enemy.emoji} size={44} radius={10} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                   <div style={{ color: enemy.boss ? '#c9a84c' : '#fff', fontSize: 14, fontWeight: 500 }}>{enemy.name}</div>
