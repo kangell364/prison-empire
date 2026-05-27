@@ -10,9 +10,6 @@ const GOLD = '#c9a84c'
 const RED  = '#e74c3c'
 const DIM  = '#666'
 
-// US-only bounds — keeps zoom out from showing the whole world.
-const US_BOUNDS = [[-130, 22], [-65, 51]]
-
 export function MapboxMap({ cities, onCityClick, height = '60vh' }) {
   const containerRef = useRef(null)
   const mapRef       = useRef(null)
