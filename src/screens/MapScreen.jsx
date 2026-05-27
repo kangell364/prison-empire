@@ -229,6 +229,22 @@ export default function MapScreen() {
     return out
   }, [mapData, ownedCountyFips])
 
+  // Per-state ownership tallies for the country-map color scale.
+  // Aggregates every county (real + synthesized) so each state has a
+  // { yours, enemy, total } record keyed by 2-letter postal code.
+  const stateOwnership = useMemo(() => {
+    const m = {}
+    Object.entries(countyByFips).forEach(([fips, c]) => {
+      const code = STATE_FIPS_TO_CODE[fips.slice(0, 2)]
+      if (!code) return
+      if (!m[code]) m[code] = { yours: 0, enemy: 0, total: 0 }
+      m[code].total++
+      if (c.isYours) m[code].yours++
+      else if (c.owner) m[code].enemy++
+    })
+    return m
+  }, [countyByFips])
+
   // Only show one landing modal at a time (queue the rest)
   const currentLanded = landed[0] || null
 
