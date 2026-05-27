@@ -1,9 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import './App.css'
 import Dashboard from './screens/Dashboard'
 import Cards from './screens/Cards'
 import Battle from './screens/Battle'
 import MapScreen from './screens/MapScreen'
+import { isMuted, setMuted, subscribeMuted } from './sounds'
 
 const NAV_ITEMS = [
   { id: 'home',   icon: 'ti-home',    label: 'Home'   },
@@ -15,6 +16,11 @@ const NAV_ITEMS = [
 
 export default function App() {
   const [screen, setScreen] = useState('home')
+  const [muted, setMutedState] = useState(isMuted())
+
+  useEffect(() => subscribeMuted(setMutedState), [])
+
+  const toggleMute = () => setMuted(!muted)
 
   const renderScreen = () => {
     switch(screen) {
@@ -42,6 +48,9 @@ export default function App() {
       <div className="app-header">
         <div className="game-logo">PRISON EMPIRE</div>
         <div className="header-actions">
+          <button className="icon-btn" aria-label={muted ? 'Unmute sound' : 'Mute sound'} onClick={toggleMute}>
+            <i className={`ti ${muted ? 'ti-volume-off' : 'ti-volume'}`} aria-hidden="true" />
+          </button>
           <button className="icon-btn" aria-label="Notifications">
             <i className="ti ti-bell" aria-hidden="true" />
             <div className="notif-dot" />

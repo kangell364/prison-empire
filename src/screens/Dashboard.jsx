@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { PLAYER, RESOURCES, CITY, INCOMING_ATTACK, CREW, LEADERBOARD, RARITY_COLORS } from '../data/gameData'
 import { CountdownRing } from '../components/CountdownRing'
+import { sfx } from '../sounds'
 
 export default function Dashboard({ onNavigate }) {
   const [timer, setTimer] = useState(INCOMING_ATTACK.timer_seconds)
@@ -9,7 +10,16 @@ export default function Dashboard({ onNavigate }) {
 
   useEffect(() => {
     if (timer <= 0 || snitchUsed) return
-    const interval = setInterval(() => setTimer(t => Math.max(0, t - 1)), 1000)
+    const interval = setInterval(() => {
+      setTimer(t => {
+        const next = Math.max(0, t - 1)
+        // Tick sounds escalate as the attack closes in. Quiet above 60s,
+        // normal tick under 60s, hot tick under 30s.
+        if (next > 0 && next <= 30)      sfx.hotTick()
+        else if (next > 0 && next <= 60) sfx.tick()
+        return next
+      })
+    }, 1000)
     return () => clearInterval(interval)
   }, [timer, snitchUsed])
 
@@ -258,7 +268,7 @@ export default function Dashboard({ onNavigate }) {
               <div style={{ color: '#888', fontSize: 12 }}>Snitches remaining:</div>
               <div style={{ color: '#e74c3c', fontSize: 14, fontWeight: 500 }}>1 / 3 free this week</div>
             </div>
-            <button className="btn btn-red btn-full" style={{ marginBottom: 10, padding: 14 }} onClick={() => { setSnitchUsed(true); setShowSnitchModal(false) }}>
+            <button className="btn btn-red btn-full" style={{ marginBottom: 10, padding: 14 }} onClick={() => { setSnitchUsed(true); setShowSnitchModal(false); sfx.snitch() }}>
               <i className="ti ti-eye-off" /> Snitch — Block Attack (Free)
             </button>
             <button className="btn btn-dark btn-full" style={{ padding: 14 }} onClick={() => setShowSnitchModal(false)}>

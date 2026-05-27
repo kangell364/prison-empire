@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { CARDS_COLLECTION, RARITY_COLORS } from '../data/gameData'
+import { sfx } from '../sounds'
 
 const RARITY_TIER = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 }
 const PACK_OPEN_DURATION_MS = 1600  // total time of shake → charge → burst
+const PACK_BURST_AT_MS      = 1300  // when the burst animation kicks in
 
 export default function Cards() {
   const [selectedCard, setSelectedCard]   = useState(null)
@@ -29,14 +31,22 @@ export default function Cards() {
     const card = locked[Math.floor(Math.random() * locked.length)] || CARDS_COLLECTION[4]
     setRevealedCard(card)
     setPackState('opening')
+    sfx.shake()
   }
 
   // Transition opening → revealed after the burst animation completes.
+  // Also fires the burst sound on the matching frame and the reveal ping
+  // (pitched by rarity tier) on transition.
   useEffect(() => {
     if (packState !== 'opening') return
-    const id = setTimeout(() => setPackState('revealed'), PACK_OPEN_DURATION_MS)
-    return () => clearTimeout(id)
-  }, [packState])
+    const tier = revealedCard ? RARITY_TIER[revealedCard.rarity] ?? 0 : 0
+    const burstId  = setTimeout(() => sfx.burst(), PACK_BURST_AT_MS)
+    const revealId = setTimeout(() => {
+      setPackState('revealed')
+      sfx.reveal(tier)
+    }, PACK_OPEN_DURATION_MS)
+    return () => { clearTimeout(burstId); clearTimeout(revealId) }
+  }, [packState, revealedCard])
 
   return (
     <div className="scroll-area animate-in">

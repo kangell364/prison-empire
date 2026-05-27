@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { US_STATES, ALL_CITIES, GRID_COLS, GRID_ROWS, PLAYER } from '../data/gameData'
 import { CountdownRing } from '../components/CountdownRing'
+import { sfx } from '../sounds'
 
 const GOLD = '#c9a84c'
 const RED  = '#e74c3c'
@@ -41,6 +42,7 @@ export default function MapScreen() {
   const launchAttack = (city) => {
     setSelectedCity(null)
     setAttacking(city)
+    sfx.launch()
     let secs = 15 * 60
     setAttackTimer(secs)
     const interval = setInterval(() => {

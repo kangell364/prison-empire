@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { BATTLE_ENEMIES, PLAYER } from '../data/gameData'
+import { sfx } from '../sounds'
 
 const STAMINA_MAX = 100
 const STAMINA_COST = 5
@@ -44,6 +45,8 @@ export default function Battle() {
     const enemyPower  = enemy.power + Math.floor(Math.random() * 30)
     setRolledPower({ player: playerPower, enemy: enemyPower })
 
+    sfx.clash()
+
     setTimeout(() => {
       const won = playerPower > enemyPower
 
@@ -61,6 +64,7 @@ export default function Battle() {
       setBattleLog(log)
       setBattleState(won ? 'won' : 'lost')
       setStamina(s => Math.max(0, s - STAMINA_COST))
+      if (won) sfx.win(); else sfx.lose()
     }, BATTLE_RESOLVE_MS)
   }
 
