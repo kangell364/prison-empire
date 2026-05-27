@@ -393,3 +393,29 @@ body {
   0%, 100% { text-shadow: 0 0 6px var(--rarity, #c9a84c); }
   50%      { text-shadow: 0 0 16px var(--rarity, #c9a84c), 0 0 24px var(--rarity, #c9a84c); }
 }
+
+/* Leaflet city-label styling — matches our dark/gold theme. */
+.leaflet-container { background: #0d0d15 !important; font-family: var(--font); }
+.leaflet-control-zoom a {
+  background: #13131f !important; color: #c9a84c !important;
+  border: 0.5px solid #2a2a3a !important;
+}
+.leaflet-control-zoom a:hover { background: #1e1e2a !important; }
+.leaflet-tooltip.city-label,
+.leaflet-tooltip {
+  background: rgba(10,10,15,0.9) !important;
+  border: 0.5px solid #2a2a3a !important;
+  color: #fff !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+}
+.leaflet-tooltip:before { display: none !important; }
+.leaflet-control-attribution {
+  background: rgba(10,10,15,0.7) !important;
+  color: #666 !important;
+  font-size: 9px !important;
+}
+.leaflet-control-attribution a { color: #888 !important; }

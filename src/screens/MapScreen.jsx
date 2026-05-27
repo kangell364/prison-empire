@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { ALL_CITIES, PLAYER } from '../data/gameData'
 import { CountdownRing } from '../components/CountdownRing'
-import { MapboxMap } from '../components/MapboxMap'
+import { LeafletMap } from '../components/LeafletMap'
 import { sfx } from '../sounds'
 
 const GOLD = '#c9a84c'
@@ -72,7 +72,7 @@ export default function MapScreen() {
           overflow: 'hidden',
           background: '#0d0d15',
         }}>
-          <MapboxMap
+          <LeafletMap
             cities={ALL_CITIES}
             onCityClick={(city) => setSelectedCity(city)}
             height="58vh"
