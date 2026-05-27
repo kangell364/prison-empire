@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react'
-import { PLAYER, TRAITS, RESOURCES, RARITY_COLORS } from '../data/gameData'
+import { PLAYER, TRAITS, RESOURCES, RARITY_COLORS, SKILLS } from '../data/gameData'
 import { sfx } from '../sounds'
 
-const GOLD = '#c9a84c'
-const RED  = '#e74c3c'
-const BLUE = '#4a9eff'
-const DIM  = '#555'
+const GOLD  = '#c9a84c'
+const RED   = '#e74c3c'
+const BLUE  = '#4a9eff'
+const GREEN = '#2ecc71'
+const DIM   = '#555'
 
 export default function Profile() {
   const [tab, setTab] = useState('upgrades')
@@ -35,15 +36,17 @@ export default function Profile() {
       <StatusBar poolMax={poolMax} />
 
       {/* Sub-tabs */}
-      <div style={{ padding: '14px 16px 0', display: 'flex', gap: 6 }}>
+      <div style={{ padding: '14px 16px 0', display: 'flex', gap: 5, flexWrap: 'wrap' }}>
         <SubTab active={tab === 'upgrades'}  onClick={() => setTab('upgrades')}>Upgrades</SubTab>
+        <SubTab active={tab === 'training'}  onClick={() => setTab('training')}>Training</SubTab>
         <SubTab active={tab === 'skills'}    onClick={() => setTab('skills')}>Skills</SubTab>
         <SubTab active={tab === 'equipment'} onClick={() => setTab('equipment')}>Equipment</SubTab>
       </div>
 
       {tab === 'upgrades'  && <UpgradesTab traits={traits} points={points} onUpgrade={upgrade} />}
-      {tab === 'skills'    && <PlaceholderTab title="Skills"
-        body="Spend Knowledge to unlock special abilities — schemes, intimidation moves, lockpicking, etc. Coming with the Supabase pass." />}
+      {tab === 'training'  && <TrainingTab />}
+      {tab === 'skills'    && <PlaceholderTab title="Skills Loadout"
+        body="Equip learned skills into Battle Dice slots 2–12. When a roll lands on an occupied slot the skill fires for the round. Fixed slots for v1; drag-to-assign UI coming next." />}
       {tab === 'equipment' && <PlaceholderTab title="Equipment"
         body="Shanks, body armor, contraband phones — slots that stack on top of your base traits. Coming with the Supabase pass." />}
     </div>
@@ -306,6 +309,223 @@ function TraitCard({ trait, value, isPrimary, canUpgrade, onUpgrade }) {
           {trait.detail}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------
+// Training tab
+// ---------------------------------------------------------------------
+
+function TrainingTab() {
+  // Local state because PLAYER is static — same pattern as Property.
+  const [learned, setLearned] = useState(PLAYER.learnedSkills)
+  const [lastUpgradeLevel, setLastUpgradeLevel] = useState(PLAYER.lastSkillUpgradeLevel)
+  const [feedback, setFeedback] = useState(null) // { skillId, kind: 'learn'|'upgrade', at }
+
+  const canUpgradeThisLevel = lastUpgradeLevel < PLAYER.level
+
+  // Next unlock teaser — first skill tier you don't yet qualify for
+  const nextUnlock = useMemo(() => {
+    const unmet = SKILLS.find(s => s.minLevel > PLAYER.level)
+    if (unmet) return unmet.minLevel
+    // No future skill data yet → first unlock is at the next 10-level mark
+    return Math.ceil((PLAYER.level + 1) / 10) * 10
+  }, [])
+
+  const learn = (skill) => {
+    const at = Date.now()
+    setLearned(l => ({ ...l, [skill.id]: { level: 1 } }))
+    setFeedback({ skillId: skill.id, kind: 'learn', at })
+    sfx.reveal(0)
+    setTimeout(() => setFeedback(f => (f && f.at === at) ? null : f), 3500)
+  }
+
+  const upgrade = (skill) => {
+    if (!canUpgradeThisLevel) return
+    const at = Date.now()
+    setLearned(l => {
+      const cur = l[skill.id] || { level: 0 }
+      return { ...l, [skill.id]: { level: cur.level + 1 } }
+    })
+    setLastUpgradeLevel(PLAYER.level)
+    setFeedback({ skillId: skill.id, kind: 'upgrade', at })
+    sfx.tick()
+    setTimeout(() => setFeedback(f => (f && f.at === at) ? null : f), 3500)
+  }
+
+  const availableSkills = SKILLS.filter(s => s.minLevel <= PLAYER.level)
+
+  return (
+    <>
+      {/* Intro */}
+      <div style={{ padding: '14px 16px 0' }}>
+        <div style={{
+          background: '#0d0d15',
+          border: '0.5px solid #1e1e2a',
+          borderRadius: 12, padding: 12,
+        }}>
+          <div style={{ color: '#fff', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
+            <i className="ti ti-brain" style={{ color: BLUE, marginRight: 6 }} />
+            Train Skills
+          </div>
+          <div style={{ color: '#888', fontSize: 11, lineHeight: 1.5 }}>
+            Learn skills here, then equip them into Battle Dice slots under the Skills tab.
+            Each player level lets you upgrade <span style={{ color: GOLD, fontWeight: 600 }}>one</span> skill.
+            New skill types unlock every 10 levels.
+          </div>
+        </div>
+      </div>
+
+      {/* Available skills */}
+      <div className="section" style={{ marginTop: 14 }}>
+        <div className="section-label">Available Skills</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {availableSkills.map(skill => (
+            <SkillCard
+              key={skill.id}
+              skill={skill}
+              learned={learned[skill.id]}
+              canUpgrade={canUpgradeThisLevel}
+              feedback={feedback && feedback.skillId === skill.id ? feedback : null}
+              onLearn={() => learn(skill)}
+              onUpgrade={() => upgrade(skill)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Next unlock */}
+      <div className="section">
+        <div className="card card-pad" style={{
+          textAlign: 'center', padding: '20px 16px',
+          background: '#0d0d15', borderColor: '#1e1e2a',
+        }}>
+          <i className="ti ti-lock" style={{ color: DIM, fontSize: 22, display: 'block', marginBottom: 6 }} />
+          <div style={{ color: '#888', fontSize: 12, lineHeight: 1.5 }}>
+            New skills unlock at <span style={{ color: GOLD, fontWeight: 700 }}>Level {nextUnlock}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Upgrade gating note */}
+      <div style={{ padding: '0 16px' }}>
+        <div style={{
+          background: canUpgradeThisLevel ? '#0e1a0e' : '#15110a',
+          border: `0.5px solid ${canUpgradeThisLevel ? `${GREEN}44` : `${GOLD}33`}`,
+          borderRadius: 10, padding: '10px 12px',
+          color: canUpgradeThisLevel ? GREEN : GOLD,
+          fontSize: 11, lineHeight: 1.5,
+        }}>
+          {canUpgradeThisLevel
+            ? `✓ You can upgrade one skill at Level ${PLAYER.level}.`
+            : `Skill upgrade used at Level ${lastUpgradeLevel}. Next upgrade unlocks at Level ${lastUpgradeLevel + 1}.`}
+        </div>
+      </div>
+    </>
+  )
+}
+
+function SkillCard({ skill, learned, canUpgrade, feedback, onLearn, onUpgrade }) {
+  const isLearned   = !!learned
+  const curLevel    = learned?.level || 0
+  const atMax       = curLevel >= skill.maxLevel
+  const cost        = isLearned ? skill.upgradeCostFor(curLevel) : skill.baseLearnCost
+
+  return (
+    <div className="card card-pad" style={{
+      padding: 14, position: 'relative', overflow: 'hidden',
+      borderColor: isLearned ? `${GOLD}55` : '#2a2a3a',
+      background: isLearned
+        ? 'linear-gradient(135deg, #15110a 0%, #13131f 70%)'
+        : '#13131f',
+    }}>
+      {isLearned && (
+        <div style={{
+          position: 'absolute', top: 0, right: 0,
+          background: GOLD, color: '#0a0a0f',
+          fontSize: 9, fontWeight: 800, letterSpacing: 1.2,
+          padding: '3px 10px',
+          borderBottomLeftRadius: 10,
+        }}>LV {curLevel}{atMax ? ' · MAX' : ''}</div>
+      )}
+
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <div style={{
+          width: 56, height: 56, borderRadius: 12,
+          background: '#1e1e2a',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 28, flexShrink: 0,
+          border: isLearned ? `1px solid ${GOLD}55` : '0.5px solid #2a2a3a',
+        }}>{skill.emoji}</div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: GOLD, fontSize: 9, fontWeight: 700, letterSpacing: 1, marginBottom: 1 }}>
+            {skill.category.toUpperCase()}
+          </div>
+          <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>{skill.name}</div>
+          <div style={{ color: '#888', fontSize: 11, lineHeight: 1.4, marginTop: 4 }}>
+            {skill.description}
+          </div>
+          <div style={{ color: '#666', fontSize: 10, marginTop: 6 }}>
+            {isLearned
+              ? <>Current effect: <span style={{ color: RED, fontWeight: 600 }}>+{curLevel * skill.perLevelAttack} attack</span> when triggered</>
+              : <>Level 1 effect: <span style={{ color: RED, fontWeight: 600 }}>+{skill.perLevelAttack} attack</span> when triggered</>
+            }
+          </div>
+          <div style={{ color: DIM, fontSize: 10, marginTop: 2 }}>
+            Min Level: {skill.minLevel} · Max Skill Level: {skill.maxLevel}
+          </div>
+        </div>
+      </div>
+
+      {/* Feedback */}
+      {feedback && (
+        <div style={{
+          marginTop: 8,
+          background: '#0e1a0e',
+          border: `0.5px solid ${GREEN}55`,
+          borderRadius: 8,
+          padding: '6px 8px',
+          fontSize: 11, color: GREEN, lineHeight: 1.4,
+        }}>
+          ✓ {feedback.kind === 'learn'
+            ? `Learned ${skill.shortName} at Level 1.`
+            : `Upgraded ${skill.shortName} to Level ${curLevel}.`}
+        </div>
+      )}
+
+      {/* Cost + action */}
+      {!atMax && (
+        <div style={{
+          marginTop: 12,
+          display: 'flex', alignItems: 'center', gap: 10,
+          paddingTop: 10,
+          borderTop: '0.5px solid #1e1e2a',
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: '#666', fontSize: 9, letterSpacing: 1 }}>COST</div>
+            <div style={{ color: GREEN, fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
+              {cost.knowledge} knowledge · {cost.hustle.toLocaleString()} Hustle
+            </div>
+          </div>
+          <button
+            onClick={isLearned ? onUpgrade : onLearn}
+            disabled={isLearned && !canUpgrade}
+            style={{
+              background: (isLearned && !canUpgrade) ? '#1e1e2a' : GOLD,
+              color: (isLearned && !canUpgrade) ? '#555' : '#0a0a0f',
+              border: 'none', borderRadius: 8,
+              padding: '10px 16px',
+              fontSize: 12, fontWeight: 700, letterSpacing: 1,
+              cursor: (isLearned && !canUpgrade) ? 'not-allowed' : 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            {isLearned ? (canUpgrade ? 'UPGRADE' : 'LV CAP') : 'LEARN'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

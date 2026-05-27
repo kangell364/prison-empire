@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import './App.css'
 import Dashboard from './screens/Dashboard'
 import Cards from './screens/Cards'
-import Battle from './screens/Battle'
+import Fight from './screens/Fight'
 import MapScreen from './screens/MapScreen'
 import Yard from './screens/Yard'
 import Profile from './screens/Profile'
@@ -31,7 +31,7 @@ export default function App() {
     switch(screen) {
       case 'home':    return <Dashboard onNavigate={setScreen} />
       case 'map':     return <MapScreen />
-      case 'battle':  return <Battle />
+      case 'battle':  return <Fight />
       case 'cards':   return <Cards />
       case 'yard':     return <Yard />
       case 'property': return <Property />
