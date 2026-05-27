@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 
@@ -13,6 +13,7 @@ const DIM  = '#666'
 export function MapboxMap({ cities, onCityClick, height = '60vh' }) {
   const containerRef = useRef(null)
   const mapRef       = useRef(null)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     if (!TOKEN || !containerRef.current || mapRef.current) return
@@ -31,6 +32,17 @@ export function MapboxMap({ cities, onCityClick, height = '60vh' }) {
     mapRef.current = map
 
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
+
+    // Surface any Mapbox errors visibly — useful for diagnosing token,
+    // style, or tile-fetch failures in production where the user can't
+    // open devtools.
+    map.on('error', (e) => {
+      const msg = e?.error?.message || e?.error?.toString() || 'Unknown map error'
+      // Filter out routine missing-source warnings that fire before sources load
+      if (msg.includes('source') && msg.includes('not exist')) return
+      console.error('Mapbox error:', e)
+      setError(msg)
+    })
 
     map.on('load', () => {
       // Tint the base style a touch warmer + darker so it feels like our app.
@@ -180,5 +192,21 @@ export function MapboxMap({ cities, onCityClick, height = '60vh' }) {
     )
   }
 
-  return <div ref={containerRef} style={{ width: '100%', height, borderRadius: 16, overflow: 'hidden' }} />
+  return (
+    <div style={{ position: 'relative', width: '100%', height }}>
+      <div ref={containerRef} style={{ width: '100%', height: '100%', borderRadius: 16, overflow: 'hidden' }} />
+      {error && (
+        <div style={{
+          position: 'absolute', left: 10, right: 10, bottom: 10,
+          background: '#1a0808', border: '0.5px solid #8b1a1a',
+          borderRadius: 8, padding: '8px 10px',
+          color: '#ff8a8a', fontSize: 11, lineHeight: 1.4,
+          fontFamily: 'ui-monospace, monospace',
+          maxHeight: 80, overflow: 'auto',
+        }}>
+          <strong style={{ color: '#ff4747' }}>Mapbox error:</strong> {error}
+        </div>
+      )}
+    </div>
+  )
 }
