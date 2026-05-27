@@ -11,7 +11,7 @@ const DIM  = '#888'
 const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
 
-export function LeafletMap({ cities, onCityClick, height = '60vh' }) {
+export function LeafletMap({ cities, onCityClick, attackingCityIds, height = '60vh' }) {
   const containerRef = useRef(null)
   const mapRef       = useRef(null)
   const [error, setError] = useState(null)
@@ -29,9 +29,10 @@ export function LeafletMap({ cities, onCityClick, height = '60vh' }) {
       zoomControl: true,
       attributionControl: false,
       // On mobile, disable dragging so single-finger scrolls the page.
-      // Desktop keeps full pan/zoom.
+      // Keep tap enabled — without it, taps on city pins don't fire click
+      // handlers. Dragging being off is what frees up single-finger scroll.
       dragging: !L.Browser.mobile,
-      tap: !L.Browser.mobile,
+      tap: true,
       scrollWheelZoom: !L.Browser.mobile,
     })
     mapRef.current = map
@@ -72,6 +73,7 @@ export function LeafletMap({ cities, onCityClick, height = '60vh' }) {
 
     cities.forEach(c => {
       if (typeof c.lat !== 'number' || typeof c.lng !== 'number') return
+      const isAttacking = attackingCityIds && attackingCityIds.has(c.id)
       const color  = c.isYours ? GOLD : c.owner ? RED : DIM
       const radius = c.tier === 3 ? 8 : c.tier === 2 ? 6 : 4
 
@@ -83,6 +85,17 @@ export function LeafletMap({ cities, onCityClick, height = '60vh' }) {
         fillOpacity: 0.25,
         interactive: false,
       }).addTo(layer)
+
+      // Attack target ping — pulsing ring on cities with a Drive By en route
+      if (isAttacking) {
+        const ringIcon = L.divIcon({
+          className: 'attack-target-ping',
+          iconSize: [42, 42],
+          iconAnchor: [21, 21],
+          html: '<span class="ring r1"></span><span class="ring r2"></span><span class="dot"></span>',
+        })
+        L.marker([c.lat, c.lng], { icon: ringIcon, interactive: false }).addTo(layer)
+      }
 
       // Solid pin (clickable)
       const pin = L.circleMarker([c.lat, c.lng], {
@@ -109,7 +122,7 @@ export function LeafletMap({ cities, onCityClick, height = '60vh' }) {
     })
 
     return () => { map.removeLayer(layer) }
-  }, [cities, onCityClick])
+  }, [cities, onCityClick, attackingCityIds])
 
   return (
     <div style={{ position: 'relative', width: '100%', height }}>

@@ -151,4 +151,11 @@ export const sfx = {
     noise({ duration: 0.35, filterFreq: 1800, filterQ: 1.2, volume: 0.22 })
     tone({ freq: 90, duration: 0.45, type: 'sine', volume: 0.22, delay: 0.05 })
   },
+  boom() {
+    // Drive-by landing — wide low impact + crackle tail
+    noise({ duration: 0.55, filterFreq: 220, filterQ: 0.4, volume: 0.40, type: 'lowpass' })
+    tone({ freq: 70, duration: 0.7, type: 'sine', volume: 0.32, sweepTo: 30 })
+    tone({ freq: 140, duration: 0.5, type: 'sawtooth', volume: 0.16, sweepTo: 50, delay: 0.03 })
+    noise({ duration: 0.25, filterFreq: 3200, filterQ: 1.4, volume: 0.18, delay: 0.18 })
+  },
 }

@@ -3,12 +3,14 @@ import { CARDS_COLLECTION, RARITY_COLORS } from '../data/gameData'
 import { sfx } from '../sounds'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
+import Crew from './Crew'
 
 const RARITY_TIER = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 }
 const PACK_OPEN_DURATION_MS = 1600  // total time of shake → charge → burst
 const PACK_BURST_AT_MS      = 1300  // when the burst animation kicks in
 
 export default function Cards() {
+  const [tab, setTab] = useState('collection')   // 'collection' | 'crew'
   const [selectedCard, setSelectedCard]   = useState(null)
   const [showPack, setShowPack]           = useState(false)
   // 'idle' (user prompted to open) | 'opening' (shake/charge/burst) | 'revealed'
@@ -50,8 +52,22 @@ export default function Cards() {
     return () => { clearTimeout(burstId); clearTimeout(revealId) }
   }, [packState, revealedCard])
 
+  // Crew tab swaps in the standalone Crew screen so all of its layout
+  // (header stats, slot grid, slot editor) renders without the pack banner
+  // and collection grid below it.
+  if (tab === 'crew') {
+    return (
+      <div className="scroll-area animate-in">
+        <TabSwitcher tab={tab} onTab={setTab} />
+        <Crew />
+      </div>
+    )
+  }
+
   return (
     <div className="scroll-area animate-in">
+
+      <TabSwitcher tab={tab} onTab={setTab} />
 
       {/* Pack Banner */}
       <div style={{ margin: '14px 16px 0', background: 'linear-gradient(135deg, #1a1510, #251e0a)', border: '0.5px solid #c9a84c44', borderRadius: 20, padding: 16, display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -147,6 +163,42 @@ export default function Cards() {
         />
       )}
 
+    </div>
+  )
+}
+
+function TabSwitcher({ tab, onTab }) {
+  const TABS = [
+    { id: 'collection', label: 'Collection', icon: 'ti-cards' },
+    { id: 'crew',       label: 'My Crew',    icon: 'ti-users' },
+  ]
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6,
+      padding: '14px 16px 0',
+    }}>
+      {TABS.map(t => {
+        const active = tab === t.id
+        return (
+          <button
+            key={t.id}
+            onClick={() => onTab(t.id)}
+            className="btn"
+            style={{
+              padding: '10px 14px',
+              background: active ? '#c9a84c18' : '#13131f',
+              border: `0.5px solid ${active ? '#c9a84c66' : '#2a2a3a'}`,
+              color: active ? '#c9a84c' : '#888',
+              borderRadius: 12,
+              fontSize: 13, fontWeight: 500,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}
+          >
+            <i className={`ti ${t.icon}`} aria-hidden="true" />
+            {t.label}
+          </button>
+        )
+      })}
     </div>
   )
 }

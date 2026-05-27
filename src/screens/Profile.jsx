@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react'
-import { PLAYER, TRAITS, RESOURCES, RARITY_COLORS, SKILLS } from '../data/gameData'
+import { PLAYER, TRAITS, RARITY_COLORS, SKILLS } from '../data/gameData'
 import { sfx } from '../sounds'
+import { useHustle } from '../state/playerStore'
 
 const GOLD  = '#c9a84c'
 const RED   = '#e74c3c'
@@ -58,6 +59,7 @@ export default function Profile() {
 // ---------------------------------------------------------------------
 
 function StatusBar({ poolMax }) {
+  const hustle = useHustle()
   const xpPct = Math.round((PLAYER.xp / PLAYER.xpNext) * 100)
   const cardColor = RARITY_COLORS[PLAYER.card.rarity]
 
@@ -137,7 +139,7 @@ function StatusBar({ poolMax }) {
             <span style={{ color: '#888', fontSize: 11 }}>Hustle</span>
           </div>
           <span style={{ color: GOLD, fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-            {RESOURCES.hustle.value.toLocaleString()}
+            {hustle.toLocaleString()}
           </span>
         </div>
       </div>

@@ -419,3 +419,53 @@ body {
   font-size: 9px !important;
 }
 .leaflet-control-attribution a { color: #888 !important; }
+
+/* Drive By target ping — pulsing rings on cities with an attack en route */
+.attack-target-ping {
+  position: relative;
+  pointer-events: none;
+}
+.attack-target-ping .ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  margin-left: -7px;
+  border-radius: 50%;
+  border: 1.5px solid #ff4747;
+  box-shadow: 0 0 8px #ff474788;
+  opacity: 0;
+  animation: targetPing 1.6s ease-out infinite;
+}
+.attack-target-ping .ring.r2 { animation-delay: 0.8s; }
+.attack-target-ping .dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: #ff4747;
+  box-shadow: 0 0 8px #ff4747;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+/* Banner slides in from the top when a Drive By launches */
+@keyframes attackBannerIn {
+  from { transform: translateY(-12px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+.attack-banner-in { animation: attackBannerIn 0.35s ease-out forwards; }
+
+/* DRIVE BY LANDED stamp — pop-in for the icon on the landing modal */
+@keyframes landingStampPop {
+  0%   { transform: scale(0.4) rotate(-12deg); opacity: 0; }
+  55%  { transform: scale(1.18) rotate(4deg);  opacity: 1; }
+  78%  { transform: scale(0.96) rotate(-2deg); opacity: 1; }
+  100% { transform: scale(1)    rotate(0);     opacity: 1; }
+}
+.landing-stamp { animation: landingStampPop 0.55s cubic-bezier(.18,.89,.32,1.28) forwards; }
