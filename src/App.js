@@ -6,15 +6,17 @@ import Battle from './screens/Battle'
 import MapScreen from './screens/MapScreen'
 import Yard from './screens/Yard'
 import Profile from './screens/Profile'
+import Property from './screens/Property'
 import { isMuted, setMuted, subscribeMuted } from './sounds'
 
+// Profile lives on the header avatar (top-right) so the bottom nav stays at 6.
 const NAV_ITEMS = [
-  { id: 'home',   icon: 'ti-home',    label: 'Home'   },
-  { id: 'map',    icon: 'ti-map',     label: 'Map'    },
-  { id: 'battle', icon: 'ti-sword',   label: 'Fight'  },
-  { id: 'cards',  icon: 'ti-cards',   label: 'Cards'  },
-  { id: 'yard',   icon: 'ti-trophy',  label: 'Yard'   },
-  { id: 'profile',icon: 'ti-user',    label: 'Profile'},
+  { id: 'home',     icon: 'ti-home',     label: 'Home'    },
+  { id: 'map',      icon: 'ti-map',      label: 'Map'     },
+  { id: 'battle',   icon: 'ti-sword',    label: 'Fight'   },
+  { id: 'cards',    icon: 'ti-cards',    label: 'Cards'   },
+  { id: 'yard',     icon: 'ti-trophy',   label: 'Yard'    },
+  { id: 'property', icon: 'ti-building', label: 'Property'},
 ]
 
 export default function App() {
@@ -31,9 +33,10 @@ export default function App() {
       case 'map':     return <MapScreen />
       case 'battle':  return <Battle />
       case 'cards':   return <Cards />
-      case 'yard':    return <Yard />
-      case 'profile': return <Profile />
-      default:        return <Dashboard onNavigate={setScreen} />
+      case 'yard':     return <Yard />
+      case 'property': return <Property />
+      case 'profile':  return <Profile />
+      default:         return <Dashboard onNavigate={setScreen} />
     }
   }
 

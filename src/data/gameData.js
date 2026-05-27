@@ -369,6 +369,121 @@ export function streetRep(p) {
   return ((p.kos - p.defeats * 10) * 100) + ((p.wins - p.losses * 5) * 5) + p.jobs
 }
 
+// PROPERTIES — passive Hustle/hr income items, modeled on Cat Champions' Property
+// page. Tier unlock levels: 1, 5, 10, 15, 20, 30, 40, 50, 60, 70, 80, then 100,
+// 125, 150, 200, 250, 300, 400, 500, 750, 1k, 1.5k, 2k, 3k, 4k, 5k.
+// Two items per tier. Income roughly doubles per tier; cost ≈ income × payback
+// hours (escalating from ~100h early-game to ~1000h late-game).
+// Costs/balance are intentionally rough — to be tuned with the economy pass.
+export const PROPERTIES = [
+  // Level 1 (starter — everyone sees these)
+  { id: 'soup_cup',            name: 'Soup Cup',                       emoji: '🥣',  perHr: 5,             baseCost: 500,              minLevel: 1 },
+  { id: 'soap_rope',           name: 'Soap on a Rope',                 emoji: '🧼',  perHr: 10,            baseCost: 1_000,            minLevel: 1 },
+
+  // Level 5
+  { id: 'bunk_stash',          name: "Bunkmate's Stash",               emoji: '🛏️',  perHr: 25,            baseCost: 5_000,            minLevel: 5 },
+  { id: 'contraband_smokes',   name: 'Contraband Cigarettes',          emoji: '🚬',  perHr: 40,            baseCost: 10_000,           minLevel: 5 },
+
+  // Level 10
+  { id: 'burner_phone',        name: 'Burner Cell Phone',              emoji: '📱',  perHr: 80,            baseCost: 20_000,           minLevel: 10 },
+  { id: 'hustle_notebook',     name: 'Hustle Notebook',                emoji: '📓',  perHr: 130,           baseCost: 40_000,           minLevel: 10 },
+
+  // Level 15
+  { id: 'workout_bench',       name: 'Yard Workout Bench',             emoji: '🏋️',  perHr: 200,           baseCost: 60_000,           minLevel: 15 },
+  { id: 'tattoo_gun',          name: 'Tattoo Gun Setup',               emoji: '🖋️',  perHr: 320,           baseCost: 120_000,          minLevel: 15 },
+
+  // Level 20
+  { id: 'hooch_still',         name: 'Hooch Still (Pruno)',            emoji: '🍶',  perHr: 500,           baseCost: 180_000,          minLevel: 20 },
+  { id: 'commissary_plug',     name: 'Commissary Connection',          emoji: '🛒',  perHr: 800,           baseCost: 360_000,          minLevel: 20 },
+
+  // Level 30
+  { id: 'laundry_racket',      name: 'Laundry Racket',                 emoji: '🧺',  perHr: 1_200,         baseCost: 480_000,          minLevel: 30 },
+  { id: 'kitchen_hustle',      name: 'Kitchen Hustle',                 emoji: '🍳',  perHr: 2_000,         baseCost: 960_000,          minLevel: 30 },
+
+  // Level 40
+  { id: 'visitor_run',         name: 'Visitor Drop Run',               emoji: '🚪',  perHr: 2_800,         baseCost: 1_200_000,        minLevel: 40 },
+  { id: 'phone_scalping',      name: 'Phone Time Scalping',            emoji: '☎️',  perHr: 4_500,         baseCost: 2_400_000,        minLevel: 40 },
+
+  // Level 50
+  { id: 'lookout_crew',        name: 'Cell Block Lookout Crew',        emoji: '👁️',  perHr: 6_500,         baseCost: 3_000_000,        minLevel: 50 },
+  { id: 'mule_network',        name: 'Drug Mule Network',              emoji: '🐴',  perHr: 10_000,        baseCost: 6_000_000,        minLevel: 50 },
+
+  // Level 60
+  { id: 'smuggler_pipeline',   name: "Smuggler's Pipeline",            emoji: '🚛',  perHr: 15_000,        baseCost: 7_500_000,        minLevel: 60 },
+  { id: 'black_market_store',  name: 'Black Market Storefront',        emoji: '🏪',  perHr: 24_000,        baseCost: 15_000_000,       minLevel: 60 },
+
+  // Level 70
+  { id: 'stash_house',         name: 'Hidden Stash House',             emoji: '🏚️',  perHr: 35_000,        baseCost: 19_000_000,       minLevel: 70 },
+  { id: 'cartel_lieutenant',   name: 'Cartel Lieutenant Contract',     emoji: '🤝',  perHr: 55_000,        baseCost: 38_000_000,       minLevel: 70 },
+
+  // Level 80
+  { id: 'penn_wing',           name: 'Federal Penn Wing',              emoji: '🏛️',  perHr: 80_000,        baseCost: 45_000_000,       minLevel: 80 },
+  { id: 'witness_intimidate',  name: 'Witness Intimidation Op',        emoji: '🤫',  perHr: 125_000,       baseCost: 90_000_000,       minLevel: 80 },
+
+  // Level 100
+  { id: 'crooked_co',          name: 'Crooked CO on Payroll',          emoji: '👮',  perHr: 200_000,       baseCost: 115_000_000,      minLevel: 100 },
+  { id: 'bookkeeping_op',      name: 'Inmate Bookkeeping Op',          emoji: '📊',  perHr: 320_000,       baseCost: 230_000_000,      minLevel: 100 },
+
+  // Level 125
+  { id: 'halfway_network',     name: 'Halfway House Network',          emoji: '🏘️',  perHr: 480_000,       baseCost: 290_000_000,      minLevel: 125 },
+  { id: 'fight_ring',          name: 'Underground Fight Ring',         emoji: '🥊',  perHr: 750_000,       baseCost: 570_000_000,      minLevel: 125 },
+
+  // Level 150
+  { id: 'commissary_monopoly', name: 'Commissary Monopoly',            emoji: '🏬',  perHr: 1_100_000,     baseCost: 700_000_000,      minLevel: 150 },
+  { id: 'smuggling_empire',    name: 'Smuggling Empire',               emoji: '🚢',  perHr: 1_700_000,     baseCost: 1_400_000_000,    minLevel: 150 },
+
+  // Level 200
+  { id: 'statewide_dist',      name: 'Statewide Distribution',         emoji: '🗺️',  perHr: 2_500_000,     baseCost: 1_700_000_000,    minLevel: 200 },
+  { id: 'multi_facility',      name: 'Multi-Facility Network',         emoji: '🏰',  perHr: 4_000_000,     baseCost: 3_400_000_000,    minLevel: 200 },
+
+  // Level 250
+  { id: 'federal_pipeline',    name: 'Federal Pipeline',               emoji: '🛢️',  perHr: 5_500_000,     baseCost: 3_900_000_000,    minLevel: 250 },
+  { id: 'cross_border',        name: 'Cross-Border Operation',         emoji: '✈️',  perHr: 8_500_000,     baseCost: 7_700_000_000,    minLevel: 250 },
+
+  // Level 300
+  { id: 'cartel_partner',      name: 'Cartel Partnership',             emoji: '💎',  perHr: 12_000_000,    baseCost: 8_600_000_000,    minLevel: 300 },
+  { id: 'money_laundering',    name: 'Money Laundering Front',         emoji: '💸',  perHr: 18_000_000,    baseCost: 17_000_000_000,   minLevel: 300 },
+
+  // Level 400
+  { id: 'offshore_acct',       name: 'Offshore Account Network',       emoji: '🏝️',  perHr: 25_000_000,    baseCost: 19_000_000_000,   minLevel: 400 },
+  { id: 'crypto_launder',      name: 'Crypto Laundering Op',           emoji: '💻',  perHr: 38_000_000,    baseCost: 38_000_000_000,   minLevel: 400 },
+
+  // Level 500
+  { id: 'politician_payroll',  name: 'Politician on Payroll',          emoji: '🗳️',  perHr: 50_000_000,    baseCost: 40_000_000_000,   minLevel: 500 },
+  { id: 'fed_judge',           name: 'Federal Judge in Pocket',        emoji: '⚖️',  perHr: 75_000_000,    baseCost: 80_000_000_000,   minLevel: 500 },
+
+  // Level 750
+  { id: 'state_senator',       name: 'State Senator Bought',           emoji: '🎖️',  perHr: 100_000_000,   baseCost: 85_000_000_000,   minLevel: 750 },
+  { id: 'governor_conn',       name: "Governor's Mansion Connection",  emoji: '🎩',  perHr: 150_000_000,   baseCost: 170_000_000_000,  minLevel: 750 },
+
+  // Level 1000
+  { id: 'dea_mole',            name: 'DEA Mole',                       emoji: '🐀',  perHr: 200_000_000,   baseCost: 180_000_000_000,  minLevel: 1000 },
+  { id: 'cabinet_bribed',      name: 'Cabinet Member Bribed',          emoji: '💼',  perHr: 300_000_000,   baseCost: 360_000_000_000,  minLevel: 1000 },
+
+  // Level 1500
+  { id: 'wall_street',         name: 'Wall Street Connection',         emoji: '📈',  perHr: 400_000_000,   baseCost: 380_000_000_000,  minLevel: 1500 },
+  { id: 'fed_reserve',         name: 'Federal Reserve Insider',        emoji: '🏦',  perHr: 600_000_000,   baseCost: 760_000_000_000,  minLevel: 1500 },
+
+  // Level 2000
+  { id: 'crime_syndicate',     name: 'International Crime Syndicate',  emoji: '🌍',  perHr: 800_000_000,   baseCost: 800_000_000_000,  minLevel: 2000 },
+  { id: 'un_diplomatic',       name: 'UN Diplomatic Cover',            emoji: '🌐',  perHr: 1_200_000_000, baseCost: 1_600_000_000_000, minLevel: 2000 },
+
+  // Level 3000
+  { id: 'black_site',          name: 'Black Site Ownership',           emoji: '🕳️',  perHr: 1_600_000_000, baseCost: 1_600_000_000_000, minLevel: 3000 },
+  { id: 'private_military',    name: 'Private Military Contractor',    emoji: '🪖',  perHr: 2_400_000_000, baseCost: 3_200_000_000_000, minLevel: 3000 },
+
+  // Level 4000
+  { id: 'nation_sponsor',      name: 'Nation-State Sponsorship',       emoji: '🚀',  perHr: 3_200_000_000, baseCost: 3_400_000_000_000, minLevel: 4000 },
+  { id: 'shadow_gov',          name: 'Shadow Government',              emoji: '👤',  perHr: 4_800_000_000, baseCost: 6_800_000_000_000, minLevel: 4000 },
+
+  // Level 5000
+  { id: 'cartel_emperor',      name: 'Cartel Emperor',                 emoji: '👑',  perHr: 6_400_000_000, baseCost: 7_000_000_000_000, minLevel: 5000 },
+  { id: 'underworld_sovereign',name: 'Underworld Sovereign',           emoji: '☠️',  perHr: 9_600_000_000, baseCost: 14_000_000_000_000, minLevel: 5000 },
+]
+
+// Per-purchase cost growth (Cat Champions ≈ 2%). Cost(n) = base × COST_GROWTH^n.
+export const PROPERTY_COST_GROWTH = 1.02
+
 // Active Hit List — community-funded bounties. Targets reference RANKED_PLAYERS.id.
 export const HIT_LIST = [
   { id: 1, targetId: 'p4',  bountyHustle: 2_400_000, contributors: 12, openedDaysAgo: 3, openedHoursAgo: 4  },
