@@ -275,8 +275,6 @@ function CollectionTile({ card, cardLevel, count, inCrew, upgrades, onTap, onMer
       cursor: 'pointer',
       position: 'relative',
       overflow: 'hidden',
-      opacity: inCrew ? 0.5 : 1,
-      filter: inCrew ? 'grayscale(0.55)' : 'none',
     }}>
       {/* Rarity top bar */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: rarityColor }} />
