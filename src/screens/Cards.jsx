@@ -2,11 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { CARDS_COLLECTION, RARITY_COLORS } from '../data/gameData'
 import { useCardCounts, addCards, mergeCard, getOwnedTuples, STACK_SIZE } from '../state/cardsStore'
 import {
-  baseAtk, baseDef,
-  useCrew, upgradeStat, upgradeLevels,
-  HUSTLE_COST_PER_LEVEL, MAX_UPGRADE_LEVEL,
+  baseAtk, baseDef, useCrew,
   ATK_PER_LEVEL, DEF_PER_LEVEL,
 } from '../state/crewStore'
+import {
+  useUpgrades, readUpgrade, getUpgrade, upgradeStat,
+  HUSTLE_COST_PER_LEVEL, MAX_UPGRADE_LEVEL,
+} from '../state/upgradesStore'
 import { useHustle, spendHustle } from '../state/playerStore'
 import { sfx } from '../sounds'
 import { Avatar } from '../components/Avatar'
@@ -79,6 +81,7 @@ export default function Cards() {
   const [filter, setFilter] = useState('All')
   const counts = useCardCounts()
   const crew   = useCrew()
+  const upgradesMap = useUpgrades()
   const hustle = useHustle()
   // "Owned" for pack-pool purposes = has at least one Level 1 copy.
   const ownedSet = useMemo(() => {
@@ -97,13 +100,12 @@ export default function Cards() {
     return s
   }, [crew.leader, crew.members])
 
-  const handleUpgrade = (cardId) => (stat) => {
-    const u = upgradeLevels(cardId, crew.upgrades)
-    const current = u[stat] || 0
+  const handleUpgrade = (cardId, cardLevel) => (stat) => {
+    const current = getUpgrade(cardId, cardLevel)[stat] || 0
     if (current >= MAX_UPGRADE_LEVEL) return
     const cost = HUSTLE_COST_PER_LEVEL(current)
     if (spendHustle(cost)) {
-      upgradeStat(cardId, stat)
+      upgradeStat(cardId, cardLevel, stat)
       sfx.buy()
     } else {
       sfx.deny?.()
@@ -244,7 +246,7 @@ export default function Cards() {
                   cardLevel={t.level}
                   count={t.count}
                   inCrew={inCrewSet.has(t.id)}
-                  upgrades={crew.upgrades[t.id]}
+                  upgrades={readUpgrade(upgradesMap, t.id, t.level)}
                   onTap={() => setSelectedCard({ card, cardLevel: t.level, count: t.count })}
                   onMerge={() => mergeCard(t.id, t.level)}
                 />
@@ -286,9 +288,9 @@ export default function Cards() {
           cardType="PLAYER"
           count={selectedCard.count}
           cardLevel={selectedCard.cardLevel}
-          upgrades={crew.upgrades[selectedCard.card.id] || { atk: 0, def: 0 }}
+          upgrades={readUpgrade(upgradesMap, selectedCard.card.id, selectedCard.cardLevel)}
           hustle={hustle}
-          onUpgrade={handleUpgrade(selectedCard.card.id)}
+          onUpgrade={handleUpgrade(selectedCard.card.id, selectedCard.cardLevel)}
           atkPerLevel={ATK_PER_LEVEL}
           defPerLevel={DEF_PER_LEVEL}
           maxUpgradeLevel={MAX_UPGRADE_LEVEL}

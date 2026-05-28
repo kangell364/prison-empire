@@ -1,14 +1,16 @@
-// Crew store — 12 slots (1 Leader + 11 Members) + per-card stat upgrades.
-// Persists to localStorage. Replaced by Supabase when the backend lands.
+// Crew store — 12 slots (1 Leader + 11 Members). Persists to localStorage;
+// replaced by Supabase when the crew_slots phase lands.
+//
+// Per-card ATK/DEF upgrades moved out to upgradesStore (Supabase-backed,
+// level-aware). The combat math below takes an explicit { [cardId]: {atk,def} }
+// upgrades map so it stays pure and works for opponents too — opponent
+// upgrades come from static data, not the store.
 //
 // Stat model:
 //   baseAtk(card) = muscle * 5 + 15         (matches BattleDiceModal formula)
 //   baseDef(card) = cred   * 5 + 10
-//   atk(card) = baseAtk + 10 × upgrades.atk
-//   def(card) = baseDef + 10 × upgrades.def
-//
-// Upgrade economy: each +10 ATK or +10 DEF costs HUSTLE_COST_PER_LEVEL Hustle.
-// Capped at MAX_UPGRADE_LEVEL per stat.
+//   atk(card) = baseAtk + ATK_PER_LEVEL × upgrades.atk
+//   def(card) = baseDef + DEF_PER_LEVEL × upgrades.def
 
 import { useEffect, useState } from 'react'
 import { STARTER_CARD_IDS } from '../data/gameData'
@@ -18,8 +20,6 @@ const KEY = 'pe_crew_v1'
 export const CREW_MEMBER_SLOTS = 11
 export const ATK_PER_LEVEL     = 10
 export const DEF_PER_LEVEL     = 10
-export const MAX_UPGRADE_LEVEL = 20
-export const HUSTLE_COST_PER_LEVEL = (currentLevel) => 200 + currentLevel * 100
 
 // ---- store internals -----------------------------------------------
 
@@ -41,7 +41,6 @@ function normalize(s) {
   return {
     leader:  s.leader  ?? null,
     members: padOrTrim(Array.isArray(s.members) ? s.members : [], CREW_MEMBER_SLOTS),
-    upgrades: s.upgrades && typeof s.upgrades === 'object' ? s.upgrades : {},
   }
 }
 
@@ -63,7 +62,6 @@ function seedFromCollection() {
   return {
     leader:  leaderId,
     members: padOrTrim(memberIds, CREW_MEMBER_SLOTS),
-    upgrades: {},
   }
 }
 
@@ -119,16 +117,6 @@ export function clearSlot(kind, slotIndex) {
   }
 }
 
-export function upgradeStat(cardId, stat /* 'atk' | 'def' */) {
-  const u = state.upgrades[cardId] || { atk: 0, def: 0 }
-  const next = (u[stat] || 0) + 1
-  if (next > MAX_UPGRADE_LEVEL) return
-  commit({
-    ...state,
-    upgrades: { ...state.upgrades, [cardId]: { ...u, [stat]: next } },
-  })
-}
-
 export function useCrew() {
   const [s, setS] = useState(state)
   useEffect(() => {
@@ -154,18 +142,14 @@ export function baseDef(card) {
   return 0
 }
 
-export function atkOf(card, upgrades = state.upgrades) {
+export function atkOf(card, upgrades = {}) {
   const u = upgrades[card?.id]
   return baseAtk(card) + (u?.atk || 0) * ATK_PER_LEVEL
 }
 
-export function defOf(card, upgrades = state.upgrades) {
+export function defOf(card, upgrades = {}) {
   const u = upgrades[card?.id]
   return baseDef(card) + (u?.def || 0) * DEF_PER_LEVEL
-}
-
-export function upgradeLevels(cardId, upgrades = state.upgrades) {
-  return upgrades[cardId] || { atk: 0, def: 0 }
 }
 
 // Combined ATK/DEF for a full crew (leader + members). Cards can be card

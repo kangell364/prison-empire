@@ -6,11 +6,14 @@ import { sfx } from '../sounds'
 import { CrewBattleModal } from '../components/CrewBattleModal'
 import { buildPracticeCrew } from '../data/opponentCrews'
 import {
-  useCrew, setLeader, setMember, clearSlot, upgradeStat,
-  atkOf, defOf, upgradeLevels,
-  MAX_UPGRADE_LEVEL, HUSTLE_COST_PER_LEVEL,
+  useCrew, setLeader, setMember, clearSlot,
+  atkOf, defOf,
   ATK_PER_LEVEL, DEF_PER_LEVEL,
 } from '../state/crewStore'
+import {
+  useUpgrades, flatAtLevel, getUpgrade, upgradeStat,
+  MAX_UPGRADE_LEVEL, HUSTLE_COST_PER_LEVEL,
+} from '../state/upgradesStore'
 import { useHustle, spendHustle, addHustle } from '../state/playerStore'
 import { useCardCounts } from '../state/cardsStore'
 
@@ -25,6 +28,10 @@ export default function Crew() {
   const crew    = useCrew()
   const hustle  = useHustle()
   const counts  = useCardCounts()
+  // Crew slots are Level-1 only, so the whole screen works off a flat
+  // { [cardId]: {atk,def} } view of the player's Level-1 upgrades.
+  const upgradesMap = useUpgrades()
+  const flat = useMemo(() => flatAtLevel(upgradesMap, 1), [upgradesMap])
   // For the crew picker, "owned" = at least one Level 1 copy. Crew slots
   // don't yet care about levels (Phase 3 work).
   const ownedSet = useMemo(() => {
@@ -44,9 +51,9 @@ export default function Crew() {
   const totals = useMemo(() => {
     let atk = 0, def = 0, filled = 0
     const all = [leaderCard, ...memberCards].filter(Boolean)
-    all.forEach(c => { atk += atkOf(c, crew.upgrades); def += defOf(c, crew.upgrades); filled++ })
+    all.forEach(c => { atk += atkOf(c, flat); def += defOf(c, flat); filled++ })
     return { atk, def, filled, total: 12 }
-  }, [leaderCard, memberCards, crew.upgrades])
+  }, [leaderCard, memberCards, flat])
 
   // Owned cards not currently in any slot — for the picker
   const benchCards = useMemo(() => {
@@ -71,12 +78,11 @@ export default function Crew() {
   // live in the modal (unified with the Cards collection); Replace/Remove
   // are surfaced as action buttons in the modal footer.
   const onUpgrade = (cardId) => (stat) => {
-    const u = upgradeLevels(cardId, crew.upgrades)
-    const current = u[stat] || 0
+    const current = getUpgrade(cardId, 1)[stat] || 0
     if (current >= MAX_UPGRADE_LEVEL) return
     const cost = HUSTLE_COST_PER_LEVEL(current)
     if (spendHustle(cost)) {
-      upgradeStat(cardId, stat)
+      upgradeStat(cardId, 1, stat)
       sfx.buy()
     } else {
       sfx.deny?.()
@@ -120,7 +126,7 @@ export default function Crew() {
         <div className="section-label">Crew Leader</div>
         <LeaderTile
           card={leaderCard}
-          upgrades={crew.upgrades}
+          upgrades={flat}
           onClick={() => setEditing({ kind: 'leader' })}
         />
       </div>
@@ -135,7 +141,7 @@ export default function Crew() {
             <MemberTile
               key={i}
               card={c}
-              upgrades={crew.upgrades}
+              upgrades={flat}
               onClick={() => setEditing({ kind: 'member', slotIndex: i })}
             />
           ))}
@@ -162,7 +168,7 @@ export default function Crew() {
             name: 'Your Crew',
             leader: leaderCard,
             members: memberCards,
-            upgrades: crew.upgrades,
+            upgrades: flat,
           }}
           opponent={battling}
           onClose={() => setBattling(null)}
@@ -182,6 +188,7 @@ export default function Crew() {
             <SlotEditor
               editing={editing}
               benchCards={benchCards}
+              upgrades={flat}
               onPick={onPick}
               onClose={() => setEditing(null)}
             />
@@ -191,7 +198,7 @@ export default function Crew() {
           <CharacterDetailModal
             character={slotCard}
             cardType="PLAYER"
-            upgrades={crew.upgrades[slotCard.id] || { atk: 0, def: 0 }}
+            upgrades={flat[slotCard.id] || { atk: 0, def: 0 }}
             hustle={hustle}
             onUpgrade={onUpgrade(slotCard.id)}
             atkPerLevel={ATK_PER_LEVEL}
@@ -215,6 +222,7 @@ export default function Crew() {
         <SlotEditor
           editing={editing}
           benchCards={benchCards}
+          upgrades={flat}
           onPick={onPick}
           onClose={() => setEditing(null)}
         />
@@ -349,7 +357,7 @@ function StatChip({ label, value, color }) {
 // shared CharacterDetailModal (upgrades + Replace/Remove there).
 // ---------------------------------------------------------------------
 
-function SlotEditor({ editing, benchCards, onPick, onClose }) {
+function SlotEditor({ editing, benchCards, upgrades, onPick, onClose }) {
   return (
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)',
@@ -371,6 +379,7 @@ function SlotEditor({ editing, benchCards, onPick, onClose }) {
 
         <CardPicker
           benchCards={benchCards}
+          upgrades={upgrades}
           onPick={onPick}
           onCancel={onClose}
         />
@@ -379,7 +388,7 @@ function SlotEditor({ editing, benchCards, onPick, onClose }) {
   )
 }
 
-function CardPicker({ benchCards, onPick, onCancel }) {
+function CardPicker({ benchCards, upgrades, onPick, onCancel }) {
   return (
     <>
       <div style={{ color: '#fff', fontSize: 20, fontWeight: 600, marginBottom: 6 }}>
@@ -429,8 +438,8 @@ function CardPicker({ benchCards, onPick, onCancel }) {
                   display: 'flex', justifyContent: 'space-between', gap: 4,
                   marginTop: 8, fontSize: 10, fontVariantNumeric: 'tabular-nums',
                 }}>
-                  <span style={{ color: RED }}>ATK {atkOf(card)}</span>
-                  <span style={{ color: '#4a9eff' }}>DEF {defOf(card)}</span>
+                  <span style={{ color: RED }}>ATK {atkOf(card, upgrades)}</span>
+                  <span style={{ color: '#4a9eff' }}>DEF {defOf(card, upgrades)}</span>
                 </div>
               </div>
             )
