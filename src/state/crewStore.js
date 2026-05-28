@@ -11,7 +11,7 @@
 // Capped at MAX_UPGRADE_LEVEL per stat.
 
 import { useEffect, useState } from 'react'
-import { CARDS_COLLECTION } from '../data/gameData'
+import { STARTER_CARD_IDS } from '../data/gameData'
 
 const KEY = 'pe_crew_v1'
 
@@ -51,18 +51,18 @@ function padOrTrim(arr, n) {
   return out
 }
 
-// First-launch crew: drop owned cards into the slots so the player isn't
-// staring at an empty roster. SlickRico is the natural leader.
+// First-launch crew: drop starter cards into the slots so the player isn't
+// staring at an empty roster. SlickRico (id 1) is the natural leader.
+// Once Phase 3 moves crew to Supabase, this seed only runs in the
+// localStorage fallback path.
 function seedFromCollection() {
-  const owned = CARDS_COLLECTION.filter(c => c.owned)
-  const leader = owned.find(c => c.id === 1) || owned[0] || null
-  const members = owned
-    .filter(c => !leader || c.id !== leader.id)
+  const leaderId = STARTER_CARD_IDS.includes(1) ? 1 : (STARTER_CARD_IDS[0] ?? null)
+  const memberIds = STARTER_CARD_IDS
+    .filter(id => id !== leaderId)
     .slice(0, CREW_MEMBER_SLOTS)
-    .map(c => c.id)
   return {
-    leader:  leader ? leader.id : null,
-    members: padOrTrim(members, CREW_MEMBER_SLOTS),
+    leader:  leaderId,
+    members: padOrTrim(memberIds, CREW_MEMBER_SLOTS),
     upgrades: {},
   }
 }

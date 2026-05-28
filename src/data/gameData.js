@@ -124,23 +124,27 @@ export const LEADERBOARD = [
 ]
 
 export const CARDS_COLLECTION = [
-  { id: 1,  name: 'Slick Rico',      emoji: '🤵', avatar: '/slickrico.jpg', rarity: 'epic',      hustle: 15, muscle: 6,  smarts: 14, cred: 12, owned: true,  special: 'Con Artist',
+  { id: 1,  name: 'Slick Rico',      emoji: '🤵', avatar: '/slickrico.jpg', rarity: 'epic',      hustle: 15, muscle: 6,  smarts: 14, cred: 12, special: 'Con Artist',
     bio: 'Three-piece-suit charm, federal-grade rap sheet. Could sell snow to penguins and bail bonds to monks. Your front man and your closer.' },
-  { id: 2,  name: 'Big T',           emoji: '💪', rarity: 'rare',      hustle: 4,  muscle: 18, smarts: 3,  cred: 9,  owned: true,  special: 'Intimidation',
+  { id: 2,  name: 'Big T',           emoji: '💪', rarity: 'rare',      hustle: 4,  muscle: 18, smarts: 3,  cred: 9,  special: 'Intimidation',
     bio: 'Two-time Golden Gloves before the system caught him. Speaks four words a day, throws five hundred punches.' },
-  { id: 3,  name: 'The Professor',   emoji: '🧠', rarity: 'uncommon',  hustle: 6,  muscle: 2,  smarts: 15, cred: 3,  owned: true,  special: 'Legal Eagle',
+  { id: 3,  name: 'The Professor',   emoji: '🧠', rarity: 'uncommon',  hustle: 6,  muscle: 2,  smarts: 15, cred: 3,  special: 'Legal Eagle',
     bio: 'Was a high school chemistry teacher. Now runs the prison\'s underground GED program and a few... extracurricular ventures.' },
-  { id: 4,  name: 'OG Marcus',       emoji: '👴', rarity: 'uncommon',  hustle: 5,  muscle: 7,  smarts: 8,  cred: 12, owned: true,  special: 'Respect',
+  { id: 4,  name: 'OG Marcus',       emoji: '👴', rarity: 'uncommon',  hustle: 5,  muscle: 7,  smarts: 8,  cred: 12, special: 'Respect',
     bio: 'Did 22 years at three different facilities. Knows every guard, every shortcut, every weak spot. Respected by every crew on every block.' },
-  { id: 5,  name: 'Tiny',            emoji: '🤏', rarity: 'common',    hustle: 7,  muscle: 6,  smarts: 7,  cred: 6,  owned: true,  special: 'Underestimated',
+  { id: 5,  name: 'Tiny',            emoji: '🤏', rarity: 'common',    hustle: 7,  muscle: 6,  smarts: 7,  cred: 6,  special: 'Underestimated',
     bio: '5\'4" and underestimated daily. Last guy who underestimated him woke up in the infirmary missing teeth and dignity.' },
-  { id: 6,  name: 'Fresh Fish Fred', emoji: '😰', rarity: 'common',    hustle: 8,  muscle: 4,  smarts: 6,  cred: 2,  owned: true,  special: 'First Timer',
+  { id: 6,  name: 'Fresh Fish Fred', emoji: '😰', rarity: 'common',    hustle: 8,  muscle: 4,  smarts: 6,  cred: 2,  special: 'First Timer',
     bio: 'Just got off the bus. Doesn\'t know which way is up. Surprisingly good at running errands and not asking questions.' },
-  { id: 7,  name: 'Contraband Carl', emoji: '📦', rarity: 'rare',      hustle: 12, muscle: 5,  smarts: 10, cred: 8,  owned: false, special: 'Black Market',
+  { id: 7,  name: 'Contraband Carl', emoji: '📦', rarity: 'rare',      hustle: 12, muscle: 5,  smarts: 10, cred: 8,  special: 'Black Market',
     bio: 'Can get you anything for a price. Phones, blades, candy bars, hope. The price varies. Everything is negotiable.' },
-  { id: 8,  name: 'Yard King',       emoji: '👑', rarity: 'legendary', hustle: 18, muscle: 16, smarts: 14, cred: 18, owned: false, special: 'Yard Advantage',
+  { id: 8,  name: 'Yard King',       emoji: '👑', rarity: 'legendary', hustle: 18, muscle: 16, smarts: 14, cred: 18, special: 'Yard Advantage',
     bio: 'Legendary. Last seen running a cell block from a cot in the medical wing. They say he\'s still in there. They say a lot of things.' },
 ]
+
+// Cards a new player starts with. Mirrored in the SQL signup trigger
+// (supabase/migrations/0002_owned_cards.sql) — keep these in sync.
+export const STARTER_CARD_IDS = [1, 2, 3, 4, 5, 6]
 
 export const BATTLE_ENEMIES = [
   { id: 1,  name: 'Nervous Ned',     emoji: '😰', power: 45,  area: 1, reward_xp: 50,  reward_hustle: 10,  boss: false,

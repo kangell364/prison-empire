@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { CARDS_COLLECTION, RARITY_COLORS } from '../data/gameData'
 import { Avatar } from '../components/Avatar'
+import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { sfx } from '../sounds'
 import { CrewBattleModal } from '../components/CrewBattleModal'
 import { buildPracticeCrew } from '../data/opponentCrews'
@@ -11,6 +12,7 @@ import {
   ATK_PER_LEVEL, DEF_PER_LEVEL,
 } from '../state/crewStore'
 import { useHustle, spendHustle, addHustle } from '../state/playerStore'
+import { useCardCounts } from '../state/cardsStore'
 
 const GOLD = '#c9a84c'
 const RED  = '#e74c3c'
@@ -22,6 +24,16 @@ const CARD_BY_ID = new Map(CARDS_COLLECTION.map(c => [c.id, c]))
 export default function Crew() {
   const crew    = useCrew()
   const hustle  = useHustle()
+  const counts  = useCardCounts()
+  // For the crew picker, "owned" = at least one Level 1 copy. Crew slots
+  // don't yet care about levels (Phase 3 work).
+  const ownedSet = useMemo(() => {
+    const s = new Set()
+    for (const [k, v] of counts.entries()) {
+      if (v > 0 && k.endsWith(':1')) s.add(Number(k.split(':')[0]))
+    }
+    return s
+  }, [counts])
   const [editing, setEditing] = useState(null)  // { kind: 'leader'|'member', slotIndex?: number }
   const [battling, setBattling] = useState(null)  // opponent object when modal is open
 
@@ -39,8 +51,8 @@ export default function Crew() {
   // Owned cards not currently in any slot — for the picker
   const benchCards = useMemo(() => {
     const inUse = new Set([crew.leader, ...crew.members].filter(x => x != null))
-    return CARDS_COLLECTION.filter(c => c.owned && !inUse.has(c.id))
-  }, [crew.leader, crew.members])
+    return CARDS_COLLECTION.filter(c => ownedSet.has(c.id) && !inUse.has(c.id))
+  }, [crew.leader, crew.members, ownedSet])
 
   const onPick = (cardId) => {
     if (!editing) return
@@ -55,7 +67,10 @@ export default function Crew() {
     setEditing(null)
   }
 
-  const onUpgrade = (cardId, stat) => {
+  // Detail modal handlers — invoked when tapping a FILLED slot. Upgrades
+  // live in the modal (unified with the Cards collection); Replace/Remove
+  // are surfaced as action buttons in the modal footer.
+  const onUpgrade = (cardId) => (stat) => {
     const u = upgradeLevels(cardId, crew.upgrades)
     const current = u[stat] || 0
     if (current >= MAX_UPGRADE_LEVEL) return
@@ -64,7 +79,7 @@ export default function Crew() {
       upgradeStat(cardId, stat)
       sfx.buy()
     } else {
-      sfx.deny()
+      sfx.deny?.()
     }
   }
 
@@ -155,20 +170,52 @@ export default function Crew() {
         />
       )}
 
-      {editing && (
+      {editing && (() => {
+        const slotCard = editing.kind === 'leader'
+          ? leaderCard
+          : memberCards[editing.slotIndex]
+
+        // Empty slot → picker. Filled slot → unified detail modal with
+        // upgrade UI + Replace/Remove actions.
+        if (slotCard == null) {
+          return (
+            <SlotEditor
+              editing={editing}
+              benchCards={benchCards}
+              onPick={onPick}
+              onClose={() => setEditing(null)}
+            />
+          )
+        }
+        return (
+          <CharacterDetailModal
+            character={slotCard}
+            cardType="PLAYER"
+            upgrades={crew.upgrades[slotCard.id] || { atk: 0, def: 0 }}
+            hustle={hustle}
+            onUpgrade={onUpgrade(slotCard.id)}
+            atkPerLevel={ATK_PER_LEVEL}
+            defPerLevel={DEF_PER_LEVEL}
+            maxUpgradeLevel={MAX_UPGRADE_LEVEL}
+            costForLevel={HUSTLE_COST_PER_LEVEL}
+            actions={[
+              { label: 'Replace Slot',  icon: 'ti-arrows-exchange', kind: 'secondary',
+                onClick: () => setEditing({ ...editing, openPicker: true }) },
+              { label: 'Remove from Crew', icon: 'ti-trash', kind: 'danger',
+                onClick: onRemove },
+            ]}
+            onClose={() => setEditing(null)}
+          />
+        )
+      })()}
+
+      {/* If the user picked Replace in the detail modal, we re-open the
+          slot editor in picker mode for the same slot. */}
+      {editing?.openPicker && (
         <SlotEditor
           editing={editing}
-          card={
-            editing.kind === 'leader'
-              ? leaderCard
-              : memberCards[editing.slotIndex]
-          }
-          upgrades={crew.upgrades}
-          hustle={hustle}
           benchCards={benchCards}
           onPick={onPick}
-          onRemove={onRemove}
-          onUpgrade={onUpgrade}
           onClose={() => setEditing(null)}
         />
       )}
@@ -298,17 +345,11 @@ function StatChip({ label, value, color }) {
 }
 
 // ---------------------------------------------------------------------
-// Slot Editor — full-viewport overlay with two modes:
-//   - Empty slot: card picker
-//   - Filled slot: detail + upgrade panel + Replace/Remove actions
+// Slot Editor — only handles empty slots now. Filled slots open the
+// shared CharacterDetailModal (upgrades + Replace/Remove there).
 // ---------------------------------------------------------------------
 
-function SlotEditor({ editing, card, upgrades, hustle, benchCards, onPick, onRemove, onUpgrade, onClose }) {
-  const [pickerOpen, setPickerOpen] = useState(card == null)
-
-  // Switch to picker if the slot becomes empty (e.g., right after Remove)
-  if (card == null && !pickerOpen) setPickerOpen(true)
-
+function SlotEditor({ editing, benchCards, onPick, onClose }) {
   return (
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)',
@@ -328,30 +369,17 @@ function SlotEditor({ editing, card, upgrades, hustle, benchCards, onPick, onRem
           {editing.kind === 'leader' ? 'CREW LEADER' : `MEMBER SLOT ${editing.slotIndex + 1}`}
         </div>
 
-        {pickerOpen ? (
-          <CardPicker
-            benchCards={benchCards}
-            onPick={onPick}
-            onCancel={() => card == null ? onClose() : setPickerOpen(false)}
-            canCancel={card != null}
-          />
-        ) : (
-          <UpgradePanel
-            card={card}
-            upgrades={upgrades}
-            hustle={hustle}
-            onUpgrade={onUpgrade}
-            onReplace={() => setPickerOpen(true)}
-            onRemove={onRemove}
-            onClose={onClose}
-          />
-        )}
+        <CardPicker
+          benchCards={benchCards}
+          onPick={onPick}
+          onCancel={onClose}
+        />
       </div>
     </div>
   )
 }
 
-function CardPicker({ benchCards, onPick, onCancel, canCancel }) {
+function CardPicker({ benchCards, onPick, onCancel }) {
   return (
     <>
       <div style={{ color: '#fff', fontSize: 20, fontWeight: 600, marginBottom: 6 }}>
@@ -411,127 +439,9 @@ function CardPicker({ benchCards, onPick, onCancel, canCancel }) {
       )}
 
       <button className="btn btn-dark btn-full" style={{ padding: 14 }} onClick={onCancel}>
-        {canCancel ? 'Back' : 'Close'}
+        Close
       </button>
     </>
   )
 }
 
-function UpgradePanel({ card, upgrades, hustle, onUpgrade, onReplace, onRemove, onClose }) {
-  const ringColor = RARITY_COLORS[card.rarity] || GOLD
-  const u = upgradeLevels(card.id, upgrades)
-
-  return (
-    <>
-      {/* Hero */}
-      <div style={{
-        background: `linear-gradient(135deg, ${ringColor}33 0%, #13131f 70%)`,
-        border: `0.5px solid ${ringColor}66`,
-        borderRadius: 16, padding: 16, marginBottom: 16,
-        display: 'flex', alignItems: 'center', gap: 14,
-      }}>
-        <Avatar src={card.avatar} emoji={card.emoji} size={84} radius={14} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: '#fff', fontSize: 18, fontWeight: 600 }}>{card.name}</div>
-          <div style={{
-            color: ringColor, fontSize: 10, textTransform: 'uppercase',
-            letterSpacing: 1.5, marginTop: 2,
-          }}>{card.rarity}</div>
-          {card.special && (
-            <div style={{
-              color: GOLD, fontSize: 11, marginTop: 6,
-              background: `${GOLD}18`, border: `0.5px solid ${GOLD}44`,
-              padding: '3px 8px', borderRadius: 6, display: 'inline-block',
-            }}>{card.special}</div>
-          )}
-        </div>
-      </div>
-
-      {/* Stats + upgrade */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-        <UpgradeRow
-          label="ATTACK"
-          color={RED}
-          card={card}
-          stat="atk"
-          value={atkOf(card, upgrades)}
-          level={u.atk || 0}
-          perLevel={ATK_PER_LEVEL}
-          hustle={hustle}
-          onUpgrade={onUpgrade}
-        />
-        <UpgradeRow
-          label="DEFENSE"
-          color="#4a9eff"
-          card={card}
-          stat="def"
-          value={defOf(card, upgrades)}
-          level={u.def || 0}
-          perLevel={DEF_PER_LEVEL}
-          hustle={hustle}
-          onUpgrade={onUpgrade}
-        />
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>
-        <button className="btn btn-dark btn-full" style={{ padding: 12 }} onClick={onReplace}>
-          <i className="ti ti-arrows-exchange" /> Replace
-        </button>
-        <button className="btn btn-dark btn-full" style={{ padding: 12, color: RED }} onClick={onRemove}>
-          <i className="ti ti-trash" /> Remove from Crew
-        </button>
-        <button className="btn btn-gold btn-full" style={{ padding: 14 }} onClick={onClose}>
-          Done
-        </button>
-      </div>
-    </>
-  )
-}
-
-function UpgradeRow({ label, color, card, stat, value, level, perLevel, hustle, onUpgrade }) {
-  const maxed = level >= MAX_UPGRADE_LEVEL
-  const cost  = maxed ? null : HUSTLE_COST_PER_LEVEL(level)
-  const canAfford = cost != null && hustle >= cost
-
-  return (
-    <div style={{
-      background: '#13131f',
-      border: `0.5px solid ${color}33`,
-      borderRadius: 12, padding: 12,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <div>
-          <div style={{ color, fontSize: 11, letterSpacing: 2, fontWeight: 600 }}>{label}</div>
-          <div style={{ color: '#fff', fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-            {value}
-          </div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ color: DIM, fontSize: 9, letterSpacing: 1 }}>LVL</div>
-          <div style={{ color: '#fff', fontSize: 14, fontWeight: 500 }}>
-            {level}/{MAX_UPGRADE_LEVEL}
-          </div>
-        </div>
-      </div>
-
-      <button
-        onClick={() => !maxed && canAfford && onUpgrade(card.id, stat)}
-        disabled={maxed || !canAfford}
-        className="btn btn-full"
-        style={{
-          padding: 10,
-          background: maxed ? '#1e1e2a' : canAfford ? `${color}22` : '#1e1e2a',
-          border: `0.5px solid ${maxed ? '#2a2a3a' : canAfford ? color + '66' : '#2a2a3a'}`,
-          color: maxed ? DIM : canAfford ? color : DIM,
-          fontSize: 12, fontWeight: 500,
-          opacity: !maxed && !canAfford ? 0.55 : 1,
-        }}
-      >
-        {maxed
-          ? 'MAXED OUT'
-          : <>+{perLevel} {label} <span style={{ opacity: 0.7, marginLeft: 8 }}>— {cost.toLocaleString()} Hustle</span></>
-        }
-      </button>
-    </div>
-  )
-}

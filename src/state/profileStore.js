@@ -39,6 +39,7 @@ export function getProfile()      { return state }
 export function getHustle()       { return state.hustle }
 export function getSteel()        { return state.steel }
 export function getDisplayName()  { return state.display_name }
+export function getUserId()       { return userId }
 
 export function useProfile() {
   const [s, setS] = useState(state)

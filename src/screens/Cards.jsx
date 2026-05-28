@@ -1,5 +1,13 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { CARDS_COLLECTION, RARITY_COLORS } from '../data/gameData'
+import { useCardCounts, addCards, mergeCard, getOwnedTuples, STACK_SIZE } from '../state/cardsStore'
+import {
+  baseAtk, baseDef,
+  useCrew, upgradeStat, upgradeLevels,
+  HUSTLE_COST_PER_LEVEL, MAX_UPGRADE_LEVEL,
+  ATK_PER_LEVEL, DEF_PER_LEVEL,
+} from '../state/crewStore'
+import { useHustle, spendHustle } from '../state/playerStore'
 import { sfx } from '../sounds'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
@@ -10,11 +18,15 @@ const PACK_OPEN_DURATION_MS = 1600  // total time of shake → charge → burst
 const PACK_BURST_AT_MS      = 1300  // when the burst animation kicks in
 const CARDS_PER_PACK        = 3
 
-// Pulls 3 distinct cards. Falls back to the full collection if there aren't
-// enough unowned ones. Guarantees at least one Uncommon+, then sorts so the
-// rarest reveals last (the big payoff card).
-function pickPackCards() {
-  const unowned = CARDS_COLLECTION.filter(c => !c.owned)
+// Picks 3 cards for a pack reveal. Stacking changes the math here —
+// duplicates are now valuable (they grow your stack toward merge), so the
+// pack can deliver the same card twice and that's a feature. We still
+// pick 3 distinct cards per pack for variety, biased toward cards you
+// don't own yet but happy to dip into owned ones once everything is
+// unlocked at base level. Guarantees at least one Uncommon+, rarest
+// reveals last for the big payoff.
+function pickPackCards(ownedSet) {
+  const unowned = CARDS_COLLECTION.filter(c => !ownedSet.has(c.id))
   const pool = unowned.length >= CARDS_PER_PACK ? unowned : CARDS_COLLECTION
   const picks = []
   const used = new Set()
@@ -24,7 +36,6 @@ function pickPackCards() {
     used.add(c.id)
     picks.push(c)
   }
-  // "Guaranteed 1 Uncommon" — if everyone rolled common, upgrade the last slot.
   if (!picks.some(c => (RARITY_TIER[c.rarity] ?? 0) >= 1)) {
     const better = pool.filter(c => (RARITY_TIER[c.rarity] ?? 0) >= 1 && !used.has(c.id))
     if (better.length > 0) picks[picks.length - 1] = better[Math.floor(Math.random() * better.length)]
@@ -40,6 +51,38 @@ export default function Cards() {
   const [packState, setPackState]         = useState('idle')
   const [revealedCards, setRevealedCards] = useState([])
   const [revealIndex,   setRevealIndex]   = useState(0)
+  const counts = useCardCounts()
+  const crew   = useCrew()
+  const hustle = useHustle()
+  // "Owned" for pack-pool purposes = has at least one Level 1 copy.
+  const ownedSet = useMemo(() => {
+    const s = new Set()
+    for (const [k, v] of counts.entries()) {
+      if (v > 0 && k.endsWith(':1')) s.add(Number(k.split(':')[0]))
+    }
+    return s
+  }, [counts])
+  // Cards currently slotted in the crew (leader + members) — used to dim
+  // their collection tiles so you can see at a glance what's in use.
+  const inCrewSet = useMemo(() => {
+    const s = new Set()
+    if (crew.leader != null) s.add(crew.leader)
+    crew.members.forEach(id => { if (id != null) s.add(id) })
+    return s
+  }, [crew.leader, crew.members])
+
+  const handleUpgrade = (cardId) => (stat) => {
+    const u = upgradeLevels(cardId, crew.upgrades)
+    const current = u[stat] || 0
+    if (current >= MAX_UPGRADE_LEVEL) return
+    const cost = HUSTLE_COST_PER_LEVEL(current)
+    if (spendHustle(cost)) {
+      upgradeStat(cardId, stat)
+      sfx.buy()
+    } else {
+      sfx.deny?.()
+    }
+  }
 
   // The burst flash uses the rarest card's color so the big moment feels coherent
   // with the payoff card the player is about to see at the end of the sequence.
@@ -53,6 +96,11 @@ export default function Cards() {
   }
 
   const closePack = () => {
+    // "Add to Collection" → increment stack count for each revealed card.
+    // Duplicates inside the pack are intentional now — they grow stacks.
+    if (packState === 'revealed' && revealedCards.length > 0) {
+      addCards(revealedCards.map(c => c.id), 1)
+    }
     setShowPack(false)
     setPackState('idle')
     setRevealedCards([])
@@ -60,7 +108,7 @@ export default function Cards() {
   }
 
   const startOpening = () => {
-    setRevealedCards(pickPackCards())
+    setRevealedCards(pickPackCards(ownedSet))
     setRevealIndex(0)
     setPackState('opening')
     sfx.shake()
@@ -129,56 +177,40 @@ export default function Cards() {
         ))}
       </div>
 
-      {/* Cards Grid */}
+      {/* Cards Grid — one tile per (card_id, card_level) the player has,
+          plus locked placeholders for catalog entries they haven't seen yet. */}
       <div className="section" style={{ marginTop: 14 }}>
-        <div className="section-label">Your Collection ({CARDS_COLLECTION.filter(c => c.owned).length}/{CARDS_COLLECTION.length})</div>
+        <div className="section-label">Your Collection ({ownedSet.size}/{CARDS_COLLECTION.length})</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {CARDS_COLLECTION.map(card => (
-            <div key={card.id} onClick={() => setSelectedCard(card)} style={{
-              background: '#13131f',
-              border: `0.5px solid ${card.owned ? RARITY_COLORS[card.rarity] + '44' : '#1e1e2a'}`,
-              borderRadius: 16,
-              padding: 14,
-              cursor: 'pointer',
-              opacity: card.owned ? 1 : 0.4,
-              position: 'relative',
-              overflow: 'hidden',
-            }}>
-              {/* Rarity top bar */}
-              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: RARITY_COLORS[card.rarity] }} />
-
-              {/* Card art */}
-              <div style={{ display: 'flex', justifyContent: 'center', margin: '8px 0' }}>
-                {card.owned
-                  ? <Avatar src={card.avatar} emoji={card.emoji} size={56} radius={8} />
-                  : <Avatar emoji="🔒" size={48} radius={8} />
-                }
-              </div>
-
-              {/* Name */}
-              <div style={{ color: card.owned ? '#fff' : '#555', fontSize: 12, fontWeight: 500, textAlign: 'center', marginBottom: 4 }}>{card.name}</div>
-
-              {/* Rarity */}
-              <div style={{ color: RARITY_COLORS[card.rarity], fontSize: 10, textAlign: 'center', textTransform: 'capitalize', marginBottom: 10 }}>{card.rarity}</div>
-
-              {/* Stats */}
-              {card.owned && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-                  {[
-                    { lbl: 'HST', val: card.hustle, color: '#c9a84c' },
-                    { lbl: 'MSC', val: card.muscle, color: '#e74c3c' },
-                    { lbl: 'SMT', val: card.smarts, color: '#4a9eff' },
-                    { lbl: 'CRD', val: card.cred,   color: '#a855f7' },
-                  ].map(s => (
-                    <div key={s.lbl} style={{ background: '#1e1e2a', borderRadius: 6, padding: '3px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: '#555', fontSize: 9 }}>{s.lbl}</span>
-                      <span style={{ color: s.color, fontSize: 11, fontWeight: 500 }}>{s.val}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+          {(() => {
+            const owned = getOwnedTuples()    // sorted by id asc, level desc
+            const ownedKey = new Set(owned.map(t => `${t.id}:${t.level}`))
+            const tiles = []
+            // Owned tuples first — each gets its own tile with type, count, merge.
+            owned.forEach(t => {
+              const card = CARDS_COLLECTION.find(c => c.id === t.id)
+              if (!card) return
+              tiles.push(
+                <CollectionTile
+                  key={`${t.id}:${t.level}`}
+                  card={card}
+                  cardLevel={t.level}
+                  count={t.count}
+                  inCrew={inCrewSet.has(t.id)}
+                  upgrades={crew.upgrades[t.id]}
+                  onTap={() => setSelectedCard({ card, cardLevel: t.level, count: t.count })}
+                  onMerge={() => mergeCard(t.id, t.level)}
+                />
+              )
+            })
+            // Locked placeholders for any catalog card the player has zero of at Lvl 1.
+            CARDS_COLLECTION.forEach(card => {
+              if (!ownedKey.has(`${card.id}:1`)) {
+                tiles.push(<LockedTile key={`locked:${card.id}`} card={card} />)
+              }
+            })
+            return tiles
+          })()}
         </div>
       </div>
 
@@ -186,7 +218,17 @@ export default function Cards() {
           character cards (no bottom-sheet gap, big cinematic hero). */}
       {selectedCard && (
         <CharacterDetailModal
-          character={selectedCard}
+          character={selectedCard.card}
+          cardType="PLAYER"
+          count={selectedCard.count}
+          cardLevel={selectedCard.cardLevel}
+          upgrades={crew.upgrades[selectedCard.card.id] || { atk: 0, def: 0 }}
+          hustle={hustle}
+          onUpgrade={handleUpgrade(selectedCard.card.id)}
+          atkPerLevel={ATK_PER_LEVEL}
+          defPerLevel={DEF_PER_LEVEL}
+          maxUpgradeLevel={MAX_UPGRADE_LEVEL}
+          costForLevel={HUSTLE_COST_PER_LEVEL}
           onClose={() => setSelectedCard(null)}
         />
       )}
@@ -205,6 +247,160 @@ export default function Cards() {
         />
       )}
 
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------
+// Collection tiles
+// ---------------------------------------------------------------------
+
+// Owned tile — shows PLAYER type, CARDS:N badge, optional MERGE button.
+// Tap anywhere except the merge button opens the detail modal.
+// `inCrew` dims the tile and shows an IN CREW badge so you can see at a
+// glance which cards are slotted vs. on the bench.
+function CollectionTile({ card, cardLevel, count, inCrew, upgrades, onTap, onMerge }) {
+  const rarityColor = RARITY_COLORS[card.rarity]
+  const canMerge    = count >= STACK_SIZE
+  const handleMerge = (e) => { e.stopPropagation(); onMerge() }
+  const atk = baseAtk(card) + (upgrades?.atk || 0) * ATK_PER_LEVEL
+  const def = baseDef(card) + (upgrades?.def || 0) * DEF_PER_LEVEL
+
+  return (
+    <div onClick={onTap} style={{
+      background: '#13131f',
+      border: `0.5px solid ${rarityColor}44`,
+      borderRadius: 16,
+      padding: '22px 14px 14px',
+      cursor: 'pointer',
+      position: 'relative',
+      overflow: 'hidden',
+      opacity: inCrew ? 0.5 : 1,
+      filter: inCrew ? 'grayscale(0.55)' : 'none',
+    }}>
+      {/* Rarity top bar */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: rarityColor }} />
+
+      {/* Type label (top-left) — for now everything in this catalog is a
+          Player card; Attack/Defence/Skill types arrive in later phases. */}
+      <div style={{
+        position: 'absolute', top: 6, left: 8,
+        color: '#888', fontSize: 8, fontWeight: 700, letterSpacing: 1.5,
+      }}>PLAYER</div>
+
+      {/* CARDS:N badge (top-right) */}
+      <div style={{
+        position: 'absolute', top: 6, right: 8,
+        color: rarityColor, fontSize: 9, fontWeight: 700, letterSpacing: 1,
+        background: `${rarityColor}18`,
+        border: `0.5px solid ${rarityColor}44`,
+        borderRadius: 4,
+        padding: '2px 5px',
+        fontVariantNumeric: 'tabular-nums',
+      }}>CARDS:{count}</div>
+
+      {/* Card art */}
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '2px 0 6px' }}>
+        <Avatar src={card.avatar} emoji={card.emoji} size={56} radius={8} />
+      </div>
+
+      {/* Name */}
+      <div style={{ color: '#fff', fontSize: 12, fontWeight: 500, textAlign: 'center', marginBottom: 2 }}>
+        {card.name}{cardLevel > 1 && <span style={{ color: rarityColor, marginLeft: 4 }}>· LVL {cardLevel}</span>}
+      </div>
+
+      {/* Rarity */}
+      <div style={{ color: rarityColor, fontSize: 10, textAlign: 'center', textTransform: 'capitalize', marginBottom: 10 }}>
+        {card.rarity}
+      </div>
+
+      {/* Combat stats — ATK + DEF only (reflects upgrades if any) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        <div style={{
+          background: '#1e1e2a', borderRadius: 8,
+          padding: '6px 8px', textAlign: 'center',
+        }}>
+          <div style={{ color: '#555', fontSize: 8, letterSpacing: 1, fontWeight: 700 }}>ATK</div>
+          <div style={{ color: '#e74c3c', fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+            {atk}
+          </div>
+        </div>
+        <div style={{
+          background: '#1e1e2a', borderRadius: 8,
+          padding: '6px 8px', textAlign: 'center',
+        }}>
+          <div style={{ color: '#555', fontSize: 8, letterSpacing: 1, fontWeight: 700 }}>DEF</div>
+          <div style={{ color: '#4a9eff', fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+            {def}
+          </div>
+        </div>
+      </div>
+
+      {/* IN CREW indicator — appears when this card is in the leader or
+          member slots. The tile is dimmed in addition, for at-a-glance scan. */}
+      {inCrew && (
+        <div style={{
+          position: 'absolute', bottom: 8, left: 8,
+          color: '#fff',
+          background: 'rgba(10,10,15,0.85)',
+          border: '0.5px solid rgba(255,255,255,0.2)',
+          borderRadius: 4,
+          padding: '2px 6px',
+          fontSize: 8, fontWeight: 800, letterSpacing: 1.2,
+        }}>IN CREW</div>
+      )}
+
+      {/* Merge button — only when at least one full stack ready */}
+      {canMerge && (
+        <button onClick={handleMerge} style={{
+          marginTop: 10, width: '100%',
+          background: rarityColor, color: '#0a0a0f',
+          border: 'none', borderRadius: 8,
+          padding: '8px 10px',
+          fontSize: 11, fontWeight: 800, letterSpacing: 1.2,
+          cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+          animation: 'logLineIn 0.3s ease forwards',
+        }}>
+          <i className="ti ti-arrows-join" /> MERGE CARDS
+        </button>
+      )}
+    </div>
+  )
+}
+
+// Locked tile — catalog card the player hasn't pulled yet.
+function LockedTile({ card }) {
+  return (
+    <div style={{
+      background: '#13131f',
+      border: '0.5px solid #1e1e2a',
+      borderRadius: 16,
+      padding: '22px 14px 14px',
+      opacity: 0.4,
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: RARITY_COLORS[card.rarity] }} />
+      <div style={{
+        position: 'absolute', top: 6, left: 8,
+        color: '#555', fontSize: 8, fontWeight: 700, letterSpacing: 1.5,
+      }}>PLAYER</div>
+      <div style={{
+        position: 'absolute', top: 6, right: 8,
+        color: '#555', fontSize: 9, fontWeight: 700, letterSpacing: 1,
+        background: '#1e1e2a',
+        border: '0.5px solid #2a2a3a',
+        borderRadius: 4,
+        padding: '2px 5px',
+      }}>CARDS:0</div>
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '2px 0 6px' }}>
+        <Avatar emoji="🔒" size={48} radius={8} />
+      </div>
+      <div style={{ color: '#555', fontSize: 12, fontWeight: 500, textAlign: 'center', marginBottom: 2 }}>{card.name}</div>
+      <div style={{ color: RARITY_COLORS[card.rarity], fontSize: 10, textAlign: 'center', textTransform: 'capitalize', marginBottom: 10 }}>
+        {card.rarity}
+      </div>
     </div>
   )
 }

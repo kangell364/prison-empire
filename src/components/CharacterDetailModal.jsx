@@ -13,7 +13,24 @@ const PURP = '#a855f7'
 // which fields the character object has.
 //
 // Big hero image at the top because the artwork is the whole point.
-export function CharacterDetailModal({ character: c, onClose, actions = [] }) {
+export function CharacterDetailModal({
+  character: c,
+  onClose,
+  actions = [],
+  cardType,
+  count,
+  cardLevel,
+  // Upgrade props — only rendered together. When supplied, the modal
+  // shows the ATK/DEF upgrade panel under Combat Stats. `upgrades` is
+  // { atk: number, def: number }; `onUpgrade(stat)` is the click handler.
+  upgrades,
+  hustle,
+  onUpgrade,
+  atkPerLevel = 10,
+  defPerLevel = 10,
+  maxUpgradeLevel = 20,
+  costForLevel,
+}) {
   if (!c) return null
 
   const accent =
@@ -109,6 +126,36 @@ export function CharacterDetailModal({ character: c, onClose, actions = [] }) {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           ><i className="ti ti-x" /></button>
+
+          {/* Card type badge (top-left) + CARDS:N badge (below close).
+              Only shown for collected cards — character types without
+              these props (enemies, ranked players) don't see them. */}
+          {cardType && (
+            <div style={{
+              position: 'absolute', top: 16, left: 16,
+              color: '#fff',
+              background: 'rgba(10,10,15,0.7)',
+              border: '0.5px solid rgba(255,255,255,0.2)',
+              borderRadius: 4,
+              padding: '3px 8px',
+              fontSize: 9, fontWeight: 800, letterSpacing: 1.5,
+            }}>
+              {cardType}
+              {cardLevel > 1 && <span style={{ color: accent, marginLeft: 6 }}>· LVL {cardLevel}</span>}
+            </div>
+          )}
+          {count != null && (
+            <div style={{
+              position: 'absolute', top: 40, left: 16,
+              color: accent,
+              background: 'rgba(10,10,15,0.7)',
+              border: `0.5px solid ${accent}55`,
+              borderRadius: 4,
+              padding: '3px 8px',
+              fontSize: 10, fontWeight: 800, letterSpacing: 1,
+              fontVariantNumeric: 'tabular-nums',
+            }}>CARDS:{count}</div>
+          )}
         </div>
 
         {/* Identity block */}
@@ -146,15 +193,15 @@ export function CharacterDetailModal({ character: c, onClose, actions = [] }) {
           </div>
         )}
 
-        {/* Card stats (hustle/muscle/smarts/cred) — for CARDS_COLLECTION items */}
+        {/* Card stats — for CARDS_COLLECTION items. ATK + DEF are the only
+            visible numbers; the underlying hustle/muscle/smarts/cred breakdown
+            was removed at user request (those derive ATK/DEF anyway). */}
         {c.hustle != null && c.muscle != null && c.smarts != null && c.cred != null && (
           <div style={{ padding: '16px 18px 0' }}>
-            <SectionLabel>Card Stats</SectionLabel>
+            <SectionLabel>Combat Stats</SectionLabel>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <StatTile icon="ti-flame"   label="Hustle" value={c.hustle} color={GOLD} />
-              <StatTile icon="ti-barbell" label="Muscle" value={c.muscle} color={RED} />
-              <StatTile icon="ti-brain"   label="Smarts" value={c.smarts} color={BLUE} />
-              <StatTile icon="ti-star"    label="Cred"   value={c.cred}   color={PURP} />
+              <StatTile icon="ti-sword"  label="Attack"  value={derivedAtk(c, upgrades, atkPerLevel)}  color={RED} />
+              <StatTile icon="ti-shield" label="Defense" value={derivedDef(c, upgrades, defPerLevel)} color={BLUE} />
             </div>
             {c.special && (
               <div style={{
@@ -171,6 +218,39 @@ export function CharacterDetailModal({ character: c, onClose, actions = [] }) {
                 Special: {c.special}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Upgrade panel — only when caller wired up upgrade callbacks.
+            Same look as the rows that used to live in the Crew slot editor,
+            unified so there's one place to upgrade. */}
+        {upgrades && onUpgrade && hustle != null && costForLevel && (
+          <div style={{ padding: '16px 18px 0' }}>
+            <SectionLabel>Upgrade</SectionLabel>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <UpgradeRow
+                label="ATTACK"
+                color={RED}
+                stat="atk"
+                level={upgrades.atk || 0}
+                perLevel={atkPerLevel}
+                maxLevel={maxUpgradeLevel}
+                cost={costForLevel(upgrades.atk || 0)}
+                hustle={hustle}
+                onUpgrade={onUpgrade}
+              />
+              <UpgradeRow
+                label="DEFENSE"
+                color={BLUE}
+                stat="def"
+                level={upgrades.def || 0}
+                perLevel={defPerLevel}
+                maxLevel={maxUpgradeLevel}
+                cost={costForLevel(upgrades.def || 0)}
+                hustle={hustle}
+                onUpgrade={onUpgrade}
+              />
+            </div>
           </div>
         )}
 
@@ -290,6 +370,53 @@ export { Avatar }
 
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
+}
+
+// Derived ATK/DEF including upgrade levels. Matches the formula used in
+// crewStore — base from muscle/cred, +perLevel per upgrade level.
+function derivedAtk(c, upgrades, perLevel) {
+  const base = (c.muscle * 5 + 15)
+  return (base + (upgrades?.atk || 0) * perLevel).toLocaleString()
+}
+function derivedDef(c, upgrades, perLevel) {
+  const base = (c.cred * 5 + 10)
+  return (base + (upgrades?.def || 0) * perLevel).toLocaleString()
+}
+
+function UpgradeRow({ label, color, stat, level, perLevel, maxLevel, cost, hustle, onUpgrade }) {
+  const maxed = level >= maxLevel
+  const canAfford = !maxed && hustle >= cost
+  return (
+    <div style={{
+      background: '#13131f',
+      border: `0.5px solid ${color}33`,
+      borderRadius: 12, padding: 12,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ color, fontSize: 11, letterSpacing: 2, fontWeight: 700 }}>{label}</div>
+        <div style={{ color: '#888', fontSize: 11 }}>
+          Lvl <span style={{ color: '#fff', fontWeight: 700 }}>{level}</span>/{maxLevel}
+        </div>
+      </div>
+      <button
+        onClick={() => !maxed && canAfford && onUpgrade(stat)}
+        disabled={maxed || !canAfford}
+        style={{
+          width: '100%', padding: 10,
+          background: maxed ? '#1e1e2a' : canAfford ? `${color}22` : '#1e1e2a',
+          border: `0.5px solid ${maxed ? '#2a2a3a' : canAfford ? color + '66' : '#2a2a3a'}`,
+          color: maxed ? '#555' : canAfford ? color : '#555',
+          fontSize: 12, fontWeight: 600, borderRadius: 8,
+          cursor: maxed || !canAfford ? 'not-allowed' : 'pointer',
+          opacity: !maxed && !canAfford ? 0.55 : 1,
+        }}
+      >
+        {maxed
+          ? 'MAXED OUT'
+          : <>+{perLevel} {label} <span style={{ opacity: 0.7, marginLeft: 8 }}>— {cost.toLocaleString()} Hustle</span></>}
+      </button>
+    </div>
+  )
 }
 
 // Derives attack/defense from a character. Matches the formula used in

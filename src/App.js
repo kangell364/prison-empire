@@ -9,6 +9,7 @@ import Profile from './screens/Profile'
 import Property from './screens/Property'
 import { isMuted, setMuted, subscribeMuted, sfx } from './sounds'
 import { ensureAuth } from './state/profileStore'
+import { ensureCardsLoaded } from './state/cardsStore'
 
 // Profile lives on the header avatar (top-right) so the bottom nav stays at 6.
 const NAV_ITEMS = [
@@ -25,7 +26,7 @@ export default function App() {
   const [muted, setMutedState] = useState(isMuted())
 
   useEffect(() => subscribeMuted(setMutedState), [])
-  useEffect(() => { ensureAuth() }, [])
+  useEffect(() => { ensureAuth().then(ensureCardsLoaded) }, [])
 
   const toggleMute = () => {
     const next = !muted
