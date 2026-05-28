@@ -54,7 +54,6 @@ export function useMapGestures({ viewW, viewH, minScale = MIN_SCALE_DEFAULT, max
   }
 
   function onPointerDown(e) {
-    e.currentTarget.setPointerCapture(e.pointerId)
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     dragMovedRef.current = 0
     if (pointersRef.current.size === 2) {
@@ -63,7 +62,16 @@ export function useMapGestures({ viewW, viewH, minScale = MIN_SCALE_DEFAULT, max
         dist: Math.hypot(b.x - a.x, b.y - a.y),
         mid:  { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
       }
+      // Pinch confirmed — capture both pointers so the gesture survives
+      // a finger straying outside the map.
+      for (const id of pointersRef.current.keys()) {
+        try { e.currentTarget.setPointerCapture(id) } catch {}
+      }
     }
+    // Single-pointer down: DON'T capture yet. Capturing here was breaking
+    // click events on inner SVG paths (state polygons) so taps did nothing.
+    // We capture below in onPointerMove only after movement exceeds the
+    // tap-slop threshold and we know this is a pan, not a tap.
   }
 
   function onPointerMove(e) {
@@ -91,6 +99,11 @@ export function useMapGestures({ viewW, viewH, minScale = MIN_SCALE_DEFAULT, max
         const dxV = (dx / r.width)  * viewW
         const dyV = (dy / r.height) * viewH
         setView(v => ({ ...v, tx: v.tx + dxV, ty: v.ty + dyV }))
+      }
+      // Now that this is clearly a pan (movement past slop), capture the
+      // pointer so it keeps tracking if the finger leaves the map area.
+      if (dragMovedRef.current > TAP_SLOP_PX) {
+        try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
       }
     }
   }
