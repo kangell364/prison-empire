@@ -3,12 +3,12 @@ import { BATTLE_ENEMIES } from '../data/gameData'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { BattleDiceModal } from '../components/BattleDiceModal'
+import { useVitals, spendStamina, STAMINA_MAX } from '../state/vitalsStore'
 
-const STAMINA_MAX  = 100
 const STAMINA_COST = 5
 
 export default function Battle() {
-  const [stamina, setStamina]           = useState(78)
+  const stamina = useVitals().stamina
   const [currentArea, setCurrentArea]   = useState(1)
   const [selectedEnemy, setSelectedEnemy] = useState(null)  // enemy in dice fight
   const [detailEnemy, setDetailEnemy]   = useState(null)    // enemy in detail card
@@ -115,7 +115,7 @@ export default function Battle() {
             cardDrop:    !!selectedEnemy.boss_reward_card,
           }}
           onClose={() => setSelectedEnemy(null)}
-          onRoll={() => setStamina(s => Math.max(0, s - STAMINA_COST))}
+          onRoll={() => spendStamina(STAMINA_COST)}
           onWin={onWin}
         />
       )}

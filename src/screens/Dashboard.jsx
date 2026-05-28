@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { PLAYER, RESOURCES, CITY, INCOMING_ATTACK, CREW, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
 import { useHustle, useSteel } from '../state/profileStore'
+import { useVitals, msToNextStamina, msToNextHealth, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
 import { CountdownRing } from '../components/CountdownRing'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
@@ -33,6 +34,9 @@ export default function Dashboard({ onNavigate }) {
 
   return (
     <div className="scroll-area animate-in">
+
+      {/* Vitals HUD — health + stamina with live regen countdown */}
+      <VitalsHud />
 
       {/* Attack Alert */}
       {!snitchUsed && (
@@ -310,4 +314,64 @@ export default function Dashboard({ onNavigate }) {
 
     </div>
   )
+}
+
+// ---------------------------------------------------------------------
+// Vitals HUD — health + stamina bars with a live "+1 in m:ss" regen
+// countdown. Sits at the top of the home screen, just under the header.
+// ---------------------------------------------------------------------
+function VitalsHud() {
+  const vitals = useVitals()   // re-renders every 1s via the store's ticker
+  return (
+    <div style={{
+      margin: '12px 16px 0',
+      background: '#13131f',
+      border: '0.5px solid #2a2a3a',
+      borderRadius: 14,
+      padding: '10px 12px',
+      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12,
+    }}>
+      <VitalRow
+        icon="ti-heart" color="#e74c3c"
+        label="Health" cur={vitals.health} max={HEALTH_MAX}
+        nextMs={msToNextHealth()}
+      />
+      <VitalRow
+        icon="ti-bolt" color="#f0d080"
+        label="Stamina" cur={vitals.stamina} max={STAMINA_MAX}
+        nextMs={msToNextStamina()}
+      />
+    </div>
+  )
+}
+
+function VitalRow({ icon, color, label, cur, max, nextMs }) {
+  const full = cur >= max
+  const pct  = Math.min(100, Math.round((cur / max) * 100))
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#888', fontSize: 10 }}>
+          <i className={`ti ${icon}`} style={{ color, fontSize: 12 }} />
+          {label}
+        </span>
+        <span style={{ color, fontSize: 10, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+          {cur.toLocaleString()} / {max.toLocaleString()}
+        </span>
+      </div>
+      <div style={{ height: 5, background: '#1e1e2a', borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 3, transition: 'width 0.4s' }} />
+      </div>
+      <div style={{ color: '#555', fontSize: 9, marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
+        {full ? 'FULL' : `+1 in ${fmtCountdown(nextMs)}`}
+      </div>
+    </div>
+  )
+}
+
+function fmtCountdown(ms) {
+  const total = Math.max(0, Math.ceil(ms / 1000))
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return `${m}:${String(s).padStart(2, '0')}`
 }

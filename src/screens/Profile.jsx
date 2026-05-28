@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { PLAYER, TRAITS, RARITY_COLORS, SKILLS } from '../data/gameData'
 import { sfx } from '../sounds'
 import { useHustle } from '../state/playerStore'
+import { useVitals, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
 
 const GOLD  = '#c9a84c'
 const RED   = '#e74c3c'
@@ -60,6 +61,7 @@ export default function Profile() {
 
 function StatusBar({ poolMax }) {
   const hustle = useHustle()
+  const vitals = useVitals()
   const xpPct = Math.round((PLAYER.xp / PLAYER.xpNext) * 100)
   const cardColor = RARITY_COLORS[PLAYER.card.rarity]
 
@@ -121,10 +123,12 @@ function StatusBar({ poolMax }) {
           </div>
         </div>
 
-        {/* Pool bars */}
+        {/* Pool bars. Health + stamina come from the regenerating vitals
+            store (single source of truth across Profile/Fight/Battle);
+            knowledge is still the static trait-derived pool. */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 12 }}>
-          <PoolBar icon="ti-heart"  color={RED}  label="Health"    cur={PLAYER.pools.health}    max={poolMax.health} />
-          <PoolBar icon="ti-bolt"   color={GOLD} label="Stamina"   cur={PLAYER.pools.stamina}   max={poolMax.stamina} />
+          <PoolBar icon="ti-heart"  color={RED}  label="Health"    cur={vitals.health}          max={HEALTH_MAX} />
+          <PoolBar icon="ti-bolt"   color={GOLD} label="Stamina"   cur={vitals.stamina}         max={STAMINA_MAX} />
           <PoolBar icon="ti-brain"  color={BLUE} label="Knowledge" cur={PLAYER.pools.knowledge} max={poolMax.knowledge} />
         </div>
 

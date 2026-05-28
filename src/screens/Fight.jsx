@@ -3,6 +3,7 @@ import { PLAYER, RANKED_PLAYERS, PVP_LEVEL_RANGE, PVP_FIGHT_COST, pvpRewardMulti
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { BattleDiceModal } from '../components/BattleDiceModal'
+import { useVitals, spendStamina, STAMINA_MAX } from '../state/vitalsStore'
 import Battle from './Battle'
 
 const GOLD   = '#c9a84c'
@@ -61,7 +62,7 @@ function SubTab({ active, onClick, children }) {
 
 function PlayersScreen() {
   const [dailyKills, setDailyKills] = useState(PLAYER.dailyKills)
-  const [stamina, setStamina]       = useState(78)
+  const stamina = useVitals().stamina
   const [target, setTarget]         = useState(null)
   const [detailPlayer, setDetailPlayer] = useState(null)
   // Track last fight reward to display on the list
@@ -86,7 +87,7 @@ function PlayersScreen() {
   }
 
   const onDiceRoll = () => {
-    setStamina(s => Math.max(0, s - PVP_FIGHT_COST))
+    spendStamina(PVP_FIGHT_COST)
   }
 
   return (
@@ -120,10 +121,10 @@ function PlayersScreen() {
                 <i className="ti ti-bolt" style={{ color: GOLD, fontSize: 11, marginRight: 4 }} />
                 Stamina
               </span>
-              <span style={{ color: GOLD, fontSize: 10, fontVariantNumeric: 'tabular-nums' }}>{stamina} / 100</span>
+              <span style={{ color: GOLD, fontSize: 10, fontVariantNumeric: 'tabular-nums' }}>{stamina} / {STAMINA_MAX}</span>
             </div>
             <div style={{ height: 4, background: '#1e1e2a', borderRadius: 2, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${stamina}%`, background: `linear-gradient(90deg, ${GOLD}, #f0d080)`, borderRadius: 2, transition: 'width 0.4s' }} />
+              <div style={{ height: '100%', width: `${Math.round(stamina / STAMINA_MAX * 100)}%`, background: `linear-gradient(90deg, ${GOLD}, #f0d080)`, borderRadius: 2, transition: 'width 0.4s' }} />
             </div>
             <div style={{ color: DIM, fontSize: 10, marginTop: 6 }}>Each fight costs {PVP_FIGHT_COST} stamina.</div>
           </div>
