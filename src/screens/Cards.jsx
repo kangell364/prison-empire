@@ -18,6 +18,26 @@ const PACK_OPEN_DURATION_MS = 1600  // total time of shake → charge → burst
 const PACK_BURST_AT_MS      = 1300  // when the burst animation kicks in
 const CARDS_PER_PACK        = 3
 
+// Collection filter chips. 'All' shows everything (owned + locked).
+// 'Owned' hides locked tiles. Rarity labels show every card of that
+// rarity regardless of ownership so users can see what's still
+// possible to collect.
+const FILTERS = ['All', 'Owned', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary']
+const RARITY_LABELS = new Set(['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'])
+
+function matchesFilter(card, filter, isOwned) {
+  if (filter === 'All')   return true
+  if (filter === 'Owned') return isOwned
+  if (RARITY_LABELS.has(filter)) return card.rarity === filter.toLowerCase()
+  return true
+}
+
+function sectionLabelFor(filter, ownedCount, totalCount) {
+  if (filter === 'All')   return `Your Collection (${ownedCount}/${totalCount})`
+  if (filter === 'Owned') return `Owned (${ownedCount})`
+  return filter
+}
+
 // Picks 3 cards for a pack reveal. Stacking changes the math here —
 // duplicates are now valuable (they grow your stack toward merge), so the
 // pack can deliver the same card twice and that's a feature. We still
@@ -51,6 +71,12 @@ export default function Cards() {
   const [packState, setPackState]         = useState('idle')
   const [revealedCards, setRevealedCards] = useState([])
   const [revealIndex,   setRevealIndex]   = useState(0)
+  // Active filter chip for the collection grid. 'All' / 'Owned' / one of
+  // the rarity labels. 'All' shows owned + locked; 'Owned' shows only
+  // tiles you have at least one of; rarity filters show every card of
+  // that rarity (owned + locked) so users can see what's still possible
+  // to collect.
+  const [filter, setFilter] = useState('All')
   const counts = useCardCounts()
   const crew   = useCrew()
   const hustle = useHustle()
@@ -170,26 +196,47 @@ export default function Cards() {
         </button>
       </div>
 
-      {/* Filter */}
+      {/* Filter chips — each one filters the collection grid below. */}
       <div style={{ padding: '14px 16px 0', display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none' }}>
-        {['All', 'Owned', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'].map(f => (
-          <div key={f} style={{ flexShrink: 0, background: f === 'All' ? '#c9a84c18' : '#13131f', border: `0.5px solid ${f === 'All' ? '#c9a84c44' : '#2a2a3a'}`, borderRadius: 20, padding: '5px 14px', color: f === 'All' ? '#c9a84c' : '#888', fontSize: 12, cursor: 'pointer' }}>{f}</div>
-        ))}
+        {FILTERS.map(f => {
+          const active = filter === f
+          return (
+            <div
+              key={f}
+              onClick={() => setFilter(f)}
+              style={{
+                flexShrink: 0,
+                background: active ? '#c9a84c18' : '#13131f',
+                border: `0.5px solid ${active ? '#c9a84c44' : '#2a2a3a'}`,
+                borderRadius: 20,
+                padding: '5px 14px',
+                color: active ? '#c9a84c' : '#888',
+                fontSize: 12,
+                cursor: 'pointer',
+              }}
+            >{f}</div>
+          )
+        })}
       </div>
 
       {/* Cards Grid — one tile per (card_id, card_level) the player has,
-          plus locked placeholders for catalog entries they haven't seen yet. */}
+          plus locked placeholders for catalog entries they haven't seen yet.
+          Filter chip narrows the list. */}
       <div className="section" style={{ marginTop: 14 }}>
-        <div className="section-label">Your Collection ({ownedSet.size}/{CARDS_COLLECTION.length})</div>
+        <div className="section-label">
+          {sectionLabelFor(filter, ownedSet.size, CARDS_COLLECTION.length)}
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {(() => {
             const owned = getOwnedTuples()    // sorted by id asc, level desc
             const ownedKey = new Set(owned.map(t => `${t.id}:${t.level}`))
             const tiles = []
+
             // Owned tuples first — each gets its own tile with type, count, merge.
             owned.forEach(t => {
               const card = CARDS_COLLECTION.find(c => c.id === t.id)
               if (!card) return
+              if (!matchesFilter(card, filter, /* owned */ true)) return
               tiles.push(
                 <CollectionTile
                   key={`${t.id}:${t.level}`}
@@ -203,12 +250,29 @@ export default function Cards() {
                 />
               )
             })
-            // Locked placeholders for any catalog card the player has zero of at Lvl 1.
+
+            // Locked placeholders for any catalog card the player has zero of
+            // at Lvl 1. 'Owned' filter hides these.
             CARDS_COLLECTION.forEach(card => {
-              if (!ownedKey.has(`${card.id}:1`)) {
-                tiles.push(<LockedTile key={`locked:${card.id}`} card={card} />)
-              }
+              if (ownedKey.has(`${card.id}:1`)) return
+              if (!matchesFilter(card, filter, /* owned */ false)) return
+              tiles.push(<LockedTile key={`locked:${card.id}`} card={card} />)
             })
+
+            if (tiles.length === 0) {
+              return (
+                <div style={{
+                  gridColumn: '1 / -1',
+                  background: '#13131f',
+                  border: '0.5px solid #1e1e2a',
+                  borderRadius: 12,
+                  padding: 20, textAlign: 'center',
+                  color: '#555', fontSize: 12,
+                }}>
+                  No {filter.toLowerCase()} cards yet.
+                </div>
+              )
+            }
             return tiles
           })()}
         </div>
