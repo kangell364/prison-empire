@@ -317,26 +317,23 @@ export default function Dashboard({ onNavigate }) {
 }
 
 // ---------------------------------------------------------------------
-// Vitals HUD — health + stamina bars with a live "+1 in m:ss" regen
-// countdown. Sits at the top of the home screen, just under the header.
+// Vitals HUD — just the health + stamina regen TIMERS (no bars; the bars
+// live on the Profile screen). Sits at the top of the home screen, under
+// the header. Each shows current value + a live "+1 in m:ss" countdown.
 // ---------------------------------------------------------------------
 function VitalsHud() {
   const vitals = useVitals()   // re-renders every 1s via the store's ticker
   return (
     <div style={{
       margin: '12px 16px 0',
-      background: '#13131f',
-      border: '0.5px solid #2a2a3a',
-      borderRadius: 14,
-      padding: '10px 12px',
-      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12,
+      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
     }}>
-      <VitalRow
+      <VitalTimer
         icon="ti-heart" color="#e74c3c"
         label="Health" cur={vitals.health} max={HEALTH_MAX}
         nextMs={msToNextHealth()}
       />
-      <VitalRow
+      <VitalTimer
         icon="ti-bolt" color="#f0d080"
         label="Stamina" cur={vitals.stamina} max={STAMINA_MAX}
         nextMs={msToNextStamina()}
@@ -345,25 +342,27 @@ function VitalsHud() {
   )
 }
 
-function VitalRow({ icon, color, label, cur, max, nextMs }) {
+function VitalTimer({ icon, color, label, cur, max, nextMs }) {
   const full = cur >= max
-  const pct  = Math.min(100, Math.round((cur / max) * 100))
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#888', fontSize: 10 }}>
-          <i className={`ti ${icon}`} style={{ color, fontSize: 12 }} />
-          {label}
-        </span>
-        <span style={{ color, fontSize: 10, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-          {cur.toLocaleString()} / {max.toLocaleString()}
-        </span>
-      </div>
-      <div style={{ height: 5, background: '#1e1e2a', borderRadius: 3, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 3, transition: 'width 0.4s' }} />
-      </div>
-      <div style={{ color: '#555', fontSize: 9, marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
-        {full ? 'FULL' : `+1 in ${fmtCountdown(nextMs)}`}
+    <div style={{
+      background: '#13131f',
+      border: '0.5px solid #2a2a3a',
+      borderRadius: 12,
+      padding: '8px 12px',
+      display: 'flex', alignItems: 'center', gap: 10,
+    }}>
+      <i className={`ti ${icon}`} style={{ color, fontSize: 18 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ color: '#888', fontSize: 10, letterSpacing: 0.5 }}>{label}</span>
+          <span style={{ color, fontSize: 11, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+            {cur.toLocaleString()}/{max.toLocaleString()}
+          </span>
+        </div>
+        <div style={{ color: full ? '#555' : '#fff', fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>
+          {full ? 'FULL' : fmtCountdown(nextMs)}
+        </div>
       </div>
     </div>
   )
