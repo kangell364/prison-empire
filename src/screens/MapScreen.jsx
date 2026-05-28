@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
-import { ALL_CITIES, PLAYER } from '../data/gameData'
+import { ALL_CITIES } from '../data/gameData'
 import { CountdownRing } from '../components/CountdownRing'
 import { USCountryMap } from '../components/USCountryMap'
 import { USStateMap } from '../components/USStateMap'
 import { useMapData, buildCityCountyMap, STATE_FIPS_TO_CODE } from '../state/mapData'
+import { useDisplayName, addHustle, addSteel } from '../state/profileStore'
 import { sfx } from '../sounds'
 
 const GOLD = '#c9a84c'
@@ -32,6 +33,7 @@ function useDriveBys() {
   const [landed, setLanded] = useState([])
   const [, forceTick] = useState(0)
   const firedRef = useRef(new Set())
+  const cityLookup = useRef(new Map(ALL_CITIES.map(c => [c.id, c])))
 
   // Persist whenever the attacks/captured set changes
   useEffect(() => {
@@ -63,7 +65,15 @@ function useDriveBys() {
       }
 
       if (completed.length > 0) {
-        // Award + capture
+        // Award + capture. Drive-by rewards (Hustle + Steel) actually credit
+        // the profile now — landed modal numbers used to be cosmetic.
+        // Generic counties (string IDs like "c01001") default to tier 1.
+        for (const a of completed) {
+          const city = cityLookup.current.get(a.cityId)
+          const tier = city?.tier || 1
+          addHustle(tier * 500)
+          addSteel(tier * 200)
+        }
         const newlyCaptured = completed.map(a => a.cityId)
         setState(s => ({
           attacks: active,
@@ -130,14 +140,15 @@ export default function MapScreen() {
   const [stateView, setStateView] = useState(null)
   const { attacks, captured, landed, launch, dismissLanded } = useDriveBys()
   const { data: mapData } = useMapData()
+  const playerName = useDisplayName()
 
   const capturedSet  = useMemo(() => new Set(captured), [captured])
   const attackingSet = useMemo(() => new Set(attacks.map(a => a.cityId)), [attacks])
 
   // Overlay locally-captured cities onto the static data
   const cities = useMemo(() => ALL_CITIES.map(c => (
-    capturedSet.has(c.id) ? { ...c, isYours: true, owner: PLAYER.name } : c
-  )), [capturedSet])
+    capturedSet.has(c.id) ? { ...c, isYours: true, owner: playerName } : c
+  )), [capturedSet, playerName])
 
   const totals = useMemo(() => ({
     yours: cities.filter(c => c.isYours).length,
@@ -189,13 +200,13 @@ export default function MapScreen() {
         // after a successful drive-by (their ID is a string like "c01001").
         if (capturedSet.has(syn.id)) {
           syn.isYours = true
-          syn.owner   = PLAYER.name
+          syn.owner   = playerName
         }
         m[fips] = syn
       })
     }
     return m
-  }, [cityCounty, cityById, mapData, capturedSet])
+  }, [cityCounty, cityById, mapData, capturedSet, playerName])
 
   // Banner lookup needs to find both real cities AND synthesized counties.
   const territoryById = useMemo(() => {
@@ -460,6 +471,7 @@ function AttackBanner({ attack, city }) {
 }
 
 function CityDetailModal({ city, inFlight, onClose, onAttack }) {
+  const playerName = useDisplayName()
   return (
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
@@ -506,7 +518,7 @@ function CityDetailModal({ city, inFlight, onClose, onAttack }) {
             color: city.isYours ? GOLD : city.owner ? RED : '#2ecc71',
             fontSize: 14, fontWeight: 500, marginTop: 4,
           }}>
-            {city.isYours ? `${PLAYER.name} (You)` : city.owner || 'Unclaimed — take it now!'}
+            {city.isYours ? `${playerName} (You)` : city.owner || 'Unclaimed — take it now!'}
           </div>
         </div>
 
@@ -540,6 +552,7 @@ function CityDetailModal({ city, inFlight, onClose, onAttack }) {
 }
 
 function DriveByLandedModal({ city, onClose }) {
+  const playerName = useDisplayName()
   if (!city) return null
   const hustleReward = city.tier * 500
   const steelReward  = city.tier * 200
@@ -582,7 +595,7 @@ function DriveByLandedModal({ city, onClose }) {
         <div style={{
           color: '#888', fontSize: 13, fontStyle: 'italic',
           textAlign: 'center', marginBottom: 22,
-        }}>is now under {PLAYER.name}'s flag</div>
+        }}>is now under {playerName}'s flag</div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 22 }}>
           <RewardTile color={GOLD} label="Hustle"     value={`+${hustleReward}`} />
@@ -613,6 +626,7 @@ function DriveByLandedModal({ city, onClose }) {
 // just show name + state + "no named city".
 // ---------------------------------------------------------------------
 function CountyDetailModal({ county, stateName, onClose, onAttack, inFlight }) {
+  const playerName = useDisplayName()
   const c = county.city
   const isAttackable = !!county.isAttackable
   const canLaunch = c && !c.isYours && isAttackable && !inFlight
@@ -675,7 +689,7 @@ function CountyDetailModal({ county, stateName, onClose, onAttack, inFlight }) {
             color: c.isYours ? GOLD : c.owner ? RED : '#2ecc71',
             fontSize: 14, fontWeight: 500, marginTop: 4,
           }}>
-            {c.isYours ? `${PLAYER.name} (You)` : c.owner || 'Unclaimed — take it now!'}
+            {c.isYours ? `${playerName} (You)` : c.owner || 'Unclaimed — take it now!'}
           </div>
         </div>
 

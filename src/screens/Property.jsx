@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { PROPERTIES, PROPERTY_COST_GROWTH, PLAYER } from '../data/gameData'
+import { useHustle, spendHustle } from '../state/playerStore'
 import { sfx } from '../sounds'
 
 const GOLD = '#c9a84c'
@@ -32,9 +33,8 @@ const QTY_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 export default function Property() {
   const playerLevel = PLAYER.level
-  // Local state — owned counts per property id. Resets on refresh until
-  // persistence lands. Currency check is intentionally NOT enforced for v1
-  // (the user wants to balance pricing later).
+  const hustle      = useHustle()
+  // Owned counts per property id — local until Phase 5 (own_property table).
   const [owned, setOwned] = useState({})
   // Per-card transient feedback ("Bought 3 for 1,540 Hustle, +15/hr")
   const [flash, setFlash] = useState({})
@@ -69,6 +69,10 @@ export default function Property() {
   const onPurchase = (p, qty) => {
     const have = owned[p.id] || 0
     const cost = bulkCost(p.baseCost, have, qty)
+    if (!spendHustle(cost)) {
+      sfx.deny?.()
+      return
+    }
     const at = Date.now()
     setOwned(o => ({ ...o, [p.id]: have + qty }))
     setFlash(f => ({ ...f, [p.id]: { qty, cost, perHrAdded: qty * p.perHr, at } }))
@@ -109,6 +113,17 @@ export default function Property() {
               <div style={{ color: '#888', fontSize: 10, marginTop: 2, letterSpacing: 1 }}>HUSTLE / HR</div>
             </div>
           </div>
+          <div style={{
+            marginTop: 12, paddingTop: 10,
+            borderTop: `0.5px solid ${GOLD}22`,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <div style={{ color: '#888', fontSize: 10, letterSpacing: 1 }}>YOUR HUSTLE</div>
+            <div style={{
+              color: GOLD, fontSize: 18, fontWeight: 700,
+              fontVariantNumeric: 'tabular-nums',
+            }}>{formatHustle(hustle)}</div>
+          </div>
         </div>
       </div>
 
@@ -125,6 +140,7 @@ export default function Property() {
                 property={p}
                 owned={owned[p.id] || 0}
                 flash={flash[p.id]}
+                hustle={hustle}
                 onPurchase={onPurchase}
               />
             ))}
@@ -160,9 +176,10 @@ export default function Property() {
 // Card
 // ---------------------------------------------------------------------
 
-function PropertyCard({ property, owned, flash, onPurchase }) {
+function PropertyCard({ property, owned, flash, hustle, onPurchase }) {
   const [qty, setQty] = useState(1)
   const cost = useMemo(() => bulkCost(property.baseCost, owned, qty), [property.baseCost, owned, qty])
+  const canAfford = hustle >= cost
 
   return (
     <div className="card" style={{
@@ -244,18 +261,20 @@ function PropertyCard({ property, owned, flash, onPurchase }) {
         <QtySelect value={qty} onChange={setQty} />
         <button
           onClick={() => onPurchase(property, qty)}
+          disabled={!canAfford}
           style={{
             flex: 1,
-            background: GOLD, color: '#0a0a0f',
+            background: canAfford ? GOLD : '#2a2a3a',
+            color: canAfford ? '#0a0a0f' : '#666',
             border: 'none', borderRadius: 8,
             padding: '10px 12px',
             fontSize: 12, fontWeight: 700, letterSpacing: 1,
-            cursor: 'pointer',
+            cursor: canAfford ? 'pointer' : 'not-allowed',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
           }}
         >
           <i className="ti ti-shopping-cart" style={{ fontSize: 13 }} />
-          PURCHASE
+          {canAfford ? 'PURCHASE' : 'NOT ENOUGH HUSTLE'}
         </button>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { PLAYER, RESOURCES, CITY, INCOMING_ATTACK, CREW, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
+import { useHustle, useSteel } from '../state/profileStore'
 import { CountdownRing } from '../components/CountdownRing'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
@@ -27,6 +28,8 @@ export default function Dashboard({ onNavigate }) {
   }, [timer, snitchUsed])
 
   const xpPct = Math.round((PLAYER.xp / PLAYER.xpNext) * 100)
+  const hustle = useHustle()
+  const steel  = useSteel()
 
   return (
     <div className="scroll-area animate-in">
@@ -134,24 +137,31 @@ export default function Dashboard({ onNavigate }) {
       <div className="section">
         <div className="section-label">Resources</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {Object.entries(RESOURCES).map(([key, r]) => (
-            <div key={key} className="card card-pad" style={{ padding: 14 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: `${r.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                <i className={`ti ${r.icon}`} style={{ color: r.color, fontSize: 18 }} />
+          {Object.entries(RESOURCES).map(([key, r]) => {
+            // hustle + steel come from the profile now; crew + snitch are
+            // still static until their own phases land.
+            const value = key === 'hustle' ? hustle
+                        : key === 'steel'  ? steel
+                        : r.value
+            return (
+              <div key={key} className="card card-pad" style={{ padding: 14 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${r.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                  <i className={`ti ${r.icon}`} style={{ color: r.color, fontSize: 18 }} />
+                </div>
+                <div style={{ color: '#fff', fontSize: 22, fontWeight: 500 }}>
+                  {key === 'crew' || key === 'snitch'
+                    ? `${value} / ${r.max}`
+                    : value.toLocaleString()}
+                </div>
+                <div style={{ color: '#555', fontSize: 11, marginTop: 2, textTransform: 'capitalize' }}>
+                  {key === 'snitch' ? 'Snitches' : key.charAt(0).toUpperCase() + key.slice(1)}
+                </div>
+                <div style={{ height: 3, background: '#1e1e2a', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${Math.round((value / r.max) * 100)}%`, background: r.color, borderRadius: 2 }} />
+                </div>
               </div>
-              <div style={{ color: '#fff', fontSize: 22, fontWeight: 500 }}>
-                {key === 'crew' || key === 'snitch'
-                  ? `${r.value} / ${r.max}`
-                  : r.value.toLocaleString()}
-              </div>
-              <div style={{ color: '#555', fontSize: 11, marginTop: 2, textTransform: 'capitalize' }}>
-                {key === 'snitch' ? 'Snitches' : key.charAt(0).toUpperCase() + key.slice(1)}
-              </div>
-              <div style={{ height: 3, background: '#1e1e2a', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${Math.round((r.value / r.max) * 100)}%`, background: r.color, borderRadius: 2 }} />
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 

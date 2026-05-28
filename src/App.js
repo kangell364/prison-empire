@@ -8,6 +8,7 @@ import Yard from './screens/Yard'
 import Profile from './screens/Profile'
 import Property from './screens/Property'
 import { isMuted, setMuted, subscribeMuted, sfx } from './sounds'
+import { ensureAuth } from './state/profileStore'
 
 // Profile lives on the header avatar (top-right) so the bottom nav stays at 6.
 const NAV_ITEMS = [
@@ -24,6 +25,7 @@ export default function App() {
   const [muted, setMutedState] = useState(isMuted())
 
   useEffect(() => subscribeMuted(setMutedState), [])
+  useEffect(() => { ensureAuth() }, [])
 
   const toggleMute = () => {
     const next = !muted
