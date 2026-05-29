@@ -413,6 +413,14 @@ body {
   0%, 100% { text-shadow: 0 0 6px var(--rarity, #c9a84c); }
   50%      { text-shadow: 0 0 16px var(--rarity, #c9a84c), 0 0 24px var(--rarity, #c9a84c); }
 }
+/* Merge consume: fanned-out cards slide to center, straighten, then implode
+   into a glowing point — the burst flash + Level-up reveal pick up from here. */
+@keyframes mergeConverge {
+  0%   { transform: translateX(var(--fanX, 0)) rotate(var(--fanR, 0)) scale(1);    opacity: 1; }
+  55%  { transform: translateX(0)              rotate(0)              scale(0.95);  opacity: 1; }
+  100% { transform: translateX(0)              rotate(0)              scale(0.25);  opacity: 0;
+         filter: drop-shadow(0 0 36px var(--rarity, #c9a84c)) brightness(1.8); }
+}
 
 /* Leaflet city-label styling — matches our dark/gold theme. */
 .leaflet-container { background: #0d0d15 !important; font-family: var(--font); }

@@ -30,6 +30,11 @@ export function CharacterDetailModal({
   defPerLevel = 10,
   maxUpgradeLevel = 20,
   costForLevel,
+  // Merge props — when canMerge is true and onMerge is supplied, a MERGE
+  // CARDS button renders below the upgrade rows. Consumes a full stack to
+  // mint one of the same card at the next level.
+  canMerge = false,
+  onMerge,
 }) {
   if (!c) return null
 
@@ -251,6 +256,24 @@ export function CharacterDetailModal({
                 onUpgrade={onUpgrade}
               />
             </div>
+          </div>
+        )}
+
+        {/* Merge — appears when a full stack is ready. Sits below the upgrade
+            rows so the flow reads: see stats → upgrade → merge to next level. */}
+        {canMerge && onMerge && (
+          <div style={{ padding: '14px 18px 0' }}>
+            <button onClick={onMerge} style={{
+              width: '100%',
+              background: accent, color: '#0a0a0f',
+              border: 'none', borderRadius: 10,
+              padding: '13px 14px',
+              fontSize: 13, fontWeight: 800, letterSpacing: 1.4,
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}>
+              <i className="ti ti-arrows-join" /> MERGE CARDS
+            </button>
           </div>
         )}
 

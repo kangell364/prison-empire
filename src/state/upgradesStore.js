@@ -67,6 +67,22 @@ export function flatAtLevel(map, level = 1) {
   return out
 }
 
+// On merge: the new (cardId, toLevel) card inherits the merged card's upgrade
+// levels. Takes the higher of the two stats so repeat merges never reduce an
+// already-upgraded higher level. No-op when there's nothing to carry.
+export function carryUpgrades(cardId, fromLevel, toLevel) {
+  const from = state.get(keyOf(cardId, fromLevel)) || ZERO
+  if (from.atk === 0 && from.def === 0) return
+  const toKey = keyOf(cardId, toLevel)
+  const cur = state.get(toKey) || ZERO
+  const merged = { atk: Math.max(cur.atk, from.atk), def: Math.max(cur.def, from.def) }
+  if (merged.atk === cur.atk && merged.def === cur.def) return
+  const m = new Map(state)
+  m.set(toKey, merged)
+  commit(m)
+  pushUpsert(cardId, toLevel, merged)
+}
+
 // Bump one stat's upgrade level by 1 for (card_id, card_level). Capped.
 export function upgradeStat(cardId, cardLevel, stat /* 'atk' | 'def' */) {
   const k = keyOf(cardId, cardLevel)

@@ -6,7 +6,7 @@ import {
   ATK_PER_LEVEL, DEF_PER_LEVEL,
 } from '../state/crewStore'
 import {
-  useUpgrades, readUpgrade, getUpgrade, upgradeStat,
+  useUpgrades, readUpgrade, getUpgrade, upgradeStat, carryUpgrades,
   HUSTLE_COST_PER_LEVEL, MAX_UPGRADE_LEVEL,
 } from '../state/upgradesStore'
 import { useHustle, spendHustle } from '../state/playerStore'
@@ -68,6 +68,7 @@ function pickPackCards(ownedSet) {
 export default function Cards() {
   const [tab, setTab] = useState('collection')   // 'collection' | 'crew'
   const [selectedCard, setSelectedCard]   = useState(null)
+  const [mergeReveal, setMergeReveal]     = useState(null)   // { card, toLevel } during merge animation
   const [showPack, setShowPack]           = useState(false)
   // 'idle' → 'opening' (shake/charge/burst) → 'revealing' (one card at a time, tap to advance) → 'revealed' (accept)
   const [packState, setPackState]         = useState('idle')
@@ -248,7 +249,6 @@ export default function Cards() {
                   inCrew={inCrewSet.has(t.id)}
                   upgrades={readUpgrade(upgradesMap, t.id, t.level)}
                   onTap={() => setSelectedCard({ card, cardLevel: t.level, count: t.count })}
-                  onMerge={() => mergeCard(t.id, t.level)}
                 />
               )
             })
@@ -282,22 +282,37 @@ export default function Cards() {
 
       {/* Card Detail — universal modal so it's consistent with all other
           character cards (no bottom-sheet gap, big cinematic hero). */}
-      {selectedCard && (
-        <CharacterDetailModal
-          character={selectedCard.card}
-          cardType="PLAYER"
-          count={selectedCard.count}
-          cardLevel={selectedCard.cardLevel}
-          upgrades={readUpgrade(upgradesMap, selectedCard.card.id, selectedCard.cardLevel)}
-          hustle={hustle}
-          onUpgrade={handleUpgrade(selectedCard.card.id, selectedCard.cardLevel)}
-          atkPerLevel={ATK_PER_LEVEL}
-          defPerLevel={DEF_PER_LEVEL}
-          maxUpgradeLevel={MAX_UPGRADE_LEVEL}
-          costForLevel={HUSTLE_COST_PER_LEVEL}
-          onClose={() => setSelectedCard(null)}
-        />
-      )}
+      {selectedCard && (() => {
+        const { card, cardLevel } = selectedCard
+        // Read the live count from the store so the MERGE button updates (and
+        // hides) as the stack is consumed, without reopening the modal.
+        const liveCount = counts.get(`${card.id}:${cardLevel}`) || 0
+        return (
+          <CharacterDetailModal
+            character={card}
+            cardType="PLAYER"
+            count={liveCount}
+            cardLevel={cardLevel}
+            upgrades={readUpgrade(upgradesMap, card.id, cardLevel)}
+            hustle={hustle}
+            onUpgrade={handleUpgrade(card.id, cardLevel)}
+            atkPerLevel={ATK_PER_LEVEL}
+            defPerLevel={DEF_PER_LEVEL}
+            maxUpgradeLevel={MAX_UPGRADE_LEVEL}
+            costForLevel={HUSTLE_COST_PER_LEVEL}
+            canMerge={liveCount >= STACK_SIZE}
+            onMerge={() => {
+              mergeCard(card.id, cardLevel)
+              // Level 2 inherits the Level-1 upgrades (higher of the two).
+              carryUpgrades(card.id, cardLevel, cardLevel + 1)
+              // Hand off to the full-screen consume → reveal animation.
+              setSelectedCard(null)
+              setMergeReveal({ card, toLevel: cardLevel + 1 })
+            }}
+            onClose={() => setSelectedCard(null)}
+          />
+        )
+      })()}
 
       {/* Pack Opening Modal */}
       {showPack && (
@@ -313,6 +328,135 @@ export default function Cards() {
         />
       )}
 
+      {/* Merge consume → Level-up reveal */}
+      {mergeReveal && (
+        <MergeRevealModal
+          card={mergeReveal.card}
+          toLevel={mergeReveal.toLevel}
+          onDone={() => setMergeReveal(null)}
+        />
+      )}
+
+    </div>
+  )
+}
+
+// Full-screen merge celebration: a fanned stack of the card converges and
+// bursts, then the next-level card bounces in — same vocabulary as the pack
+// reveal so the two moments feel like one family.
+function MergeRevealModal({ card, toLevel, onDone }) {
+  const color = RARITY_COLORS[card.rarity] || '#c9a84c'
+  const [phase, setPhase] = useState('merging')   // 'merging' → 'revealed'
+  const FAN = [-2, -1, 0, 1, 2]
+  const SPARKLES = 12
+
+  useEffect(() => {
+    sfx.shake?.()
+    const burst  = setTimeout(() => sfx.burst?.(), 900)
+    const reveal = setTimeout(() => { setPhase('revealed'); sfx.reveal?.(4) }, 1300)
+    return () => { clearTimeout(burst); clearTimeout(reveal) }
+  }, [])
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: '#0a0a0f',
+      display: 'flex', alignItems: 'stretch', justifyContent: 'center',
+      zIndex: 320, '--rarity': color,
+    }}>
+      {phase === 'merging' && (
+        <div aria-hidden="true" style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: color, opacity: 0,
+          animation: 'rarityFlash 0.9s ease-out 1.0s forwards',
+        }} />
+      )}
+
+      <div style={{
+        width: '100%', maxWidth: 390, padding: '70px 24px 100px',
+        textAlign: 'center', display: 'flex', flexDirection: 'column',
+        justifyContent: 'flex-start',
+      }}>
+        {phase === 'merging' ? (
+          <>
+            <div style={{ position: 'relative', height: 150, marginBottom: 24 }}>
+              {FAN.map((f, i) => (
+                <div key={i} aria-hidden="true" style={{
+                  position: 'absolute', left: '50%', top: 20, marginLeft: -36,
+                  animation: 'mergeConverge 1.15s ease-in forwards',
+                  '--fanX': `${f * 36}px`,
+                  '--fanR': `${f * 9}deg`,
+                }}>
+                  <Avatar src={card.avatar} emoji={card.emoji} size={72} radius={12} />
+                </div>
+              ))}
+            </div>
+            <div style={{ color, fontSize: 14, letterSpacing: 2, opacity: 0.85, fontWeight: 600 }}>
+              MERGING {STACK_SIZE} CARDS…
+            </div>
+            <div style={{ height: 130 }} />
+          </>
+        ) : (
+          <div style={{ position: 'relative' }}>
+            {/* Expanding rarity rings */}
+            {[0, 1, 2].map(i => (
+              <div key={`ring-${i}`} aria-hidden="true" style={{
+                position: 'absolute', left: '50%', top: 76,
+                width: 110, height: 110, borderRadius: '50%',
+                border: `2px solid ${color}`, pointerEvents: 'none',
+                animation: `rarityRingExpand 1.2s ease-out ${i * 0.18}s forwards`, opacity: 0,
+              }} />
+            ))}
+
+            {/* Sparkle particles */}
+            {Array.from({ length: SPARKLES }).map((_, i) => {
+              const angle    = (i / SPARKLES) * Math.PI * 2
+              const distance = 70 + ((i * 13) % 35)
+              return (
+                <div key={`spark-${i}`} aria-hidden="true" style={{
+                  position: 'absolute', left: 'calc(50% - 3px)', top: 'calc(76px - 3px)',
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: color, boxShadow: `0 0 6px ${color}`,
+                  pointerEvents: 'none', opacity: 0,
+                  animation: `sparkleFloat 1.4s ease-out ${0.1 + i * 0.03}s forwards`,
+                  '--dx': `${Math.cos(angle) * distance}px`,
+                  '--dy': `${Math.sin(angle) * distance}px`,
+                }} />
+              )
+            })}
+
+            <div style={{
+              marginTop: 20, marginBottom: 8,
+              animation: 'cardRevealBounce 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+              filter: `drop-shadow(0 0 16px ${color})`,
+              display: 'flex', justifyContent: 'center',
+            }}>
+              <Avatar src={card.avatar} emoji={card.emoji} size={128} radius={16} />
+            </div>
+
+            <div style={{
+              height: 3, background: color, borderRadius: 2, margin: '8px auto 14px', width: 90,
+              opacity: 0, animation: 'logLineIn 0.4s ease 0.5s forwards',
+            }} />
+
+            <div style={{
+              color: '#fff', fontSize: 22, fontWeight: 600, marginBottom: 4,
+              opacity: 0, animation: 'logLineIn 0.4s ease 0.55s forwards',
+            }}>{card.name}</div>
+
+            <div style={{
+              color, fontSize: 15, fontWeight: 700, letterSpacing: 3, marginBottom: 18,
+              opacity: 0,
+              animation: 'logLineIn 0.4s ease 0.65s forwards, labelGlow 1.6s ease-in-out 1s infinite',
+            }}>LEVEL {toLevel}</div>
+
+            <button className="btn btn-primary btn-full"
+              style={{ padding: 14, opacity: 0, animation: 'logLineIn 0.4s ease 0.9s forwards' }}
+              onClick={onDone}>
+              Collect
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -321,14 +465,12 @@ export default function Cards() {
 // Collection tiles
 // ---------------------------------------------------------------------
 
-// Owned tile — shows PLAYER type, CARDS:N badge, optional MERGE button.
-// Tap anywhere except the merge button opens the detail modal.
+// Owned tile — shows PLAYER type, CARDS:N badge. Tap opens the detail modal,
+// where upgrades and the MERGE action live.
 // `inCrew` dims the tile and shows an IN CREW badge so you can see at a
 // glance which cards are slotted vs. on the bench.
-function CollectionTile({ card, cardLevel, count, inCrew, upgrades, onTap, onMerge }) {
+function CollectionTile({ card, cardLevel, count, inCrew, upgrades, onTap }) {
   const rarityColor = RARITY_COLORS[card.rarity]
-  const canMerge    = count >= STACK_SIZE
-  const handleMerge = (e) => { e.stopPropagation(); onMerge() }
   const atk = baseAtk(card) + (upgrades?.atk || 0) * ATK_PER_LEVEL
   const def = baseDef(card) + (upgrades?.def || 0) * DEF_PER_LEVEL
 
@@ -412,22 +554,6 @@ function CollectionTile({ card, cardLevel, count, inCrew, upgrades, onTap, onMer
           padding: '2px 6px',
           fontSize: 8, fontWeight: 800, letterSpacing: 1.2,
         }}>IN CREW</div>
-      )}
-
-      {/* Merge button — only when at least one full stack ready */}
-      {canMerge && (
-        <button onClick={handleMerge} style={{
-          marginTop: 10, width: '100%',
-          background: rarityColor, color: '#0a0a0f',
-          border: 'none', borderRadius: 8,
-          padding: '8px 10px',
-          fontSize: 11, fontWeight: 800, letterSpacing: 1.2,
-          cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-          animation: 'logLineIn 0.3s ease forwards',
-        }}>
-          <i className="ti ti-arrows-join" /> MERGE CARDS
-        </button>
       )}
     </div>
   )
