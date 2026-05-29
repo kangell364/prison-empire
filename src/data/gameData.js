@@ -177,6 +177,49 @@ export const PLAYER_LOOKS = [
 ]
 export const DEFAULT_LOOK_ID = 'look_1'
 
+// ── Territory facilities (gang-war map control points) ───────────────
+// Curated, NAMED prison facilities are the capturable nodes on the map —
+// NOT every county (genre playbook: control points, not painted tiles).
+// Each anchors to an existing city (cityId → county via map data) so it
+// lands in the right place. Tier sets the prize + difficulty. Admin-curated:
+// add map targets by appending here. See [[project-gang-territory-design]].
+export const FACILITY_TIERS = {
+  1: { label: 'County Jail',          hustlePerHr: 50,   steelPerHr: 20  },
+  2: { label: 'State Prison',         hustlePerHr: 150,  steelPerHr: 60  },
+  3: { label: 'Federal Penitentiary', hustlePerHr: 400,  steelPerHr: 160 },
+  4: { label: 'Supermax',             hustlePerHr: 1000, steelPerHr: 400 },
+}
+
+export const FACILITIES = [
+  { id: 'fac_huntsville',  name: 'Huntsville Unit',         cityId: 1,   tier: 2 }, // TX — player home
+  { id: 'fac_dallas',      name: 'Dallas County Jail',      cityId: 2,   tier: 1 },
+  { id: 'fac_travis',      name: 'Travis State Jail',       cityId: 3,   tier: 1 },
+  { id: 'fac_rikers',      name: 'Rikers Island',           cityId: 10,  tier: 2 },
+  { id: 'fac_attica',      name: 'Attica Correctional',     cityId: 11,  tier: 3 },
+  { id: 'fac_eastern',     name: 'Eastern State Pen',       cityId: 17,  tier: 3 },
+  { id: 'fac_western',     name: 'Western Penitentiary',    cityId: 18,  tier: 2 },
+  { id: 'fac_usp_atlanta', name: 'USP Atlanta',             cityId: 41,  tier: 3 },
+  { id: 'fac_dade',        name: 'Miami-Dade Correctional', cityId: 44,  tier: 2 },
+  { id: 'fac_orleans',     name: 'Orleans Parish Prison',   cityId: 60,  tier: 1 },
+  { id: 'fac_angola',      name: 'Angola State Pen',        cityId: 61,  tier: 4 },
+  { id: 'fac_stateville',  name: 'Stateville Correctional', cityId: 70,  tier: 3 },
+  { id: 'fac_detroit',     name: 'Detroit Detention',       cityId: 77,  tier: 1 },
+  { id: 'fac_leavenworth', name: 'USP Leavenworth',         cityId: 86,  tier: 3 },
+  { id: 'fac_adx',         name: 'ADX Florence',            cityId: 108, tier: 4 },
+  { id: 'fac_lancaster',   name: 'CSP Los Angeles',         cityId: 125, tier: 2 },
+  { id: 'fac_sanquentin',  name: 'San Quentin',             cityId: 126, tier: 3 },
+  { id: 'fac_folsom',      name: 'Folsom State Prison',     cityId: 128, tier: 2 },
+  { id: 'fac_phoenix',     name: 'ASPC Phoenix',            cityId: 131, tier: 2 },
+]
+
+export const PLAYER_HOME_FACILITY_ID = 'fac_huntsville'
+
+// AI gangs that hold facilities until real players exist (single-player-first).
+export const AI_GANGS = [
+  'Block Crew', 'County Posse', 'Backyard Boys', 'Yardbirds', 'Cell House',
+  'Shanktown', 'Trailer Mafia', 'Hill Boys', 'Iron Bench', 'Yard Dogs',
+]
+
 export const BATTLE_ENEMIES = [
   { id: 1,  name: 'Nervous Ned',     emoji: '😰', power: 45,  area: 1, reward_xp: 50,  reward_hustle: 10,  boss: false,
     bio: 'First fight of the morning. Shakes harder than the bunks. Easy meal.' },
