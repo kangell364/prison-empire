@@ -13,12 +13,13 @@
 
 import { useEffect, useState } from 'react'
 import { FACILITIES, FACILITY_TIERS, AI_GANGS, PLAYER_HOME_FACILITY_ID } from '../data/gameData'
-import { addHustle, addSteel } from './profileStore'
+import { addHustle, addSteel, spendSteel } from './profileStore'
 
 const KEY            = 'pe_territories_v1'
 export const LOYALTY_MAX   = 100
 export const HIT_DAMAGE    = 25          // loyalty removed per drive-by landing
 export const FLIP_LOYALTY  = 50          // loyalty a facility starts at after flipping
+export const REINFORCE_AMOUNT = 30       // defense restored per reinforce
 const REGEN_PER_HR   = 5                 // loyalty healed per hour while held
 const INCOME_CAP_HRS = 24                // max hours of income that accrue uncollected
 
@@ -139,6 +140,43 @@ export function applyHit(facilityId) {
   }
   commit({ ...state, [facilityId]: { ...rec, loyalty: next, loyaltyAt: now } })
   return { flipped: false, loyalty: next }
+}
+
+// An ENEMY raid has landed on a facility YOU hold — chip its defense. If it
+// hits 0 the facility is lost to the raiding gang. Mirror of applyHit, but
+// hostile. Returns { lost, loyalty, gang }.
+export function applyRaid(facilityId, gang) {
+  const rec = state[facilityId]
+  if (!rec || rec.owner !== 'you') return { lost: false, loyalty: 0, gang }
+  const now = Date.now()
+  const next = effectiveLoyalty(rec) - HIT_DAMAGE
+  if (next <= 0) {
+    commit({ ...state, [facilityId]: { owner: gang, loyalty: FLIP_LOYALTY, loyaltyAt: now, lastCollectedAt: now } })
+    return { lost: true, loyalty: FLIP_LOYALTY, gang }
+  }
+  commit({ ...state, [facilityId]: { ...rec, loyalty: next, loyaltyAt: now } })
+  return { lost: false, loyalty: next, gang }
+}
+
+// Steel cost to reinforce a facility you hold (scales with tier — supermaxes
+// are pricier to hold).
+export function reinforceCost(facilityId) {
+  const fac = FACILITY_BY_ID.get(facilityId)
+  return fac ? fac.tier * 150 : 0
+}
+
+// Spend Steel to restore a held facility's defense. Returns { ok, loyalty, cost }
+// or { ok:false, reason }.
+export function reinforce(facilityId) {
+  const rec = state[facilityId]
+  if (!rec || rec.owner !== 'you') return { ok: false, reason: 'not-yours' }
+  const cur = effectiveLoyalty(rec)
+  if (cur >= LOYALTY_MAX) return { ok: false, reason: 'full' }
+  const cost = reinforceCost(facilityId)
+  if (!spendSteel(cost)) return { ok: false, reason: 'broke' }
+  const next = Math.min(LOYALTY_MAX, cur + REINFORCE_AMOUNT)
+  commit({ ...state, [facilityId]: { ...rec, loyalty: next, loyaltyAt: Date.now() } })
+  return { ok: true, loyalty: next, cost }
 }
 
 // Bank a held facility's accrued income. Returns what was credited.

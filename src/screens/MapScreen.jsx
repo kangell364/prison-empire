@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
-import { ALL_CITIES, FACILITIES, FACILITY_TIERS, PLAYER_HOME_FACILITY_ID } from '../data/gameData'
+import { ALL_CITIES, FACILITIES, FACILITY_TIERS, PLAYER_HOME_FACILITY_ID, AI_GANGS } from '../data/gameData'
 import { CountdownRing } from '../components/CountdownRing'
 import { USCountryMap } from '../components/USCountryMap'
 import { USStateMap } from '../components/USStateMap'
 import { ScoutScreen } from '../components/ScoutScreen'
 import { useMapData, buildCityCountyMap, STATE_CODE_TO_FIPS } from '../state/mapData'
 import { useDisplayName } from '../state/profileStore'
-import { useTerritories, applyHit } from '../state/territoriesStore'
+import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
 import { sfx } from '../sounds'
 
 const GOLD = '#c9a84c'
@@ -20,6 +20,14 @@ const IS_TEST = typeof window !== 'undefined' &&
 const ATTACK_DURATION_MS = IS_TEST ? 30 * 1000 : 15 * 60 * 1000
 const STORAGE_KEY        = IS_TEST ? 'pe_drive_bys_test_v2' : 'pe_drive_bys_v2'
 const TICK_THRESHOLDS    = IS_TEST ? [20, 10, 5] : [60, 30, 10]
+
+// Enemy retaliation: rival gangs launch raids at facilities YOU hold. Same
+// travel time as your own drive-bys (so the player can react/reinforce), but
+// spawned on a cadence while the map is open. Raids only begin once you hold a
+// couple of facilities so a brand-new player learns offense first.
+const RAID_STORAGE_KEY   = IS_TEST ? 'pe_raids_test_v1' : 'pe_raids_v1'
+const RAID_SPAWN_MS      = IS_TEST ? 12 * 1000 : 90 * 1000
+const MIN_HOLD_TO_RAID   = 2
 
 const FACILITY_BY_ID = new Map(FACILITIES.map(f => [f.id, f]))
 
@@ -91,6 +99,89 @@ function loadAttacks() {
 }
 
 // ---------------------------------------------------------------------
+// Raids hook — incoming enemy drive-bys against YOUR facilities. Mirrors
+// useDriveBys but hostile: spawns on a cadence while the map is open, lands via
+// applyRaid (chips your defense, loses the facility at 0). `territories` is
+// passed so spawning re-evaluates as ownership changes.
+// ---------------------------------------------------------------------
+function useRaids(territories) {
+  const [raids, setRaids]   = useState(loadRaids)
+  const [landed, setLanded] = useState([])
+  const [, tick] = useState(0)
+  const firedRef = useRef(new Set())
+
+  useEffect(() => {
+    try { localStorage.setItem(RAID_STORAGE_KEY, JSON.stringify(raids)) } catch {}
+  }, [raids])
+
+  // Land / tick loop.
+  useEffect(() => {
+    if (raids.length === 0) return
+    const iv = setInterval(() => {
+      const now = Date.now()
+      const active = [], completed = []
+      for (const r of raids) (r.endsAt <= now ? completed : active).push(r)
+
+      for (const r of active) {
+        const rem = Math.ceil((r.endsAt - now) / 1000)
+        for (const t of TICK_THRESHOLDS) {
+          const k = `${r.id}:${t}`
+          if (rem <= t && !firedRef.current.has(k)) {
+            firedRef.current.add(k)
+            sfx.hotTick()
+          }
+        }
+      }
+
+      if (completed.length > 0) {
+        const results = completed.map(r => ({ ...r, ...applyRaid(r.facilityId, r.gang) }))
+        setRaids(active)
+        setLanded(L => [...L, ...results])
+        sfx.boom()
+      } else {
+        tick(t => t + 1)
+      }
+    }, 1000)
+    return () => clearInterval(iv)
+  }, [raids])
+
+  // Spawn loop — periodically pick one of your facilities to threaten.
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const owned = FACILITIES.filter(f => getTerritory(f.id)?.owner === 'you')
+      if (owned.length < MIN_HOLD_TO_RAID) return
+      setRaids(cur => {
+        const underRaid = new Set(cur.map(r => r.facilityId))
+        const eligible = owned.filter(f => !underRaid.has(f.id))
+        if (!eligible.length) return cur
+        // Weight by tier — richer facilities draw more heat.
+        const pool = eligible.flatMap(f => Array(f.tier).fill(f))
+        const target = pool[Math.floor(Math.random() * pool.length)]
+        const gang = AI_GANGS[Math.floor(Math.random() * AI_GANGS.length)]
+        const now = Date.now()
+        return [...cur, { id: `raid-${target.id}-${now}`, facilityId: target.id, gang, endsAt: now + ATTACK_DURATION_MS }]
+      })
+    }, RAID_SPAWN_MS)
+    return () => clearInterval(iv)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [territories])
+
+  const dismissLanded = (id) => setLanded(L => L.filter(r => r.id !== id))
+  return { raids, landed, dismissLanded }
+}
+
+function loadRaids() {
+  try {
+    const raw = localStorage.getItem(RAID_STORAGE_KEY)
+    if (!raw) return []
+    const now = Date.now()
+    return (JSON.parse(raw) || []).filter(r => r.endsAt > now && r.facilityId)
+  } catch {
+    return []
+  }
+}
+
+// ---------------------------------------------------------------------
 // MapScreen
 // ---------------------------------------------------------------------
 export default function MapScreen() {
@@ -99,8 +190,10 @@ export default function MapScreen() {
   const { attacks, landed, launch, dismissLanded } = useDriveBys()
   const { data: mapData } = useMapData()
   const territories = useTerritories()
+  const { raids, landed: raidLanded, dismissLanded: dismissRaid } = useRaids(territories)
 
   const attackingSet = useMemo(() => new Set(attacks.map(a => a.facilityId)), [attacks])
+  const raidByFacility = useMemo(() => new Map(raids.map(r => [r.facilityId, r])), [raids])
   const cityById = useMemo(() => new Map(ALL_CITIES.map(c => [c.id, c])), [])
 
   // Facility → county FIPS (via its anchor city's coordinates).
@@ -168,9 +261,20 @@ export default function MapScreen() {
   }
 
   const currentLanded = landed[0] || null
+  const currentRaidLanded = raidLanded[0] || null
 
   return (
     <div className="scroll-area animate-in">
+      {/* Incoming enemy raids (most urgent — render first) */}
+      {raids.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 16px 0' }}>
+          {raids.map(r => (
+            <RaidBanner key={r.id} raid={r} facility={FACILITY_BY_ID.get(r.facilityId)} city={cityById.get(FACILITY_BY_ID.get(r.facilityId)?.cityId)}
+              onDefend={() => setSelectedFacility(FACILITY_BY_ID.get(r.facilityId))} />
+          ))}
+        </div>
+      )}
+
       {/* In-flight drive-bys */}
       {attacks.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 16px 0' }}>
@@ -302,6 +406,7 @@ export default function MapScreen() {
         <ScoutScreen
           facility={selectedFacility}
           inFlight={attackingSet.has(selectedFacility.id)}
+          incomingRaid={raidByFacility.get(selectedFacility.id) || null}
           onAttack={(f) => { launch(f); setSelectedFacility(null) }}
           onClose={() => setSelectedFacility(null)}
         />
@@ -312,6 +417,14 @@ export default function MapScreen() {
           facility={FACILITY_BY_ID.get(currentLanded.facilityId)}
           result={currentLanded}
           onClose={() => dismissLanded(currentLanded.id)}
+        />
+      )}
+
+      {currentRaidLanded && (
+        <RaidLandedModal
+          facility={FACILITY_BY_ID.get(currentRaidLanded.facilityId)}
+          result={currentRaidLanded}
+          onClose={() => dismissRaid(currentRaidLanded.id)}
         />
       )}
     </div>
@@ -352,6 +465,77 @@ function AttackBanner({ attack, facility, city }) {
         </div>
         <div style={{ color: '#fff', fontSize: 13, marginBottom: 2 }}>→ {label}{city ? `, ${city.state}` : ''}</div>
         <div style={{ color: DIM, fontSize: 10 }}>{isClose ? 'Almost there — hold on' : 'Your crew is moving — cannot cancel'}</div>
+      </div>
+    </div>
+  )
+}
+
+// Incoming enemy raid banner — red, urgent. Tapping it opens the facility so
+// the player can reinforce before it lands.
+function RaidBanner({ raid, facility, city, onDefend }) {
+  const total = Math.ceil(ATTACK_DURATION_MS / 1000)
+  const remaining = Math.max(0, Math.ceil((raid.endsAt - Date.now()) / 1000))
+  const label = facility ? facility.name : 'Your facility'
+
+  return (
+    <div className="attack-banner-in" onClick={onDefend} style={{
+      background: 'linear-gradient(135deg, #2a0a0a 0%, #100404 100%)',
+      border: `1px solid ${RED}88`, borderRadius: 16, padding: 14,
+      display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer',
+    }}>
+      <CountdownRing remaining={remaining} total={total} size={64} strokeWidth={4} variant="incoming" />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ color: RED, fontSize: 13, fontWeight: 600, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <i className="ti ti-alert-triangle-filled" /> Incoming Raid
+        </div>
+        <div style={{ color: '#fff', fontSize: 13, marginBottom: 2 }}>{raid.gang} → {label}{city ? `, ${city.state}` : ''}</div>
+        <div style={{ color: GOLD, fontSize: 10, fontWeight: 600 }}>Tap to reinforce — hold your ground</div>
+      </div>
+      <i className="ti ti-shield-half-filled" style={{ color: RED, fontSize: 20 }} />
+    </div>
+  )
+}
+
+// Shown when an enemy raid lands on a facility you held: either you lost it, or
+// your defense held (just chipped).
+function RaidLandedModal({ facility, result, onClose }) {
+  if (!facility) return null
+  const lost    = !!result.lost
+  const loyalty = result.loyalty ?? 0
+  const gang    = result.gang || 'A rival gang'
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'stretch', justifyContent: 'center', zIndex: 250 }}>
+      <div style={{ background: '#13131f', padding: 24, width: '100%', maxWidth: 390, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', paddingTop: 80 }}>
+        <div className="landing-stamp" style={{ textAlign: 'center', marginBottom: 18 }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 84, height: 84, borderRadius: '50%',
+            background: `${RED}22`, border: `2px solid ${RED}`, color: RED, fontSize: 40, boxShadow: `0 0 32px ${RED}66`,
+          }}>
+            <i className={`ti ${lost ? 'ti-flag-off' : 'ti-shield-check'}`} />
+          </div>
+        </div>
+
+        <div style={{ color: RED, fontSize: 13, fontWeight: 600, letterSpacing: 3, textAlign: 'center', marginBottom: 6 }}>
+          {lost ? 'TERRITORY LOST' : 'DEFENSE HELD'}
+        </div>
+        <div style={{ color: '#fff', fontSize: 24, fontWeight: 600, textAlign: 'center', marginBottom: 6 }}>{facility.name}</div>
+
+        {lost ? (
+          <div style={{ color: '#888', fontSize: 13, fontStyle: 'italic', textAlign: 'center', marginBottom: 22 }}>
+            {gang} overran it — hit it back to take it again
+          </div>
+        ) : (
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ color: '#888', fontSize: 13, textAlign: 'center', marginBottom: 10 }}>{gang} got beat back — reinforce before they return</div>
+            <div style={{ height: 8, background: '#0a0a0f', borderRadius: 4, overflow: 'hidden', border: '0.5px solid #2a2a3a' }}>
+              <div style={{ height: '100%', width: `${loyalty}%`, background: `linear-gradient(90deg, ${GOLD}, #f0d080)`, borderRadius: 4 }} />
+            </div>
+            <div style={{ color: DIM, fontSize: 11, textAlign: 'center', marginTop: 6 }}>Defense {loyalty}/100</div>
+          </div>
+        )}
+
+        <button className="btn btn-gold btn-full" style={{ padding: 14 }} onClick={onClose}>Continue</button>
       </div>
     </div>
   )

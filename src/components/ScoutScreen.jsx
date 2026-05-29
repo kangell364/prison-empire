@@ -1,9 +1,10 @@
 import React from 'react'
 import { ALL_CITIES, FACILITY_TIERS, PLAYER } from '../data/gameData'
-import { useDisplayName } from '../state/profileStore'
+import { useDisplayName, useSteel } from '../state/profileStore'
 import {
   useTerritories, effectiveLoyalty, pendingIncome, collect,
   tierIncome, holderPower, LOYALTY_MAX, HIT_DAMAGE,
+  reinforce, reinforceCost, REINFORCE_AMOUNT,
 } from '../state/territoriesStore'
 
 const GOLD = '#c9a84c'
@@ -20,9 +21,10 @@ const CITY_BY_ID = new Map(ALL_CITIES.map(c => [c.id, c]))
 // rival-held / yours), a tier badge, the loyalty bar (capture progress), the
 // holder's gang strength vs yours, and the right action (Claim / Attack /
 // Collect). Bottom-sheet to match the rest of the map's modals.
-export function ScoutScreen({ facility, inFlight, onAttack, onClose }) {
+export function ScoutScreen({ facility, inFlight, incomingRaid, onAttack, onClose }) {
   const territories = useTerritories()
   const playerName  = useDisplayName()
+  const steel       = useSteel()
   if (!facility) return null
 
   const rec     = territories[facility.id] || null
@@ -40,6 +42,9 @@ export function ScoutScreen({ facility, inFlight, onAttack, onClose }) {
   const favored    = yourPower >= theirPower
   const hitsToFlip = Math.max(1, Math.ceil(loyalty / HIT_DAMAGE))
   const pending    = pendingIncome(facility.id)
+  const reinCost   = reinforceCost(facility.id)
+  const canAfford  = steel >= reinCost
+  const atMaxDef   = loyalty >= LOYALTY_MAX
 
   return (
     <div style={{
@@ -125,6 +130,35 @@ export function ScoutScreen({ facility, inFlight, onAttack, onClose }) {
               )}
             </div>
           </>
+        )}
+
+        {/* Yours + under raid: urgent warning */}
+        {isYours && incomingRaid && (
+          <div style={{ background: '#2a0a0a', border: `0.5px solid ${RED}88`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+            <div style={{ color: RED, fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <i className="ti ti-alert-triangle-filled" /> {incomingRaid.gang} raid incoming
+            </div>
+            <div style={{ color: '#c88', fontSize: 12, marginTop: 4 }}>
+              They'll knock {HIT_DAMAGE} off your defense. Reinforce now or risk losing it.
+            </div>
+          </div>
+        )}
+
+        {/* Yours: reinforce defense */}
+        {isYours && (
+          <button
+            className="btn btn-dark btn-full"
+            style={{ padding: 14, marginBottom: 10, opacity: atMaxDef || !canAfford ? 0.5 : 1,
+                     border: incomingRaid ? `1px solid ${GOLD}` : undefined }}
+            disabled={atMaxDef || !canAfford}
+            onClick={() => { reinforce(facility.id) }}
+          >
+            <i className="ti ti-shield-plus" /> {atMaxDef
+              ? 'Defense Maxed'
+              : !canAfford
+                ? `Reinforce — need ${reinCost.toLocaleString()} Steel`
+                : `Reinforce +${REINFORCE_AMOUNT} Def — ${reinCost.toLocaleString()} Steel`}
+          </button>
         )}
 
         {/* Yours: collect income */}
