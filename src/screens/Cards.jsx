@@ -371,6 +371,22 @@ function MergeRevealModal({ card, toLevel, onDone }) {
         }} />
       )}
 
+      {/* Close (X) top-right — matches the detail modal so the level-up screen
+          dismisses the same way as every other card view. */}
+      <button
+        onClick={onDone}
+        aria-label="Close"
+        style={{
+          position: 'absolute', top: 12, right: 12, zIndex: 2,
+          width: 32, height: 32, borderRadius: '50%',
+          background: 'rgba(10,10,15,0.7)',
+          border: '0.5px solid rgba(255,255,255,0.15)',
+          color: '#fff', fontSize: 18, fontWeight: 700,
+          cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      ><i className="ti ti-x" /></button>
+
       <div style={{
         width: '100%', maxWidth: 390, padding: '70px 24px 100px',
         textAlign: 'center', display: 'flex', flexDirection: 'column',
@@ -473,6 +489,12 @@ function CollectionTile({ card, cardLevel, count, inCrew, upgrades, onTap }) {
   const rarityColor = RARITY_COLORS[card.rarity]
   const atk = baseAtk(card) + (upgrades?.atk || 0) * ATK_PER_LEVEL
   const def = baseDef(card) + (upgrades?.def || 0) * DEF_PER_LEVEL
+  // Cards pile into stacks of STACK_SIZE; extras spill into the next stack.
+  const fullStacks = Math.floor(count / STACK_SIZE)
+  const remainder  = count % STACK_SIZE
+  const stackLabel = fullStacks > 0
+    ? `${fullStacks} STACK${fullStacks > 1 ? 'S' : ''}${remainder > 0 ? ` +${remainder}` : ''}`
+    : null
 
   return (
     <div onClick={onTap} style={{
@@ -505,10 +527,35 @@ function CollectionTile({ card, cardLevel, count, inCrew, upgrades, onTap }) {
         fontVariantNumeric: 'tabular-nums',
       }}>CARDS:{count}</div>
 
-      {/* Card art */}
+      {/* Card art — sits on offset 'card-back' layers, one per full stack, so
+          a deeper pile reads as more stacks at a glance. */}
       <div style={{ display: 'flex', justifyContent: 'center', margin: '2px 0 6px' }}>
-        <Avatar src={card.avatar} emoji={card.emoji} size={56} radius={8} />
+        <div style={{ position: 'relative', width: 56, height: 56 }}>
+          {Array.from({ length: Math.min(fullStacks, 3) }).map((_, i) => {
+            const off = (i + 1) * 4
+            return (
+              <div key={i} aria-hidden="true" style={{
+                position: 'absolute', top: 0, left: 0, zIndex: 0,
+                width: 56, height: 56, borderRadius: 8,
+                background: '#181826',
+                border: `0.5px solid ${rarityColor}55`,
+                transform: `translate(${-off}px, ${-off}px)`,
+              }} />
+            )
+          })}
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <Avatar src={card.avatar} emoji={card.emoji} size={56} radius={8} />
+          </div>
+        </div>
       </div>
+
+      {/* Stack count — only once at least one full stack has formed. */}
+      {stackLabel && (
+        <div style={{
+          textAlign: 'center', marginBottom: 4,
+          color: rarityColor, fontSize: 9, fontWeight: 800, letterSpacing: 1,
+        }}>{stackLabel}</div>
+      )}
 
       {/* Name */}
       <div style={{ color: '#fff', fontSize: 12, fontWeight: 500, textAlign: 'center', marginBottom: 2 }}>
