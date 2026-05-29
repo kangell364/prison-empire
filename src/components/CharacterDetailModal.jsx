@@ -146,7 +146,7 @@ export function CharacterDetailModal({
               fontSize: 9, fontWeight: 800, letterSpacing: 1.5,
             }}>
               {cardType}
-              {cardLevel > 1 && <span style={{ color: accent, marginLeft: 6 }}>· LVL {cardLevel}</span>}
+              {cardLevel >= 1 && <span style={{ color: accent, marginLeft: 6 }}>· LVL {cardLevel}</span>}
             </div>
           )}
           {count != null && (

@@ -528,11 +528,12 @@ function CollectionTile({ card, cardLevel, count, inCrew, upgrades, onTap }) {
       }}>CARDS:{count}</div>
 
       {/* Card art — sits on offset 'card-back' layers, one per full stack, so
-          a deeper pile reads as more stacks at a glance. */}
-      <div style={{ display: 'flex', justifyContent: 'center', margin: '2px 0 6px' }}>
+          a deeper pile reads as more stacks at a glance. Extra top margin keeps
+          it clear of the PLAYER / CARDS badges. */}
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 6px' }}>
         <div style={{ position: 'relative', width: 56, height: 56 }}>
           {Array.from({ length: Math.min(fullStacks, 3) }).map((_, i) => {
-            const off = (i + 1) * 4
+            const off = (i + 1) * 3
             return (
               <div key={i} aria-hidden="true" style={{
                 position: 'absolute', top: 0, left: 0, zIndex: 0,
@@ -559,7 +560,7 @@ function CollectionTile({ card, cardLevel, count, inCrew, upgrades, onTap }) {
 
       {/* Name */}
       <div style={{ color: '#fff', fontSize: 12, fontWeight: 500, textAlign: 'center', marginBottom: 2 }}>
-        {card.name}{cardLevel > 1 && <span style={{ color: rarityColor, marginLeft: 4 }}>· LVL {cardLevel}</span>}
+        {card.name}{cardLevel >= 1 && <span style={{ color: rarityColor, marginLeft: 4 }}>· LVL {cardLevel}</span>}
       </div>
 
       {/* Rarity */}
