@@ -1,0 +1,240 @@
+PRISON EMPIRE — CHARACTER CARD BUILDS (reference for Higgsfield)
+================================================================
+One prompt = ONE person. Run them one at a time. The reference photos
+(MAIN CARD.jpeg / MAIN CARD 2.png) supply the style, the cell background,
+the steel bars, and the orange jumpsuit — so each line only describes the
+person's head/neck.
+
+Format that works (keep it short, like these):
+  "White man with short thick black hair, no glasses, clean-shaven, early 20s."
+  "Middle Eastern man with thick eyebrows and a burn scar across half the face, with an intense glare."
+
+200 lines = 200 unique characters. A TRAIT BANK for writing more is at the bottom.
+
+------------------------------------------------------------------
+
+1. White man with short thick black hair, no glasses, clean-shaven, early 20s.
+2. White man with a brown buzz cut and light stubble, 30s.
+3. White man with slicked-back blonde hair and a goatee, 40s.
+4. White man, bald with a thick full beard, 50s.
+5. White man with messy red hair and freckles, clean-shaven, mid 20s.
+6. White man with gray balding hair and a heavily wrinkled face, 60s.
+7. White man with a tall red mohawk, a nose ring, and a manic grin.
+8. White man with an eye patch and a scar across the lips, gaunt cheeks, sinister smirk.
+9. White man, bald, with full face tattoos, screaming with bared teeth.
+10. White man with a blonde buzz cut, a broken nose, and a black-eye bruise.
+11. White man with long greasy hair, a mullet, and a thin mustache.
+12. White man with mutton-chop sideburns, bald on top, with wild bloodshot eyes.
+13. White man with a handlebar mustache, bald, with an intense glare.
+14. White man with thick square glasses and balding hair, nervous expression.
+15. White man, heavy-set with a double chin and short brown hair.
+16. White man with a long ponytail, a biker look, and a thick mustache.
+17. White man, elderly and gaunt, bald with sunken eyes and a toothless grin.
+18. White man with a shaved head, neck tattoos, and gauged ears, snarling.
+19. White man with curly brown hair and a short beard, 30s.
+20. White man with a flat-top haircut and a square jaw, stoic.
+21. White man with spiked bleached hair and a lip piercing, smug.
+22. White man with a buzz cut, cauliflower ears, and a crooked nose, snarling.
+23. White man with shoulder-length dark hair and a goatee, menacing.
+24. White man with a receding hairline and round glasses, 50s, defeated look.
+25. White man with a shaved head and a deep scar across one eyebrow.
+26. White man with sandy blonde hair, clean-shaven, scared wide eyes, early 30s.
+27. White man with a salt-and-pepper beard and short hair, 50s.
+28. White man with a face tattoo across one cheek and a shaved head, cold stare.
+29. Black man with short black hair, clean-shaven, 30s.
+30. Black man with long dreadlocks and a goatee, calm expression.
+31. Black man with cornrows and neck tattoos, intense glare.
+32. Black man, bald with gold-tooth grills, screaming.
+33. Black man with a high-top fade, early 20s, smug.
+34. Black man, muscular and burly, with a shaved head and a facial scar.
+35. Black man with short twists and a thin goatee, 30s.
+36. Black man, elderly with gray hair and a gray beard, weathered face.
+37. Black man, bald with a thick full beard, stoic.
+38. Black man with dreadlocks tied up, a scar across the nose, manic laugh.
+39. Black man with a half-shaved head and burn scars on one side, grimacing.
+40. Black man with gray dreadlocks, a milky blind eye, and deep wrinkles, grim.
+41. Black man with cornrows, a branded scar on the cheek, and gold teeth.
+42. Black man with a short afro and a chinstrap beard, 30s.
+43. Black man with a shaved head and face tattoos, furious expression.
+44. Black man with a sharp fade and a clean lineup, clean-shaven, 20s.
+45. Black man with long box braids and a mustache.
+46. Black man, bald with round glasses, 40s, thoughtful.
+47. Black man with a flat-top fade and a goatee, 30s.
+48. Black man with a deep scar across the throat and short twists, intense glare.
+49. Black man with a graying afro and beard, 50s.
+50. Black man with a do-rag and a thin mustache, smug.
+51. Black man with a shaved head and teardrop tattoos, cold stare.
+52. Black man with short hair and a full beard, heavy-set, 40s.
+53. Black man with a high-top carved with designs and eyebrow slits, snarling.
+54. Black man with locs pulled back and a scar over one eye.
+55. East Asian man with short black hair, clean-shaven, 30s.
+56. East Asian man, bald with a long thin gray beard, elderly.
+57. East Asian man with an undercut hairstyle, young, intense.
+58. East Asian man with slicked-back hair and a thin mustache, older.
+59. East Asian man, bald with a dragon tattoo up the neck, cold stare.
+60. East Asian man with a scar across one eye and a milky blind eye, menacing.
+61. East Asian man with full traditional face tattoos and a top-knot, glaring.
+62. East Asian man with a face tattoo across one cheek and an undercut, snarling.
+63. East Asian man with spiky black hair, clean-shaven, 20s.
+64. East Asian man with a shaved head and gold grills, cold smirk.
+65. South Asian (Indian) man with black hair and a thick mustache, 40s.
+66. South Asian (Indian) man with a long beard and a scar across one eye, enraged.
+67. South Asian (Pakistani) man with short hair and a full beard, 30s.
+68. South Asian man with a shaved head, a full beard, and a scar across the eyebrow, screaming.
+69. Southeast Asian (Filipino) man with short black hair and a neck tattoo.
+70. Southeast Asian (Vietnamese) man with spiky hair, clean-shaven, 20s.
+71. Southeast Asian (Thai) man with a shaved head and an ornate neck tattoo, stoic.
+72. South Asian man with slicked hair and a goatee, 30s, smug.
+73. Hispanic man with slicked-back black hair, a goatee, and a facial scar.
+74. Latino man with curly black hair and a thin mustache, 30s.
+75. Latino man with a shaved head and a teardrop tattoo under one eye.
+76. Latino man with a spiderweb neck tattoo and a broken nose, baring his teeth.
+77. Latino man, bald with full face and scalp tattoos, screaming with bulging neck veins.
+78. Latino man with a mustache and a bullet-wound scar on the cheek.
+79. Latino man with slicked hair and teardrop plus spiderweb tattoos, menacing.
+80. Latino man with a fade and a chinstrap beard, 20s.
+81. Latino man with three-dot and teardrop face tattoos and a shaved head, smug.
+82. Latino man with wavy dark hair and a full beard, 40s.
+83. Middle Eastern man with dark hair and a full beard, intense.
+84. Middle Eastern man with thick eyebrows and a burn scar across half the face, with an intense glare.
+85. Middle Eastern man with a shaved head, a throat tattoo, and missing front teeth, screaming.
+86. Middle Eastern man with a long beard, an eye patch, and a scar across the brow, furious.
+87. Middle Eastern man with short hair and heavy stubble, 30s.
+88. Middle Eastern man with slicked hair and a neat beard, 40s, smug.
+89. Native American man with long dark hair and a stoic face, 40s.
+90. Native American man with braided hair and a weathered face, 50s.
+91. Pacific Islander man, large build, with short hair and traditional neck tattoos.
+92. Pacific Islander man, bald with a full head tattoo and a missing tooth, with a war-cry scream.
+93. Pacific Islander man with a top-knot and full facial tribal tattoos, fierce.
+94. Mixed-race (Black and white) man with short curly hair and light stubble.
+95. Mixed-race man with a fade and freckles, 20s.
+96. White man with a crew cut and a scar through one eyebrow, 30s.
+97. Black man with waves and a thin mustache, 20s, smug.
+98. Latino man with a slicked ponytail and a goatee, 40s.
+99. East Asian man with a bowl cut and round glasses, 20s, nervous.
+100. White man with dreadlocks and a beard, 30s.
+101. Black man with a shaved head and a long beard, 40s, menacing.
+102. Middle Eastern man with curly hair and a short beard, 30s.
+103. White man with a faux-hawk and stubble, 20s.
+104. Latino man with a buzz cut and a neck tattoo, intense.
+105. South Asian man with a top-knot and a full beard, 40s.
+106. Black man with a flat-top and a chinstrap, 30s, stoic.
+107. White man with greasy shoulder-length hair and rotten teeth, wild eyes.
+108. East Asian man with a man bun and a goatee, 30s.
+109. Pacific Islander man with curly hair and a full beard, large build.
+110. White man with a comb-over and thick glasses, 50s.
+111. Black man with a short afro and round glasses, 20s.
+112. Latino man with a shaved head and a mustache, heavy-set.
+113. Native American man with a shaved-sides mohawk and a stoic look.
+114. White man with a Viking-style braided beard and a bald top.
+115. Middle Eastern man, elderly with a long gray beard, 60s.
+116. Black man with twists and a scar across the cheek, snarling.
+117. East Asian man with a shaved head and a scar across the lips, cold smirk.
+118. White man with sandy hair, clean-shaven, smug, 30s.
+119. Latino man with curly hair and a thick beard, 40s, intense.
+120. White man, gaunt with hollow cheeks and buzzed hair, scared.
+121. Black man, bald with face tattoos and gold grills, screaming with bared teeth.
+122. Mixed-race man with an afro and light stubble, 20s.
+123. White man with a mohawk, neck and face tattoos, and gauged ears, manic grin.
+124. South Asian man with short hair and a mustache, 30s.
+125. Southeast Asian man with a shaved head and heavy neck tattoos, stoic.
+126. White man with a buzz cut and a bandage over one eye, gritted teeth.
+127. Black man with cornrows and a goatee, 30s, smug.
+128. East Asian man with slicked hair and a scar over one eye, menacing.
+129. Latino man with a fade and teardrop tattoos, cold stare.
+130. White man with a thick lumberjack beard and short hair, 40s.
+131. White woman with long blonde hair, no glasses, 20s.
+132. White woman with a short pixie cut, multiple ear piercings, and dyed-red hair.
+133. White woman with red curly hair and freckles, 30s.
+134. White woman, elderly with gray hair and a weathered face, 60s.
+135. White woman with a shaved head and heavy face piercings, screaming.
+136. White woman with wild unkempt hair, dark circles, and crazed bloodshot eyes.
+137. White woman with a blonde bob, cold stare, 30s.
+138. White woman with long brown hair and a scar across one eye, crazed grin.
+139. White woman with a high ponytail and a teardrop tattoo, smug.
+140. White woman with a buzz cut and neck tattoos, fierce.
+141. White woman with straight black dyed hair and dark lipstick, 20s.
+142. White woman with a messy bun and tired eyes, 40s.
+143. Black woman with long box braids, 20s.
+144. Black woman with a large afro and a fierce expression.
+145. Black woman with cornrows and gold hoop earrings, smug.
+146. Black woman with a shaved head and face tattoos, cold stare.
+147. Black woman with short natural curls, 30s.
+148. Black woman with a long straight weave and dark lipstick, 20s.
+149. Black woman, elderly with gray locs and a weathered face.
+150. Black woman with bantu knots and a nose ring, fierce snarl.
+151. Black woman with a high puff and hoop earrings, 20s.
+152. East Asian woman with straight black hair, 20s.
+153. East Asian woman with a short bob and red lipstick, smug.
+154. East Asian woman with a shaved head and a neck tattoo, cold blank stare.
+155. East Asian woman with a scar across one eye and straight hair, chilling stare.
+156. East Asian woman with dyed silver hair in a bob, 20s.
+157. East Asian woman, older with hair in a bun, 50s.
+158. Hispanic/Latina woman with long dark wavy hair, 20s.
+159. Latina woman with hair in a tight bun and large hoop earrings.
+160. Latina woman with a teardrop tattoo, dark lipstick, and tight braids, cold stare.
+161. Latina woman with long straight dark hair, no makeup, fierce expression.
+162. Latina woman with a scar across the lip and a bun, cold stare.
+163. Latina woman with curly dark hair and winged eyeliner, smug.
+164. Latina woman, 40s with shoulder-length hair, tired look.
+165. South Asian (Indian) woman with long black hair, 20s.
+166. South Asian woman with a braid over one shoulder, 30s.
+167. Southeast Asian (Vietnamese) woman with long straight black hair.
+168. Southeast Asian (Filipina) woman with a short bob, smug.
+169. South Asian woman with a shaved head and a face tattoo, fierce.
+170. Middle Eastern woman with dark wavy hair, intense glare.
+171. Middle Eastern woman with a scar across the cheek and dark hair, furious.
+172. Middle Eastern woman with long black hair and thick eyebrows, 30s.
+173. Native American woman with long dark braided hair, stoic.
+174. Pacific Islander woman with long dark wavy hair, fierce.
+175. Pacific Islander woman with a top-knot and a chin tattoo, intense.
+176. Mixed-race woman with curly hair and freckles, 20s.
+177. Mixed-race woman with locs and a nose ring, smug.
+178. White woman with a mohawk dyed green and a lip ring, manic grin.
+179. Black woman with a half-shaved head and face tattoos, snarling.
+180. Latina woman with a shaved head and teardrop tattoos, cold stare.
+181. East Asian woman with bangs and round glasses, nervous, 20s.
+182. White woman with long gray hair, elderly, sinister grin.
+183. Black woman with a short fade and bold makeup, fierce.
+184. Middle Eastern woman, elderly with a deeply lined face and long gray hair, 60s.
+185. White man with a shaved head and a teardrop tattoo, dead-eyed stare.
+186. Black man with a graying beard and a bald head, 50s, stoic.
+187. Latino man with a slicked undercut and a goatee, smug, 30s.
+188. East Asian man with messy hair and a black eye, nervous.
+189. White man with a red beard and short hair, 30s.
+190. Black man with a flat-top and a thick beard, 40s, menacing.
+191. South Asian man with a clean-shaven head and a long beard, intense.
+192. Pacific Islander man with a buzz cut and facial tattoos, war cry.
+193. White woman with two long braids and freckles, 20s.
+194. Latina woman with an undercut and a face tattoo, fierce.
+195. Black woman with long goddess braids, smug, 30s.
+196. East Asian man with a top-knot and a thin beard, stoic.
+197. White man with wild curly hair and round glasses, manic, 30s.
+198. Middle Eastern man with a shaved head and a thick beard, intense glare.
+199. Latino man with a buzz cut and a scar across the nose, snarling.
+200. White man with slicked hair and a pencil mustache, smug, 50s.
+
+==============================  TRAIT BANK  ==============================
+One person per line. Pick one from each group (skip any), keep it short:
+  "[ETHNICITY] [man/woman] with [HAIR] and [FACIAL HAIR/FEATURE], [EXPRESSION], [AGE]."
+
+ETHNICITY: white, Black, East Asian, South Asian (Indian/Pakistani),
+  Southeast Asian (Filipino/Vietnamese/Thai), Hispanic/Latino, Middle Eastern,
+  Native American, Pacific Islander, mixed-race.
+AGE: early 20s, 30s, 40s, 50s, elderly 60s-70s.
+HAIR: bald, shaved, buzz cut, short, long, slicked-back, undercut, high-top
+  fade, mohawk, liberty spikes, dreadlocks, cornrows, twists, afro, box braids,
+  ponytail, man bun, top-knot, mullet, pixie cut, bob, curly, gray/balding,
+  dyed (red/blue/green/silver).
+FACIAL HAIR: clean-shaven, stubble, goatee, mustache (thin/handlebar/pencil),
+  full beard, long beard, braided beard, chinstrap, mutton chops.
+FEATURES: scar across eye/cheek/lip/nose/throat/eyebrow, eye patch, milky blind
+  eye, broken nose, cauliflower ears, burn scars, branded scar, bullet-wound
+  scar, bandage over one eye, black-eye bruise, face tattoos, neck/throat
+  tattoo, scalp tattoo, teardrop tattoo, spiderweb tattoo, tribal tattoo,
+  lettering tattoo, gold grills, missing teeth, rotten teeth, gauged ears,
+  septum/eyebrow/lip/nose ring, thick square glasses, round glasses, freckles,
+  heavy-set/double chin, muscular/burly, gaunt, eyebrow slits, hoop earrings.
+EXPRESSION: angry, furious, nervous, scared, smug, menacing, stoic, cold blank
+  stare, defeated, screaming, snarling, baring teeth, manic grin, crazed wide
+  eyes, sinister smirk, war cry, manic laugh.
