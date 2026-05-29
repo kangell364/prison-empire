@@ -146,6 +146,37 @@ export const CARDS_COLLECTION = [
 // (supabase/migrations/0002_owned_cards.sql) — keep these in sync.
 export const STARTER_CARD_IDS = [1, 2, 3, 4, 5, 6]
 
+// Player "look" cards — purely cosmetic skins for the home-screen player card.
+// ISOLATED from CARDS_COLLECTION on purpose: these are NOT earned in-game and
+// have NO attack/defense. They are curated by an admin only, and reached only
+// through the SWAP button on the home screen. The active look is stored on the
+// profile (profiles.player_look_id) so it persists; the default is look_1.
+// To add art for a card, drop the image in public/ and set its `avatar` path
+// (e.g. avatar: '/player-look-3.jpg'). Cards without an avatar show the 👤
+// placeholder until art is added.
+export const PLAYER_LOOKS = [
+  { id: 'look_1',  name: 'Player Card 1',  avatar: '/player-look-1.jpg',  rarity: 'epic' },
+  { id: 'look_2',  name: 'Player Card 2',  avatar: '/player-look-2.jpg',  rarity: 'epic' },
+  { id: 'look_3',  name: 'Player Card 3',  avatar: '/player-look-3.jpg',  rarity: 'epic' },
+  { id: 'look_4',  name: 'Player Card 4',  avatar: '/player-look-4.jpg',  rarity: 'epic' },
+  { id: 'look_5',  name: 'Player Card 5',  avatar: '/player-look-5.jpg',  rarity: 'epic' },
+  { id: 'look_6',  name: 'Player Card 6',  avatar: '/player-look-6.jpg',  rarity: 'epic' },
+  { id: 'look_7',  name: 'Player Card 7',  avatar: '/player-look-7.jpg',  rarity: 'epic' },
+  { id: 'look_8',  name: 'Player Card 8',  avatar: '/player-look-8.jpg',  rarity: 'epic' },
+  { id: 'look_9',  name: 'Player Card 9',  avatar: '/player-look-9.jpg',  rarity: 'epic' },
+  { id: 'look_10', name: 'Player Card 10', avatar: '/player-look-10.jpg', rarity: 'epic' },
+  { id: 'look_11', name: 'Player Card 11', avatar: '/player-look-11.jpg', rarity: 'epic' },
+  { id: 'look_12', name: 'Player Card 12', avatar: '/player-look-12.jpg', rarity: 'epic' },
+  { id: 'look_13', name: 'Player Card 13', avatar: '/player-look-13.jpg', rarity: 'epic' },
+  { id: 'look_14', name: 'Player Card 14', avatar: '/player-look-14.jpg', rarity: 'epic' },
+  { id: 'look_15', name: 'Player Card 15', avatar: '/player-look-15.jpg', rarity: 'epic' },
+  { id: 'look_16', name: 'Player Card 16', avatar: '/player-look-16.jpg', rarity: 'epic' },
+  { id: 'look_17', name: 'Player Card 17', avatar: '/player-look-17.jpg', rarity: 'epic' },
+  { id: 'look_18', name: 'Player Card 18', avatar: '/player-look-18.jpg', rarity: 'epic' },
+  { id: 'look_19', name: 'Player Card 19', avatar: '/player-look-19.jpg', rarity: 'epic' },
+]
+export const DEFAULT_LOOK_ID = 'look_1'
+
 export const BATTLE_ENEMIES = [
   { id: 1,  name: 'Nervous Ned',     emoji: '😰', power: 45,  area: 1, reward_xp: 50,  reward_hustle: 10,  boss: false,
     bio: 'First fight of the morning. Shakes harder than the bunks. Easy meal.' },

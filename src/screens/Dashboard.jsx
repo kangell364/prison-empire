@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { PLAYER, RESOURCES, CITY, INCOMING_ATTACK, CREW, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
-import { useHustle, useSteel } from '../state/profileStore'
+import { PLAYER, PLAYER_LOOKS, RESOURCES, CITY, INCOMING_ATTACK, CREW, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
+import { useHustle, useSteel, useDisplayName, usePlayerLook } from '../state/profileStore'
 import { useVitals, msToNextStamina, msToNextHealth, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
 import { CountdownRing } from '../components/CountdownRing'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
+import { SwapLookModal } from '../components/SwapLookModal'
 import { sfx } from '../sounds'
 
 export default function Dashboard({ onNavigate }) {
@@ -12,6 +13,7 @@ export default function Dashboard({ onNavigate }) {
   const [snitchUsed, setSnitchUsed] = useState(false)
   const [showSnitchModal, setShowSnitchModal] = useState(false)
   const [detailChar, setDetailChar] = useState(null)
+  const [showSwap, setShowSwap] = useState(false)
 
   useEffect(() => {
     if (timer <= 0 || snitchUsed) return
@@ -31,6 +33,12 @@ export default function Dashboard({ onNavigate }) {
   const xpPct = Math.round((PLAYER.xp / PLAYER.xpNext) * 100)
   const hustle = useHustle()
   const steel  = useSteel()
+  const playerName = useDisplayName()
+  const lookId = usePlayerLook()
+  // The home-screen player card is now a cosmetic "look" (see SWAP). Level, XP
+  // and stats are unaffected — only the art + name change.
+  const look = PLAYER_LOOKS.find(l => l.id === lookId) || PLAYER_LOOKS[0]
+  const lookColor = RARITY_COLORS[look.rarity] || '#c9a84c'
 
   return (
     <div className="scroll-area animate-in">
@@ -74,36 +82,36 @@ export default function Dashboard({ onNavigate }) {
       <div className="section" style={{ marginTop: 14 }}>
         <div className="section-label">Your Card</div>
         <div className="card card-pad" style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          {/* Card Art */}
+          {/* Card Art — the player's chosen cosmetic look (swappable). */}
           <div style={{
             width: 70, height: 92,
             background: '#1a1a2e',
             borderRadius: 10,
-            border: `1px solid ${RARITY_COLORS[PLAYER.card.rarity]}44`,
+            border: `1px solid ${lookColor}44`,
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'flex-end',
             flexShrink: 0, position: 'relative', overflow: 'hidden'
           }}>
-            {PLAYER.card.avatar ? (
-              <img src={PLAYER.card.avatar} alt={PLAYER.card.name}
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            {look.avatar ? (
+              <img src={look.avatar} alt={look.name}
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
             ) : (
-              <div style={{ fontSize: 30, marginBottom: 4 }}>{PLAYER.card.emoji}</div>
+              <div style={{ fontSize: 30, marginBottom: 4 }}>{look.emoji}</div>
             )}
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: RARITY_COLORS[PLAYER.card.rarity] }} />
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: lookColor }} />
             <div style={{
               position: 'relative', zIndex: 1, width: '100%',
               background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.85) 60%)',
               padding: '12px 4px 3px',
             }}>
-              <div style={{ color: RARITY_COLORS[PLAYER.card.rarity], fontSize: 8, fontWeight: 700, letterSpacing: 0.5, textAlign: 'center' }}>{PLAYER.card.name.toUpperCase()}</div>
+              <div style={{ color: lookColor, fontSize: 8, fontWeight: 700, letterSpacing: 0.5, textAlign: 'center' }}>{playerName.toUpperCase()}</div>
               <div style={{ color: '#bbb', fontSize: 8, marginTop: 1, textAlign: 'center' }}>LVL {PLAYER.level}</div>
             </div>
           </div>
 
           {/* Player Info */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: '#fff', fontSize: 18, fontWeight: 500 }}>{PLAYER.name}</div>
+            <div style={{ color: '#fff', fontSize: 18, fontWeight: 500 }}>{playerName}</div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(201,168,76,0.1)', border: '0.5px solid rgba(201,168,76,0.3)', borderRadius: 20, padding: '3px 10px', margin: '5px 0 8px' }}>
               <i className="ti ti-building" style={{ color: '#c9a84c', fontSize: 11 }} />
               <span style={{ color: '#c9a84c', fontSize: 11 }}>{PLAYER.facility} — {PLAYER.state}</span>
@@ -135,6 +143,21 @@ export default function Dashboard({ onNavigate }) {
             </div>
           </div>
         </div>
+
+        {/* SWAP — opens the cosmetic player-card picker. Muted gray with the
+            same text color as the "XP to Level" label (#555). */}
+        <button
+          onClick={() => { sfx.tap?.(); setShowSwap(true) }}
+          className="btn"
+          style={{
+            width: '100%', marginTop: 10, padding: '11px 0', borderRadius: 12,
+            background: '#1e1e2a', border: '0.5px solid #2a2a3a',
+            color: '#555', fontSize: 12, fontWeight: 700, letterSpacing: 1.5,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}
+        >
+          <i className="ti ti-repeat" /> SWAP
+        </button>
       </div>
 
       {/* Resources */}
@@ -311,6 +334,8 @@ export default function Dashboard({ onNavigate }) {
       {detailChar && (
         <CharacterDetailModal character={detailChar} onClose={() => setDetailChar(null)} />
       )}
+
+      {showSwap && <SwapLookModal onClose={() => setShowSwap(false)} />}
 
     </div>
   )

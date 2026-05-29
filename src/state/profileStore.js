@@ -14,18 +14,19 @@
 
 import { useEffect, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../supabase'
-import { RESOURCES, PLAYER } from '../data/gameData'
+import { RESOURCES, PLAYER, DEFAULT_LOOK_ID } from '../data/gameData'
 
 const PROFILE_KEY        = 'pe_profile_v1'
 const LEGACY_HUSTLE_KEY  = 'pe_hustle_v1'
 const MIGRATED_FLAG_KEY  = 'pe_migrated_v1'
 
 const DEFAULTS = {
-  display_name:  PLAYER.name,
-  hustle:        RESOURCES.hustle.value,
-  steel:         RESOURCES.steel.value,
-  cred:          0,
-  snitches_left: RESOURCES.snitch.value,
+  display_name:   PLAYER.name,
+  hustle:         RESOURCES.hustle.value,
+  steel:          RESOURCES.steel.value,
+  cred:           0,
+  snitches_left:  RESOURCES.snitch.value,
+  player_look_id: DEFAULT_LOOK_ID,
 }
 
 let state = readLocalSeed()
@@ -84,6 +85,13 @@ export function spendSteel(cost) {
 export function setDisplayName(name) {
   if (typeof name !== 'string' || !name.trim()) return
   commit({ display_name: name.trim() })
+}
+
+export function getPlayerLookId()  { return state.player_look_id }
+export function usePlayerLook()    { return useProfile().player_look_id }
+export function setPlayerLook(id) {
+  if (typeof id !== 'string' || !id) return
+  commit({ player_look_id: id })
 }
 
 // Called from App.js on mount. Safe to call repeatedly — returns the same
