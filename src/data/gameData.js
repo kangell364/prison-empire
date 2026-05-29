@@ -174,6 +174,14 @@ export const PLAYER_LOOKS = [
   { id: 'look_17', name: 'Player Card 17', avatar: '/player-look-17.jpg', rarity: 'epic' },
   { id: 'look_18', name: 'Player Card 18', avatar: '/player-look-18.jpg', rarity: 'epic' },
   { id: 'look_19', name: 'Player Card 19', avatar: '/player-look-19.jpg', rarity: 'epic' },
+  { id: 'look_20', name: 'Player Card 20', avatar: '/player-look-20.jpg', rarity: 'epic' },
+  { id: 'look_21', name: 'Player Card 21', avatar: '/player-look-21.jpg', rarity: 'epic' },
+  { id: 'look_22', name: 'Player Card 22', avatar: '/player-look-22.jpg', rarity: 'epic' },
+  { id: 'look_23', name: 'Player Card 23', avatar: '/player-look-23.jpg', rarity: 'epic' },
+  { id: 'look_24', name: 'Player Card 24', avatar: '/player-look-24.jpg', rarity: 'epic' },
+  { id: 'look_25', name: 'Player Card 25', avatar: '/player-look-25.jpg', rarity: 'epic' },
+  { id: 'look_26', name: 'Player Card 26', avatar: '/player-look-26.jpg', rarity: 'epic' },
+  { id: 'look_27', name: 'Player Card 27', avatar: '/player-look-27.jpg', rarity: 'epic' },
 ]
 export const DEFAULT_LOOK_ID = 'look_1'
 
