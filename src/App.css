@@ -482,6 +482,25 @@ body {
   animation: pulse 1.2s ease-in-out infinite;
 }
 
+/* "You are here" GPS-style ping on the country map — a steady dot with an
+   expanding ring underneath it. transform-box: fill-box makes the scale
+   animate around each circle's own center even inside an SVG <g> transform. */
+@keyframes locPing {
+  0%   { transform: scale(0.5); opacity: 0.55; }
+  70%  { transform: scale(2.8); opacity: 0; }
+  100% { transform: scale(2.8); opacity: 0; }
+}
+.loc-ping-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: locPing 2.2s ease-out infinite;
+}
+.loc-ping-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
 /* Banner slides in from the top when a Drive By launches */
 @keyframes attackBannerIn {
   from { transform: translateY(-12px); opacity: 0; }

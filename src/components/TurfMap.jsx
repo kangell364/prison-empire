@@ -11,7 +11,7 @@
 import React, { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { GRID, getBlock, subscribeBlocks, CREW_COLORS } from '../state/blocksStore'
+import { GRID, getBlock, subscribeBlocks, CREW_COLORS, cellOf, cellCenter, cellKey } from '../state/blocksStore'
 
 const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -41,6 +41,8 @@ export function TurfMap({ houses, center, label, onScout, onBlockTap, onBack }) 
   const housesRef = useRef(houses)
   const onScoutRef = useRef(onScout)
   const onBlockTapRef = useRef(onBlockTap)
+  const houseCellsRef = useRef(new Set())   // grid cells a trap house occupies
+  const drawBlocksRef = useRef(null)         // lets the house layer trigger a block redraw
   housesRef.current = houses
   onScoutRef.current = onScout
   onBlockTapRef.current = onBlockTap
@@ -81,6 +83,7 @@ export function TurfMap({ houses, center, label, onScout, onBlockTap, onBack }) 
       if ((x1 - x0) * (y1 - y0) > 700) return   // safety cap
       layer = L.layerGroup().addTo(map)
       for (let gx = x0; gx < x1; gx++) for (let gy = y0; gy < y1; gy++) {
+        if (houseCellsRef.current.has(cellKey(gx, gy))) continue   // a trap house owns this cell
         const blk = getBlock(gx, gy)
         const owner = blk.owner
         const color = owner ? (owner === 'you' ? CREW_COLORS.you : blk.color) : '#3a3a4a'
@@ -97,34 +100,64 @@ export function TurfMap({ houses, center, label, onScout, onBlockTap, onBack }) 
         }
       }
     }
+    drawBlocksRef.current = draw
     map.on('moveend zoomend', draw)
     const unsub = subscribeBlocks(draw)   // redraw when blocks change
     draw()
-    return () => { map.off('moveend zoomend', draw); unsub(); if (layer) { try { map.removeLayer(layer) } catch {} } }
+    return () => { map.off('moveend zoomend', draw); unsub(); drawBlocksRef.current = null; if (layer) { try { map.removeLayer(layer) } catch {} } }
   }, [])
 
-  // Draw / redraw house markers when the set changes.
+  // Draw / redraw house markers when the set changes. Each house is SNAPPED to
+  // a block cell so it sits ON the grid (one trap house = one block) instead of
+  // floating over the cells. Two houses never share a cell — collisions spiral
+  // out to the nearest free cell, tiling co-located houses onto adjacent blocks.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !houses) return
     const layer = L.layerGroup().addTo(map)
+
+    // Assign a unique grid cell to each house (stable: same input order → same
+    // cells). Returns [gx, gy]; spirals outward in rings if the base cell is taken.
+    const taken = new Set()
+    const claimCell = (lng, lat) => {
+      const [bx, by] = cellOf(lng, lat)
+      if (!taken.has(cellKey(bx, by))) { taken.add(cellKey(bx, by)); return [bx, by] }
+      for (let r = 1; r < 16; r++) {
+        for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue   // current ring only
+          const gx = bx + dx, gy = by + dy
+          if (!taken.has(cellKey(gx, gy))) { taken.add(cellKey(gx, gy)); return [gx, gy] }
+        }
+      }
+      taken.add(cellKey(bx, by)); return [bx, by]
+    }
+
     houses.forEach(h => {
       if (typeof h.lat !== 'number' || typeof h.lng !== 'number') return
       const color = h.color || GOLD
-      const d = 0.002   // ~220m half-side — a tight, Atlas-Earth-style lot
+      const [gx, gy] = claimCell(h.lng, h.lat)
+      const w = gx * GRID, s = gy * GRID            // cell SW corner [lat=s, lng=w]
+      const [clat, clng] = cellCenter(gx, gy)       // cell center [lat, lng]
       const onTap = (h.kind === 'business' && h.facility) ? () => onScoutRef.current && onScoutRef.current(h.facility) : null
 
-      // Glowing claimed parcel (soft halo + brighter plot) under the house.
-      L.rectangle([[h.lat - d * 1.5, h.lng - d * 1.5], [h.lat + d * 1.5, h.lng + d * 1.5]],
+      // Soft halo just outside the cell + the claimed plot = exactly the block cell.
+      const pad = GRID * 0.35
+      L.rectangle([[s - pad, w - pad], [s + GRID + pad, w + GRID + pad]],
         { stroke: false, fillColor: color, fillOpacity: 0.12, interactive: false }).addTo(layer)
-      const plot = L.rectangle([[h.lat - d, h.lng - d], [h.lat + d, h.lng + d]],
+      const plot = L.rectangle([[s, w], [s + GRID, w + GRID]],
         { color, weight: 2, opacity: 0.95, fillColor: color, fillOpacity: 0.22 }).addTo(layer)
       if (onTap) plot.on('click', onTap)
 
       const icon = L.divIcon({ className: 'turf-marker', iconSize: [60, 70], iconAnchor: [30, 56], html: markerHtml(h) })
-      const m = L.marker([h.lat, h.lng], { icon }).addTo(layer)
+      const m = L.marker([clat, clng], { icon }).addTo(layer)
       if (onTap) m.on('click', onTap)
     })
+
+    // Tell the block layer which cells are now house-occupied, then redraw it so
+    // it stops drawing block rects / NPCs underneath the houses.
+    houseCellsRef.current = taken
+    if (drawBlocksRef.current) drawBlocksRef.current()
+
     return () => { try { map.removeLayer(layer) } catch {} }
   }, [houses])
 

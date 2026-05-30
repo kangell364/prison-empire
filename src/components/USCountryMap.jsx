@@ -19,8 +19,8 @@ const STROKE_HOVER  = '#c9a84c'
 //   colorFor(stateFips, postalCode) → string  — fill color for that state
 //   onStateClick(stateFeature)               — tap handler (Phase 3b drills in)
 //   height                                    — CSS height; width is responsive
-//   label                                     — optional title shown above the map
-export function USCountryMap({ colorFor, onStateClick, height = '58vh' }) {
+//   marker      [lng, lat]                    — "you are here" flashing dot (your trap house)
+export function USCountryMap({ colorFor, onStateClick, height = '58vh', marker }) {
   const { data, error } = useMapData()
   const [hover, setHover] = useState(null)
   const { view, ref, handlers, zoomed, resetView, suppressTap } =
@@ -33,8 +33,8 @@ export function USCountryMap({ colorFor, onStateClick, height = '58vh' }) {
 
   // Project once data is ready. Albers USA handles the 50 states + DC and
   // produces a fitted projection so the country fills the viewBox.
-  const { paths, labels } = useMemo(() => {
-    if (!data) return { paths: [], labels: [] }
+  const { paths, labels, markerXY } = useMemo(() => {
+    if (!data) return { paths: [], labels: [], markerXY: null }
     const proj = geoAlbersUsa().fitSize([VIEW_W, VIEW_H], data.states)
     const path = geoPath(proj)
     const paths = data.states.features.map(f => ({
@@ -47,6 +47,10 @@ export function USCountryMap({ colorFor, onStateClick, height = '58vh' }) {
     // Filter to skip territories (no AS/GU/etc in our city data) — they're
     // also off-projection so paths come back null for them.
     const inProjection = paths.filter(p => p.d != null)
+    // Project the "you are here" marker through the same Albers projection
+    // (returns null if the point falls outside the contiguous-US/AK/HI insets).
+    const mxy = marker && Number.isFinite(marker[0]) && Number.isFinite(marker[1])
+      ? proj(marker) : null
     return {
       paths: inProjection,
       labels: inProjection.filter(p => {
@@ -54,8 +58,9 @@ export function USCountryMap({ colorFor, onStateClick, height = '58vh' }) {
         const [x, y] = p.centroid
         return Number.isFinite(x) && Number.isFinite(y)
       }),
+      markerXY: mxy && Number.isFinite(mxy[0]) && Number.isFinite(mxy[1]) ? mxy : null,
     }
-  }, [data])
+  }, [data, marker])
 
   if (error) {
     return (
@@ -142,6 +147,19 @@ export function USCountryMap({ colorFor, onStateClick, height = '58vh' }) {
               >{p.code}</text>
             ))}
           </g>
+
+          {/* "You are here" — a GPS-blue flashing dot at your trap house. Blue
+              (not gold) so it reads instantly as YOU and never blends into the
+              gold "owned" state fill. Radii are counter-scaled so the dot keeps
+              a constant screen size at any zoom level. */}
+          {markerXY && (
+            <g transform={`translate(${markerXY[0]} ${markerXY[1]})`} pointerEvents="none">
+              <circle className="loc-ping-ring" r={5 / view.scale}
+                fill="none" stroke="#4aa8ff" strokeWidth={1.5 / view.scale} />
+              <circle r={4 / view.scale} fill="#4aa8ff" stroke="#0d0d15" strokeWidth={1 / view.scale} />
+              <circle className="loc-ping-dot" r={4 / view.scale} fill="#4aa8ff" />
+            </g>
+          )}
         </g>
       </svg>
 

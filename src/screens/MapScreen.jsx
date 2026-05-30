@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react'
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { ALL_CITIES, FACILITIES, FACILITY_TIERS, PLAYER_HOME_FACILITY_ID, AI_GANGS } from '../data/gameData'
 import { CountdownRing } from '../components/CountdownRing'
 import { USCountryMap } from '../components/USCountryMap'
@@ -18,6 +18,7 @@ import { sfx } from '../sounds'
 const GOLD = '#c9a84c'
 const RED  = '#e74c3c'
 const DIM  = '#555'
+const VACANT = '#1e1e2a'   // unclaimed reads as dark/empty on the map (no green)
 
 // Append `?test=1` for a 30-second timer instead of 15 minutes.
 const IS_TEST = typeof window !== 'undefined' &&
@@ -123,7 +124,7 @@ function loadAttacks() {
 // applyRaid (chips your defense, loses the facility at 0). `territories` is
 // passed so spawning re-evaluates as ownership changes.
 // ---------------------------------------------------------------------
-function useRaids(territories, homeId, liveFips) {
+function useRaids(territories, homeId, liveFips, fipsCoords) {
   const [raids, setRaids]   = useState(loadRaids)
   const [landed, setLanded] = useState([])
   const [, tick] = useState(0)
@@ -156,7 +157,8 @@ function useRaids(territories, homeId, liveFips) {
         const results = completed.map(r => {
           if (r.kind === 'personal') {
             const dest = liveFips && liveFips.length ? liveFips[Math.floor(Math.random() * liveFips.length)] : null
-            return { ...r, ...applyHomeRaid(r.facilityId, r.gang, dest) }
+            const coords = dest && fipsCoords ? fipsCoords(dest) : null   // [lng,lat] centroid → land on an open block
+            return { ...r, ...applyHomeRaid(r.facilityId, r.gang, dest, coords) }
           }
           return { ...r, ...applyRaid(r.facilityId, r.gang) }
         })
@@ -168,7 +170,7 @@ function useRaids(territories, homeId, liveFips) {
       }
     }, 1000)
     return () => clearInterval(iv)
-  }, [raids, liveFips])
+  }, [raids, liveFips, fipsCoords])
 
   // Spawn loop — periodically pick one of your facilities to threaten.
   useEffect(() => {
@@ -260,6 +262,27 @@ function useBlockRaids(homeCoords) {
 }
 
 // ---------------------------------------------------------------------
+// Device location — the phone's REAL GPS position, projected onto the USA
+// view as a blinking "you are here" dot. watchPosition keeps it live as the
+// player moves; needs a secure context (HTTPS / localhost) + user permission.
+// Returns [lng, lat] to match the map's projection input, or null until/unless
+// a fix is granted (denied or off-map simply shows no dot).
+// ---------------------------------------------------------------------
+function useDeviceLocation() {
+  const [coords, setCoords] = useState(null)   // [lng, lat]
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return
+    const id = navigator.geolocation.watchPosition(
+      (pos) => setCoords([pos.coords.longitude, pos.coords.latitude]),
+      ()    => {},   // denied / unavailable — leave null, no dot
+      { enableHighAccuracy: false, maximumAge: 60_000, timeout: 15_000 },
+    )
+    return () => { try { navigator.geolocation.clearWatch(id) } catch {} }
+  }, [])
+  return coords
+}
+
+// ---------------------------------------------------------------------
 // MapScreen
 // ---------------------------------------------------------------------
 export default function MapScreen() {
@@ -284,7 +307,14 @@ export default function MapScreen() {
     return [...s]
   }, [cityCounty])
 
-  const { raids, landed: raidLanded, dismissLanded: dismissRaid } = useRaids(territories, world.player.home_house_id, liveFips)
+  // County FIPS → [lng,lat] centroid — the KO scatter destination, near which
+  // the house lands on an open block (blocksStore.scatterToBlock).
+  const fipsCoords = useCallback((fips) => {
+    const f = findCountyFeature(mapData, fips)
+    return f ? geoCentroid(f) : null
+  }, [mapData])
+
+  const { raids, landed: raidLanded, dismissLanded: dismissRaid } = useRaids(territories, world.player.home_house_id, liveFips, fipsCoords)
   useAiOffense()
 
   const attackingSet = useMemo(() => new Set(attacks.map(a => a.facilityId)), [attacks])
@@ -314,7 +344,7 @@ export default function MapScreen() {
     const out = {}
     FACILITIES.forEach(f => {
       const h = world.houses[f.id]
-      if (!h || !h.owner_player_id) out[f.id] = { kind: 'vacant', color: '#2ecc71' }
+      if (!h || !h.owner_player_id) out[f.id] = { kind: 'vacant', color: VACANT }
       else if (h.owner_player_id === 'you') out[f.id] = { kind: 'you', color: GOLD }
       else out[f.id] = { kind: 'mob', mobId: h.owner_mob_id, color: mobColorById[h.owner_mob_id] || RED }
     })
@@ -344,9 +374,11 @@ export default function MapScreen() {
 
   // Current county of a movable house: explicit county_fips, else via its city.
   const houseCounty = (h) => h?.county_fips || (h?.cityId != null ? cityCounty[h.cityId] : null)
-  // Geographic coords [lng,lat] of a house (county centroid, else its city).
+  // Geographic coords [lng,lat] of a house. A KO scatter pins it to an exact
+  // block (block_lat/block_lng); otherwise county centroid, else its city.
   const houseCoords = (h) => {
     if (!h) return null
+    if (h.block_lat != null && h.block_lng != null) return [h.block_lng, h.block_lat]
     if (h.county_fips) { const f = findCountyFeature(mapData, h.county_fips); return f ? geoCentroid(f) : null }
     const c = cityById.get(h.cityId); return c ? [c.lng, c.lat] : null
   }
@@ -360,6 +392,10 @@ export default function MapScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const homeCoords = useMemo(() => houseCoords(homeHouse), [homeHouse, mapData])
   const { lost: blockLost, dismiss: dismissBlockLost } = useBlockRaids(homeCoords)
+
+  // Phone's real GPS location → blinking dot on the USA view (the state you're
+  // physically in). Falls back to the trap house if GPS is denied/unavailable.
+  const deviceCoords = useDeviceLocation()
 
   // Is the tapped block inside the home-turf radius of your trap house?
   const blockHomeTurf = useMemo(() => {
@@ -377,21 +413,26 @@ export default function MapScreen() {
     const out = []
     Object.values(world.houses).forEach(h => {
       let lng = null, lat = null
-      if (h.county_fips) { const f = findCountyFeature(mapData, h.county_fips); if (f) { const c = geoCentroid(f); lng = c[0]; lat = c[1] } }
+      // A KO scatter pins the house to an exact block — keep it there (fixed),
+      // don't spread it. Otherwise county centroid, else its city.
+      const fixed = h.block_lat != null && h.block_lng != null
+      if (fixed) { lng = h.block_lng; lat = h.block_lat }
+      if (lng == null && h.county_fips) { const f = findCountyFeature(mapData, h.county_fips); if (f) { const c = geoCentroid(f); lng = c[0]; lat = c[1] } }
       if (lng == null && h.cityId != null) { const c = cityById.get(h.cityId); if (c) { lng = c.lng; lat = c.lat } }
       if (lng == null) return
-      if (h.kind === 'business') out.push({ id: h.id, kind: 'business', name: h.name, color: facilityControl[h.id]?.color, facility: FACILITY_BY_ID.get(h.id), lat, lng })
+      if (h.kind === 'business') out.push({ id: h.id, kind: 'business', name: h.name, color: facilityControl[h.id]?.color, facility: FACILITY_BY_ID.get(h.id), lat, lng, fixed })
       else if (h.kind === 'personal') {
         const isYou = h.owner_player_id === 'you'
         const color = isYou ? GOLD : (world.mobs[world.players[h.owner_player_id]?.mob_id]?.color || '#888')
-        out.push({ id: h.id, kind: 'personal', name: world.players[h.owner_player_id]?.name || h.name, isYou, color, lat, lng })
+        out.push({ id: h.id, kind: 'personal', name: world.players[h.owner_player_id]?.name || h.name, isYou, color, lat, lng, fixed })
       }
-      else if (h.kind === 'mansion') { const mob = world.mobs[h.owner_mob_id]; out.push({ id: h.id, kind: 'mansion', name: mob?.name || h.name, color: mob?.color || RED, lat, lng }) }
+      else if (h.kind === 'mansion') { const mob = world.mobs[h.owner_mob_id]; out.push({ id: h.id, kind: 'mansion', name: mob?.name || h.name, color: mob?.color || RED, lat, lng, fixed }) }
     })
     // Spread houses that share a location onto adjacent parcels (no overlap) —
     // grid them around the shared point so they tile like Atlas-Earth lots.
+    // Block-pinned (KO-scattered) houses are excluded — they stay on their block.
     const groups = {}
-    out.forEach(e => { const k = `${e.lat.toFixed(3)},${e.lng.toFixed(3)}`; (groups[k] || (groups[k] = [])).push(e) })
+    out.forEach(e => { if (e.fixed) return; const k = `${e.lat.toFixed(3)},${e.lng.toFixed(3)}`; (groups[k] || (groups[k] = [])).push(e) })
     const SPACING = 0.014
     Object.values(groups).forEach(g => {
       if (g.length < 2) return
@@ -609,14 +650,14 @@ export default function MapScreen() {
             <USCountryMap
               colorFor={(fips, code) => stateColorFor(stateControl[code], mobColorById)}
               onStateClick={(s) => setStateView(s)}
+              marker={deviceCoords || homeCoords}
               height="58vh"
             />
           )}
           <div style={{ display: 'flex', justifyContent: 'center', gap: 16, padding: '10px 12px', borderTop: `0.5px solid ${GOLD}22` }}>
             {[
-              { color: GOLD, label: 'Yours' },
+              { color: GOLD, label: 'Your Mob' },
               { color: RED, label: 'Rival Mobs' },
-              { color: '#2ecc71', label: 'Vacant' },
             ].map(l => (
               <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: l.color, boxShadow: `0 0 6px ${l.color}77` }} />
@@ -953,13 +994,13 @@ function hexToRgba(hex, a) {
 }
 
 // State fill (country view): gold if you hold any facility there; otherwise the
-// DOMINANT rival mob's color (intensity scales with its share); faint green if
-// only vacant; dark if no facilities. Colors by MOB — the Phase-B projection.
+// DOMINANT rival mob's color (intensity scales with its share); dark if only
+// vacant or no facilities. Colors by MOB — the Phase-B projection.
 function stateColorFor(s, mobColorById) {
   if (!s || s.total === 0) return '#1e1e2a'
   if (s.yours > 0) return `rgba(201,168,76,${(0.3 + Math.min(1, s.yours / s.total) * 0.5).toFixed(2)})`
   let domId = null, domN = 0
   for (const id in s.mobCounts) if (s.mobCounts[id] > domN) { domN = s.mobCounts[id]; domId = id }
   if (domId) return hexToRgba(mobColorById[domId] || '#e74c3c', 0.3 + Math.min(1, domN / s.total) * 0.5)
-  return 'rgba(46,204,113,0.35)'
+  return '#1e1e2a'   // facilities exist but all vacant → dark (no green)
 }

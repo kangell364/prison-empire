@@ -177,6 +177,45 @@ export function poach(gx, gy, homeTurf) {
   return { ok: true, cost }
 }
 
+// ---- KO / scatter landing ------------------------------------------
+
+// Where a KO'd / scattered movable house (personal trap house OR mob mansion)
+// touches down. Spiral outward from the destination point for the nearest
+// VACANT block and plant on it (free — a forced landing isn't a purchase). If
+// EVERY block in range is already owned, take over the CHEAPEST one (lowest
+// takeover price) so the house always has somewhere to land. Returns the chosen
+// cell center [lat, lng] so the caller can pin the house exactly on that block.
+export function scatterToBlock(lng, lat, maxRing = 14) {
+  const [bx, by] = cellOf(lng, lat)
+  let cheapest = null, cheapestCost = Infinity
+  for (let r = 0; r <= maxRing; r++) {
+    for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) {
+      if (r > 0 && Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue   // ring r only
+      const gx = bx + dx, gy = by + dy
+      const b = getBlock(gx, gy)
+      if (!b.owner) return claimLanding(gx, gy)                  // vacant — land here, free
+      const cost = poachPrice(b, false)                          // owned — remember the cheapest
+      if (cost < cheapestCost) { cheapestCost = cost; cheapest = [gx, gy] }
+    }
+  }
+  // 100% of blocks in range are owned → take over the cheapest one.
+  return cheapest ? claimLanding(cheapest[0], cheapest[1]) : cellCenter(bx, by)
+}
+
+// Plant your flag on a cell (a forced KO landing — no Hustle charged, ignores
+// the block cap). Returns the cell center [lat, lng].
+function claimLanding(gx, gy) {
+  const b = getBlock(gx, gy)
+  const now = Date.now()
+  overrides[cellKey(gx, gy)] = {
+    owner: 'you', ownerKind: 'you', npc: b.npc, baseLoyalty: b.baseLoyalty,
+    incomePerHr: b.incomePerHr, loyalty: b.baseLoyalty, basePaid: 0,
+    lastCollectedAt: now, lastPoachAt: now,
+  }
+  commit()
+  return cellCenter(gx, gy)
+}
+
 // Bank a held block's accrued income.
 export function collect(gx, gy) {
   const got = pendingIncome(gx, gy)
