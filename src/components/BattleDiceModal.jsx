@@ -3,6 +3,7 @@ import { PLAYER, SKILLS } from '../data/gameData'
 import { sfx } from '../sounds'
 import { Avatar } from './Avatar'
 import { usePlayerCard } from '../state/profileStore'
+import { useVitals, STAMINA_MAX } from '../state/vitalsStore'
 
 const GOLD   = '#c9a84c'
 const BLUE   = '#4a9eff'
@@ -57,6 +58,8 @@ function opponentSkillLoadout(opp) {
 //               to make a fight cost real, shared health.
 export function BattleDiceModal({ opponent, cost, rewards, onClose, onRoll, onWin, onResult }) {
   const me = usePlayerCard()   // live player card (look + name), synced everywhere
+  const stamina = useVitals().stamina       // live shared stamina
+  const canAfford = stamina >= cost          // each roll costs `cost` stamina
   const [phase, setPhase]     = useState('idle')    // idle | rolling | resolved
   const [diceA, setDiceA]     = useState(1)
   const [diceB, setDiceB]     = useState(1)
@@ -103,6 +106,7 @@ export function BattleDiceModal({ opponent, cost, rewards, onClose, onRoll, onWi
 
   const roll = () => {
     if (phase === 'rolling') return
+    if (stamina < cost) { sfx.deny?.(); return }   // not enough stamina to fight
     if (phase === 'resolved') {
       setPlayerHp(maxPlayerHp)
       setOppHp(maxOppHp)
@@ -285,26 +289,44 @@ export function BattleDiceModal({ opponent, cost, rewards, onClose, onRoll, onWi
           <SlotGrid side="opp" equipped={oppEquippedMap} learned={oppLearned} highlight={highlight} landed={landedSlot} color={ORANGE} />
         </div>
 
-        {/* Primary CTA */}
+        {/* Stamina readout — so you always know what you've got to fight with. */}
+        {phase !== 'resolved' && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ color: '#888', fontSize: 11 }}>
+                <i className="ti ti-bolt" style={{ color: canAfford ? GOLD : RED, fontSize: 12, marginRight: 4 }} />
+                Stamina
+              </span>
+              <span style={{ color: canAfford ? GOLD : RED, fontSize: 11, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                {stamina} / {STAMINA_MAX} · {cost} per roll
+              </span>
+            </div>
+            <div style={{ height: 4, background: '#1e1e2a', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.round(stamina / STAMINA_MAX * 100)}%`, background: canAfford ? `linear-gradient(90deg, ${GOLD}, #f0d080)` : RED, borderRadius: 2, transition: 'width 0.4s' }} />
+            </div>
+          </div>
+        )}
+
+        {/* Primary CTA — dark + disabled when you can't afford the roll. */}
         {phase !== 'resolved' && (
           <button
             onClick={roll}
-            disabled={phase === 'rolling'}
+            disabled={phase === 'rolling' || !canAfford}
             style={{
-              marginTop: 16, width: '100%',
-              background: phase === 'rolling' ? '#1e1e2a' : GOLD,
-              color: phase === 'rolling' ? '#555' : '#0a0a0f',
+              marginTop: 10, width: '100%',
+              background: (phase === 'rolling' || !canAfford) ? '#1e1e2a' : GOLD,
+              color: (phase === 'rolling' || !canAfford) ? '#555' : '#0a0a0f',
               border: 'none', borderRadius: 12,
               padding: '16px 12px',
               fontSize: 16, fontWeight: 800, letterSpacing: 1.5,
-              cursor: phase === 'rolling' ? 'wait' : 'pointer',
+              cursor: phase === 'rolling' ? 'wait' : !canAfford ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              boxShadow: phase === 'rolling' ? 'none' : `0 0 20px ${GOLD}44`,
-              animation: phase === 'idle' ? 'pulse 2s ease-in-out infinite' : 'none',
+              boxShadow: (phase === 'rolling' || !canAfford) ? 'none' : `0 0 20px ${GOLD}44`,
+              animation: (phase === 'idle' && canAfford) ? 'pulse 2s ease-in-out infinite' : 'none',
             }}
           >
-            <i className="ti ti-dice" style={{ fontSize: 18 }} />
-            {phase === 'rolling' ? 'ROLLING…' : `ROLL THE DICE  ·  ${cost} STAMINA`}
+            <i className={`ti ${canAfford ? 'ti-dice' : 'ti-bolt-off'}`} style={{ fontSize: 18 }} />
+            {phase === 'rolling' ? 'ROLLING…' : !canAfford ? 'NOT ENOUGH STAMINA' : `ROLL THE DICE  ·  ${cost} STAMINA`}
           </button>
         )}
 
@@ -333,14 +355,15 @@ export function BattleDiceModal({ opponent, cost, rewards, onClose, onRoll, onWi
           <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
             <button
               onClick={roll}
+              disabled={!canAfford}
               style={{
-                flex: 1, background: GOLD, color: '#0a0a0f',
+                flex: 1, background: canAfford ? GOLD : '#1e1e2a', color: canAfford ? '#0a0a0f' : '#555',
                 border: 'none', borderRadius: 10, padding: 14,
-                fontSize: 12, fontWeight: 800, letterSpacing: 1, cursor: 'pointer',
+                fontSize: 12, fontWeight: 800, letterSpacing: 1, cursor: canAfford ? 'pointer' : 'not-allowed',
               }}
             >
-              <i className="ti ti-refresh" style={{ fontSize: 13, marginRight: 4 }} />
-              ROLL AGAIN
+              <i className={`ti ${canAfford ? 'ti-refresh' : 'ti-bolt-off'}`} style={{ fontSize: 13, marginRight: 4 }} />
+              {canAfford ? 'ROLL AGAIN' : 'NO STAMINA'}
             </button>
             <button
               onClick={onClose}
