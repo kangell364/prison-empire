@@ -1,35 +1,17 @@
-import React, { useState, useEffect } from 'react'
-import { PLAYER, PLAYER_LOOKS, RESOURCES, INCOMING_ATTACK, CREW, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
+import React, { useState } from 'react'
+import { PLAYER, PLAYER_LOOKS, RESOURCES, CARDS_COLLECTION, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
 import { useHustle, useSteel, useDisplayName, usePlayerLook } from '../state/profileStore'
 import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, collectAllBlocks, MAX_BLOCKS } from '../state/blocksStore'
+import { useCrew, baseAtk, baseDef } from '../state/crewStore'
 import { useVitals, msToNextStamina, msToNextHealth, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
-import { CountdownRing } from '../components/CountdownRing'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { SwapLookModal } from '../components/SwapLookModal'
 import { sfx } from '../sounds'
 
 export default function Dashboard({ onNavigate }) {
-  const [timer, setTimer] = useState(INCOMING_ATTACK.timer_seconds)
-  const [snitchUsed, setSnitchUsed] = useState(false)
-  const [showSnitchModal, setShowSnitchModal] = useState(false)
   const [detailChar, setDetailChar] = useState(null)
   const [showSwap, setShowSwap] = useState(false)
-
-  useEffect(() => {
-    if (timer <= 0 || snitchUsed) return
-    const interval = setInterval(() => {
-      setTimer(t => {
-        const next = Math.max(0, t - 1)
-        // Tick sounds escalate as the attack closes in. Quiet above 60s,
-        // normal tick under 60s, hot tick under 30s.
-        if (next > 0 && next <= 30)      sfx.hotTick()
-        else if (next > 0 && next <= 60) sfx.tick()
-        return next
-      })
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [timer, snitchUsed])
 
   const xpPct = Math.round((PLAYER.xp / PLAYER.xpNext) * 100)
   const hustle = useHustle()
@@ -40,6 +22,15 @@ export default function Dashboard({ onNavigate }) {
   const blocksOwned = yourBlockCount()
   const blockIncomeHr = yourBlockIncomePerHr()
   const blockPending  = yourPendingIncome()
+  // Live crew — the real 12-slot roster (1 Leader + 11 Members) from crewStore,
+  // resolved against the card catalog. Mirrors the Cards → My Crew screen.
+  const crew = useCrew()
+  const cardById = new Map(CARDS_COLLECTION.map(c => [c.id, c]))
+  const crewSlots = [
+    { card: crew.leader != null ? cardById.get(crew.leader) : null, isLeader: true },
+    ...crew.members.map(id => ({ card: id != null ? cardById.get(id) : null, isLeader: false })),
+  ]
+  const crewFilled = crewSlots.filter(s => s.card).length
   const playerName = useDisplayName()
   const lookId = usePlayerLook()
   // The home-screen player card is now a cosmetic "look" (see SWAP). Level, XP
@@ -52,38 +43,6 @@ export default function Dashboard({ onNavigate }) {
 
       {/* Vitals HUD — health + stamina with live regen countdown */}
       <VitalsHud />
-
-      {/* Attack Alert */}
-      {!snitchUsed && (
-        <div className="attack-alert">
-          <div className="alert-icon">
-            <i className="ti ti-alert-triangle" />
-          </div>
-          <div className="alert-content">
-            <div className="alert-title">INCOMING DRIVE BY</div>
-            <div className="alert-sub">{INCOMING_ATTACK.attacker} moving on {INCOMING_ATTACK.city}</div>
-          </div>
-          <CountdownRing
-            remaining={timer}
-            total={INCOMING_ATTACK.timer_seconds}
-            size={48}
-            strokeWidth={3.5}
-            variant="incoming"
-          />
-        </div>
-      )}
-
-      {snitchUsed && (
-        <div style={{ margin: '12px 16px 4px', background: '#0d1a0d', border: '1px solid #2d6a2d', borderRadius: 16, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 40, height: 40, background: 'rgba(46,204,113,0.15)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <i className="ti ti-shield-check" style={{ color: '#2ecc71', fontSize: 20 }} />
-          </div>
-          <div>
-            <div style={{ color: '#2ecc71', fontSize: 13, fontWeight: 500 }}>HOUSTON PROTECTED</div>
-            <div style={{ color: '#555', fontSize: 11, marginTop: 2 }}>Cops on alert — drive by blocked for 4 hours</div>
-          </div>
-        </div>
-      )}
 
       {/* Player Card */}
       <div className="section" style={{ marginTop: 14 }}>
@@ -204,7 +163,7 @@ export default function Dashboard({ onNavigate }) {
         <div className="section-label">Your Turf</div>
         <div className="card">
           {/* Live block economy — total Hustle/hr from every block you run. */}
-          <div style={{ padding: '16px 16px 0' }}>
+          <div style={{ padding: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
               <div style={{ color: '#fff', fontSize: 16, fontWeight: 500 }}>Block Income</div>
               <div style={{ color: '#666', fontSize: 11 }}>{blocksOwned}/{MAX_BLOCKS} blocks</div>
@@ -231,44 +190,43 @@ export default function Dashboard({ onNavigate }) {
               <i className="ti ti-coin" style={{ fontSize: 15 }} /> {blockPending > 0 ? `Collect ${blockPending.toLocaleString()} Hustle` : 'Nothing to Collect'}
             </button>
           </div>
-
-          {/* Actions */}
-          <div style={{ display: 'flex', gap: 8, padding: '14px 16px' }}>
-            <button className="btn btn-dark" style={{ flex: 1 }} onClick={() => onNavigate('map')}>
-              <i className="ti ti-shield" style={{ fontSize: 15 }} /> Defend
-            </button>
-            <button className="btn btn-red" style={{ flex: 1 }} onClick={() => setShowSnitchModal(true)} disabled={snitchUsed}>
-              <i className="ti ti-eye-off" style={{ fontSize: 15 }} /> {snitchUsed ? 'Snitched' : 'Snitch'}
-            </button>
-            <button className="btn btn-gold" style={{ flex: 1 }} onClick={() => onNavigate('map')}>
-              <i className="ti ti-sword" style={{ fontSize: 15 }} /> Drive By
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* Crew */}
+      {/* Crew — the real 12-slot roster (Leader + 11 Members) from crewStore */}
       <div className="section">
-        <div className="section-label">Your Crew ({CREW.filter(c => !c.locked).length}/{CREW.length})</div>
+        <div className="section-label">Your Crew ({crewFilled}/{crewSlots.length})</div>
         <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 4 }}>
-          {CREW.map(member => (
-            <div key={member.id} style={{
-              flexShrink: 0, width: 72,
-              background: '#13131f',
-              border: `0.5px solid ${member.locked ? '#1e1e2a' : '#2a2a3a'}`,
-              borderRadius: 14, padding: '10px 8px',
-              textAlign: 'center',
-              opacity: member.locked ? 0.5 : 1,
-            }}>
-              <div style={{ width: 40, height: 40, borderRadius: 12, background: '#1e1e2a', margin: '0 auto 6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: member.locked ? 16 : 20 }}>
-                {member.locked ? <i className="ti ti-lock" style={{ color: '#333' }} /> : member.emoji}
+          {crewSlots.map((slot, i) => {
+            const c = slot.card
+            const rc = c ? (RARITY_COLORS[c.rarity] || '#c9a84c') : '#1e1e2a'
+            const power = c ? baseAtk(c) + baseDef(c) : 0
+            return (
+              <div key={i} style={{
+                position: 'relative', flexShrink: 0, width: 72,
+                background: '#13131f',
+                border: `0.5px solid ${c ? rc + '55' : '#1e1e2a'}`,
+                borderRadius: 14, padding: '10px 8px',
+                textAlign: 'center',
+                opacity: c ? 1 : 0.5,
+              }}>
+                {slot.isLeader && (
+                  <div style={{ position: 'absolute', top: -6, right: -4, width: 20, height: 20, borderRadius: '50%', background: '#c9a84c', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,.6)' }}>
+                    <i className="ti ti-crown" style={{ color: '#0a0a0f', fontSize: 12 }} />
+                  </div>
+                )}
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: '#1e1e2a', margin: '0 auto 6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, overflow: 'hidden' }}>
+                  {c ? <Avatar src={c.avatar} emoji={c.emoji} size={40} radius={12} /> : <i className="ti ti-plus" style={{ color: '#333' }} />}
+                </div>
+                <div style={{ color: c ? '#888' : '#333', fontSize: 9, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {c ? c.name : (slot.isLeader ? 'Leader' : 'Empty')}
+                </div>
+                {c
+                  ? <div style={{ color: '#c9a84c', fontSize: 11, marginTop: 2 }}>+{power}</div>
+                  : <div style={{ color: '#333', fontSize: 9, marginTop: 2 }}>{slot.isLeader ? 'slot' : 'open'}</div>}
               </div>
-              <div style={{ color: member.locked ? '#333' : '#888', fontSize: 9, fontWeight: 500 }}>
-                {member.locked ? `Lv ${member.unlockLevel}` : member.name}
-              </div>
-              {!member.locked && <div style={{ color: '#c9a84c', fontSize: 11, marginTop: 2 }}>+{member.power}</div>}
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -295,34 +253,6 @@ export default function Dashboard({ onNavigate }) {
           ))}
         </div>
       </div>
-
-      {/* Snitch Modal */}
-      {showSnitchModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }} onClick={() => setShowSnitchModal(false)}>
-          <div style={{ background: '#13131f', borderRadius: '24px 24px 0 0', padding: 24, width: '100%', maxWidth: 390 }} onClick={e => e.stopPropagation()}>
-            <div style={{ width: 40, height: 4, background: '#2a2a3a', borderRadius: 2, margin: '0 auto 20px' }} />
-            <div style={{ textAlign: 'center', marginBottom: 20 }}>
-              <div style={{ fontSize: 40, marginBottom: 8 }}>🚔</div>
-              <div style={{ color: '#fff', fontSize: 18, fontWeight: 500, marginBottom: 4 }}>Call the Cops?</div>
-              <div style={{ color: '#888', fontSize: 13, lineHeight: 1.5 }}>Using a snitch will block all incoming drive bys for 4 hours — but everyone will know you snitched.</div>
-            </div>
-            <div style={{ background: '#1a0808', border: '0.5px solid #8b1a1a', borderRadius: 12, padding: 12, marginBottom: 16 }}>
-              <div style={{ color: '#e74c3c', fontSize: 12, fontWeight: 500, marginBottom: 4 }}>CONSEQUENCES</div>
-              <div style={{ color: '#888', fontSize: 12, lineHeight: 1.6 }}>• -5 Street Cred permanently<br />• "Snitch" badge on your profile<br />• City marked on map for all to see<br />• Drive bys resume when protection expires</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <div style={{ color: '#888', fontSize: 12 }}>Snitches remaining:</div>
-              <div style={{ color: '#e74c3c', fontSize: 14, fontWeight: 500 }}>1 / 3 free this week</div>
-            </div>
-            <button className="btn btn-red btn-full" style={{ marginBottom: 10, padding: 14 }} onClick={() => { setSnitchUsed(true); setShowSnitchModal(false); sfx.snitch() }}>
-              <i className="ti ti-eye-off" /> Snitch — Block Drive By (Free)
-            </button>
-            <button className="btn btn-dark btn-full" style={{ padding: 14 }} onClick={() => setShowSnitchModal(false)}>
-              Hold Off — I'll Defend
-            </button>
-          </div>
-        </div>
-      )}
 
       {detailChar && (
         <CharacterDetailModal character={detailChar} onClose={() => setDetailChar(null)} />

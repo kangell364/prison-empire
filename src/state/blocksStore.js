@@ -253,3 +253,35 @@ export function collectAllBlocks() {
   if (total > 0) { addHustle(total); commit() }
   return total
 }
+
+// ---- DEV SEED (temporary) ------------------------------------------
+// TODO REMOVE BEFORE LAUNCH. One-time-per-device seed that hands the player a
+// starter empire of 50 owned blocks (a contiguous 10×5 patch around Houston) so
+// the "Your Turf" card + turf map have real data to play with. Guarded by a
+// localStorage flag so it only runs once and never fights the player's own
+// recruit/poach/collect. Each block is left ~2h "uncollected" so the Collect
+// flow has something to bank. Bypasses MAX_BLOCKS on purpose (it's a seed).
+;(function devSeedBlocks() {
+  const FLAG = 'pe_blocks_devseed_50_v1'
+  try {
+    if (localStorage.getItem(FLAG)) return
+    const [cx, cy] = cellOf(-95.3698, 29.7604)   // Houston, TX
+    const twoHoursAgo = Date.now() - 2 * 3_600_000
+    let count = 0
+    for (let dy = 0; dy < 5; dy++) {
+      for (let dx = 0; dx < 10; dx++) {
+        const gx = cx + dx, gy = cy + dy
+        const b = getBlock(gx, gy)
+        overrides[cellKey(gx, gy)] = {
+          owner: 'you', ownerKind: 'you', npc: b.npc, baseLoyalty: b.baseLoyalty,
+          incomePerHr: b.incomePerHr, loyalty: b.baseLoyalty, basePaid: 0,
+          lastCollectedAt: twoHoursAgo, lastPoachAt: twoHoursAgo,
+        }
+        count++
+      }
+    }
+    localStorage.setItem(FLAG, '1')
+    commit()
+    if (count) console.info(`[devSeed] granted ${count} starter blocks near Houston`)
+  } catch {}
+})()
