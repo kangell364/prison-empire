@@ -109,12 +109,11 @@ export default function Dashboard({ onNavigate }) {
               </div>
             </div>
 
-            {/* Stats — the player's own ATK/DEF (from Power) + Knowledge. */}
+            {/* Stats — the player's own ATK/DEF (from Power). */}
             <div style={{ display: 'flex', gap: 8 }}>
               {[
-                { val: baseAtk(PLAYER).toLocaleString(), lbl: 'Attack',    color: '#e74c3c' },
-                { val: baseDef(PLAYER).toLocaleString(), lbl: 'Defense',   color: '#4a9eff' },
-                { val: PLAYER.pools.knowledge.toLocaleString(), lbl: 'Knowledge', color: '#a855f7' },
+                { val: baseAtk(PLAYER).toLocaleString(), lbl: 'Attack',  color: '#e74c3c' },
+                { val: baseDef(PLAYER).toLocaleString(), lbl: 'Defense', color: '#4a9eff' },
               ].map(s => (
                 <div key={s.lbl} style={{ background: '#1e1e2a', borderRadius: 8, padding: '5px 10px', textAlign: 'center' }}>
                   <div style={{ color: s.color, fontSize: 13, fontWeight: 500 }}>{s.val}</div>
