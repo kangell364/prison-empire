@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
-import { PLAYER, TRAITS, RARITY_COLORS, SKILLS } from '../data/gameData'
+import { PLAYER, PLAYER_LOOKS, TRAITS, RARITY_COLORS, SKILLS } from '../data/gameData'
 import { sfx } from '../sounds'
-import { useHustle } from '../state/playerStore'
+import { useHustle, usePlayerLook, useDisplayName } from '../state/profileStore'
 import { useVitals, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
 
 const GOLD  = '#c9a84c'
@@ -10,7 +10,7 @@ const BLUE  = '#4a9eff'
 const GREEN = '#2ecc71'
 const DIM   = '#555'
 
-export default function Profile() {
+export default function Profile({ onBack }) {
   const [tab, setTab] = useState('upgrades')
   // Local interactive state — clicking Upgrade actually spends a point and
   // bumps the trait. Resets on refresh until Supabase lands.
@@ -35,7 +35,7 @@ export default function Profile() {
 
   return (
     <div className="scroll-area animate-in">
-      <StatusBar poolMax={poolMax} />
+      <StatusBar poolMax={poolMax} onBack={onBack} />
 
       {/* Sub-tabs */}
       <div style={{ padding: '14px 16px 0', display: 'flex', gap: 5, flexWrap: 'wrap' }}>
@@ -59,11 +59,15 @@ export default function Profile() {
 // Status bar (top of profile)
 // ---------------------------------------------------------------------
 
-function StatusBar({ poolMax }) {
+function StatusBar({ poolMax, onBack }) {
   const hustle = useHustle()
   const vitals = useVitals()
+  // Live cosmetic look + name — synced with the home screen (SWAP / rename).
+  const lookId = usePlayerLook()
+  const look = PLAYER_LOOKS.find(l => l.id === lookId) || PLAYER_LOOKS[0]
+  const name = useDisplayName()
   const xpPct = Math.round((PLAYER.xp / PLAYER.xpNext) * 100)
-  const cardColor = RARITY_COLORS[PLAYER.card.rarity]
+  const cardColor = RARITY_COLORS[look.rarity] || GOLD
 
   return (
     <div style={{ padding: '14px 16px 0' }}>
@@ -71,57 +75,57 @@ function StatusBar({ poolMax }) {
         background: 'linear-gradient(135deg, #15110a 0%, #13131f 70%)',
         border: `1px solid ${cardColor}44`,
         borderRadius: 18,
-        padding: 14,
+        overflow: 'hidden',
       }}>
-        {/* Top row: card art + identity */}
-        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-          <div style={{
-            width: 64, height: 84,
-            background: '#1a1a2e',
-            border: `1px solid ${cardColor}66`,
-            borderRadius: 10,
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'flex-end',
-            flexShrink: 0, position: 'relative', overflow: 'hidden',
-          }}>
-            {PLAYER.card.avatar ? (
-              <img src={PLAYER.card.avatar} alt={PLAYER.card.name}
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <div style={{ fontSize: 30 }}>{PLAYER.card.emoji}</div>
-            )}
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: cardColor }} />
-            <div style={{
-              position: 'relative', zIndex: 1, width: '100%',
-              background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.85) 60%)',
-              padding: '10px 2px 3px',
-              textAlign: 'center',
-            }}>
-              <div style={{ color: cardColor, fontSize: 7, fontWeight: 700, letterSpacing: 0.5 }}>LVL {PLAYER.level}</div>
-            </div>
-          </div>
-
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: '#fff', fontSize: 18, fontWeight: 500 }}>{PLAYER.name}</div>
-            <div style={{ color: cardColor, fontSize: 11, fontWeight: 500, marginTop: 1 }}>{PLAYER.archetype}</div>
-            <div style={{ color: '#888', fontSize: 11, marginTop: 2 }}>{PLAYER.facility} — {PLAYER.state}</div>
-            <div style={{ marginTop: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                <span style={{ color: '#555', fontSize: 9 }}>XP to Lv {PLAYER.level + 1}</span>
-                <span style={{ color: '#888', fontSize: 9 }}>
-                  {PLAYER.xp.toLocaleString()} / {PLAYER.xpNext.toLocaleString()}
-                </span>
-              </div>
-              <div style={{ height: 4, background: '#1e1e2a', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%', width: `${xpPct}%`,
-                  background: `linear-gradient(90deg, ${GOLD}, #f0d080)`,
-                  borderRadius: 2,
-                }} />
-              </div>
-            </div>
+        {/* Large hero portrait — the player's current look, big like the card
+            detail view, with name/identity overlaid and an X to go home. */}
+        <div style={{ position: 'relative', width: '100%', height: 280, overflow: 'hidden' }}>
+          {look.avatar ? (
+            <img src={look.avatar} alt={name}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
+          ) : (
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 140, background: 'radial-gradient(circle at center, #1a1a2e 0%, #0a0a0f 100%)' }}>{look.emoji}</div>
+          )}
+          {/* Top accent stripe */}
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: cardColor }} />
+          {/* Bottom gradient so text reads on any art */}
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 130, background: 'linear-gradient(180deg, transparent 0%, rgba(10,10,15,0.55) 50%, #13131f 100%)', pointerEvents: 'none' }} />
+          {/* X — back to home (same spot as the card modal's close) */}
+          <button
+            onClick={() => { sfx.tap?.(); onBack && onBack() }}
+            aria-label="Close"
+            style={{
+              position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: '50%',
+              background: 'rgba(10,10,15,0.7)', border: '0.5px solid rgba(255,255,255,0.15)',
+              color: '#fff', fontSize: 18, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          ><i className="ti ti-x" /></button>
+          {/* Identity overlaid bottom-left */}
+          <div style={{ position: 'absolute', left: 16, right: 16, bottom: 12 }}>
+            <div style={{ color: cardColor, fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase' }}>{PLAYER.archetype} · Lv {PLAYER.level}</div>
+            <div style={{ color: '#fff', fontSize: 26, fontWeight: 700, lineHeight: 1.1 }}>{name}</div>
+            <div style={{ color: '#aaa', fontSize: 12, marginTop: 2 }}>{PLAYER.facility} — {PLAYER.state}</div>
           </div>
         </div>
+
+        <div style={{ padding: 14 }}>
+          {/* XP bar */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+              <span style={{ color: '#555', fontSize: 9 }}>XP to Lv {PLAYER.level + 1}</span>
+              <span style={{ color: '#888', fontSize: 9 }}>
+                {PLAYER.xp.toLocaleString()} / {PLAYER.xpNext.toLocaleString()}
+              </span>
+            </div>
+            <div style={{ height: 4, background: '#1e1e2a', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', width: `${xpPct}%`,
+                background: `linear-gradient(90deg, ${GOLD}, #f0d080)`,
+                borderRadius: 2,
+              }} />
+            </div>
+          </div>
 
         {/* Pool bars. Health + stamina come from the regenerating vitals
             store (single source of truth across Profile/Fight/Battle);
@@ -145,6 +149,7 @@ function StatusBar({ poolMax }) {
           <span style={{ color: GOLD, fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
             {hustle.toLocaleString()}
           </span>
+        </div>
         </div>
       </div>
     </div>
