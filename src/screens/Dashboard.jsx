@@ -42,6 +42,14 @@ export default function Dashboard({ onNavigate }) {
   // and stats are unaffected — only the art + name change.
   const look = PLAYER_LOOKS.find(l => l.id === lookId) || PLAYER_LOOKS[0]
   const lookColor = RARITY_COLORS[look.rarity] || '#c9a84c'
+  // Tapping the player card opens it large in the shared CharacterDetailModal,
+  // same as the crew/collection cards. It's cosmetic (no combat stats), so the
+  // modal just shows the big portrait + identity.
+  const playerCard = {
+    name: playerName, avatar: look.avatar, emoji: look.emoji, rarity: look.rarity,
+    archetype: PLAYER.archetype, facility: PLAYER.facility, state: PLAYER.state,
+    level: PLAYER.level, isYou: true,
+  }
 
   return (
     <div className="scroll-area animate-in">
@@ -53,15 +61,18 @@ export default function Dashboard({ onNavigate }) {
       <div className="section" style={{ marginTop: 14 }}>
         <div className="section-label">Your Card</div>
         <div className="card card-pad" style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          {/* Card Art — the player's chosen cosmetic look (swappable). */}
-          <div style={{
+          {/* Card Art — the player's chosen cosmetic look (swappable). Tap to
+              open it large, like the other cards. */}
+          <div
+            onClick={() => { sfx.tap?.(); setDetailChar(playerCard) }}
+            style={{
             width: 70, height: 92,
             background: '#1a1a2e',
             borderRadius: 10,
             border: `1px solid ${lookColor}44`,
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'flex-end',
-            flexShrink: 0, position: 'relative', overflow: 'hidden'
+            flexShrink: 0, position: 'relative', overflow: 'hidden', cursor: 'pointer',
           }}>
             {look.avatar ? (
               <img src={look.avatar} alt={look.name}
