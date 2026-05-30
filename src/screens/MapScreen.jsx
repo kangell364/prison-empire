@@ -4,6 +4,7 @@ import { CountdownRing } from '../components/CountdownRing'
 import { USCountryMap } from '../components/USCountryMap'
 import { USStateMap } from '../components/USStateMap'
 import { ScoutScreen } from '../components/ScoutScreen'
+import { CountyTopDown } from '../components/CountyTopDown'
 import { useMapData, buildCityCountyMap, STATE_CODE_TO_FIPS } from '../state/mapData'
 import { useDisplayName } from '../state/profileStore'
 import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
@@ -187,6 +188,7 @@ function loadRaids() {
 // ---------------------------------------------------------------------
 export default function MapScreen() {
   const [stateView, setStateView] = useState(null)          // null = country view
+  const [countyView, setCountyView] = useState(null)        // Map 2 (top-down) target
   const [selectedFacility, setSelectedFacility] = useState(null)
   const { attacks, landed, launch, dismissLanded } = useDriveBys()
   const { data: mapData } = useMapData()
@@ -245,6 +247,21 @@ export default function MapScreen() {
     })
     return m
   }, [facilityControl, cityById])
+
+  // Trap houses sitting in the focused county (drives the top-down view).
+  const countyEntries = useMemo(() => {
+    if (!countyView) return []
+    const out = []
+    const biz = facilityByFips[countyView.fips]
+    if (biz) out.push({ id: biz.id, kind: 'business', facility: biz, name: biz.name, color: facilityControl[biz.id].color })
+    Object.values(world.houses).forEach(h => {
+      if (h.kind === 'business') return
+      if ((h.cityId != null ? cityCounty[h.cityId] : null) !== countyView.fips) return
+      if (h.kind === 'personal') out.push({ id: h.id, kind: 'personal', name: world.players[h.owner_player_id]?.name || h.name })
+      else if (h.kind === 'mansion') { const mob = world.mobs[h.owner_mob_id]; out.push({ id: h.id, kind: 'mansion', name: mob?.name || h.name, color: mob?.color || RED }) }
+    })
+    return out
+  }, [countyView, facilityByFips, facilityControl, world.houses, world.players, world.mobs, cityCounty])
 
   const summary = useMemo(() => {
     let yours = 0, enemy = 0, vacant = 0
@@ -362,7 +379,7 @@ export default function MapScreen() {
               colorFor={(fips) => { const f = facilityByFips[fips]; return f ? facilityControl[f.id].color : '#15151f' }}
               strokeFor={(fips) => facilityByFips[fips] ? '#fff' : `${GOLD}59`}
               strokeWidthFor={(fips) => facilityByFips[fips] ? 1.5 : 0.7}
-              onCountyClick={(c) => { const f = facilityByFips[c.fips]; if (f) { sfx.tap(); setSelectedFacility(f) } }}
+              onCountyClick={(c) => { if (facilityByFips[c.fips]) { sfx.tap(); setCountyView({ fips: c.fips, name: c.name, stateCode: stateView.code }) } }}
               height="58vh"
             />
           ) : (
@@ -421,6 +438,15 @@ export default function MapScreen() {
             )}
           </div>
         </div>
+      )}
+
+      {countyView && (
+        <CountyTopDown
+          county={countyView}
+          entries={countyEntries}
+          onBack={() => setCountyView(null)}
+          onScout={(f) => setSelectedFacility(f)}
+        />
       )}
 
       {selectedFacility && (
