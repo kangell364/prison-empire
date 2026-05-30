@@ -4,7 +4,7 @@ import { CountdownRing } from '../components/CountdownRing'
 import { USCountryMap } from '../components/USCountryMap'
 import { USStateMap } from '../components/USStateMap'
 import { ScoutScreen } from '../components/ScoutScreen'
-import { CountyTopDown } from '../components/CountyTopDown'
+import { TurfMap } from '../components/TurfMap'
 import { useMapData, buildCityCountyMap, STATE_CODE_TO_FIPS } from '../state/mapData'
 import { useDisplayName } from '../state/profileStore'
 import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
@@ -224,7 +224,7 @@ function useAiOffense() {
 // ---------------------------------------------------------------------
 export default function MapScreen() {
   const [stateView, setStateView] = useState(null)          // null = country view
-  const [countyView, setCountyView] = useState(null)        // Map 2 (top-down) target
+  const [turfView, setTurfView] = useState(null)            // Map 2 (turf map): { center:[lat,lng], label }
   const [selectedFacility, setSelectedFacility] = useState(null)
   const [relocating, setRelocating] = useState(false)       // picking a relocate target
   const [moveConfirm, setMoveConfirm] = useState(null)      // { fips, name, state, miles, sec }
@@ -315,21 +315,25 @@ export default function MapScreen() {
   const moving    = !!homeHouse?.moving_until
   const moveRemaining = moving ? Math.max(0, Math.ceil((homeHouse.moving_until - Date.now()) / 1000)) : 0
 
-  // Trap houses sitting in the focused county (drives the top-down view).
-  const countyEntries = useMemo(() => {
-    if (!countyView) return []
+  // All trap houses positioned by real coordinates for the turf map (Map 2):
+  // business → its facility city; personal/mansion → county centroid or city.
+  const turfHouses = useMemo(() => {
     const out = []
-    const biz = facilityByFips[countyView.fips]
-    if (biz) out.push({ id: biz.id, kind: 'business', facility: biz, name: biz.name, color: facilityControl[biz.id].color })
     Object.values(world.houses).forEach(h => {
-      if (h.kind === 'business') return
-      const fips = h.county_fips || (h.cityId != null ? cityCounty[h.cityId] : null)
-      if (fips !== countyView.fips) return
-      if (h.kind === 'personal') out.push({ id: h.id, kind: 'personal', name: world.players[h.owner_player_id]?.name || h.name, isYou: h.owner_player_id === 'you' })
-      else if (h.kind === 'mansion') { const mob = world.mobs[h.owner_mob_id]; out.push({ id: h.id, kind: 'mansion', name: mob?.name || h.name, color: mob?.color || RED }) }
+      let lng = null, lat = null
+      if (h.county_fips) { const f = findCountyFeature(mapData, h.county_fips); if (f) { const c = geoCentroid(f); lng = c[0]; lat = c[1] } }
+      if (lng == null && h.cityId != null) { const c = cityById.get(h.cityId); if (c) { lng = c.lng; lat = c.lat } }
+      if (lng == null) return
+      if (h.kind === 'business') out.push({ id: h.id, kind: 'business', name: h.name, color: facilityControl[h.id]?.color, facility: FACILITY_BY_ID.get(h.id), lat, lng })
+      else if (h.kind === 'personal') {
+        const isYou = h.owner_player_id === 'you'
+        const color = isYou ? GOLD : (world.mobs[world.players[h.owner_player_id]?.mob_id]?.color || '#888')
+        out.push({ id: h.id, kind: 'personal', name: world.players[h.owner_player_id]?.name || h.name, isYou, color, lat, lng })
+      }
+      else if (h.kind === 'mansion') { const mob = world.mobs[h.owner_mob_id]; out.push({ id: h.id, kind: 'mansion', name: mob?.name || h.name, color: mob?.color || RED, lat, lng }) }
     })
     return out
-  }, [countyView, facilityByFips, facilityControl, world.houses, world.players, world.mobs, cityCounty])
+  }, [world.houses, world.players, world.mobs, mapData, cityById, facilityControl])
 
   const summary = useMemo(() => {
     let yours = 0, enemy = 0, vacant = 0
@@ -399,7 +403,7 @@ export default function MapScreen() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 16px 0' }}>
           {raids.map(r => r.kind === 'personal'
             ? <RaidBanner key={r.id} raid={r} isHome facility={{ name: 'Your Trap House' }} city={null}
-                onDefend={() => { sfx.tap(); setRelocating(true); setCountyView(null) }} />
+                onDefend={() => { sfx.tap(); setRelocating(true); setTurfView(null) }} />
             : <RaidBanner key={r.id} raid={r} facility={FACILITY_BY_ID.get(r.facilityId)} city={cityById.get(FACILITY_BY_ID.get(r.facilityId)?.cityId)}
                 onDefend={() => setSelectedFacility(FACILITY_BY_ID.get(r.facilityId))} />
           )}
@@ -439,7 +443,7 @@ export default function MapScreen() {
             </div>
           </div>
           {!moving && !relocating && (
-            <button className="btn" onClick={() => { sfx.tap(); setRelocating(true); setCountyView(null) }}
+            <button className="btn" onClick={() => { sfx.tap(); setRelocating(true); setTurfView(null) }}
               style={{ padding: '7px 11px', background: GOLD, color: '#0a0a0f', border: 'none', borderRadius: 9, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>
               <i className="ti ti-arrows-move" /> Relocate
             </button>
@@ -507,7 +511,12 @@ export default function MapScreen() {
               strokeWidthFor={(fips) => facilityByFips[fips] ? 1.5 : 0.7}
               onCountyClick={(c) => {
                 if (relocating) { sfx.tap(); beginMoveTo(c.fips, c.name); return }
-                if (facilityByFips[c.fips]) { sfx.tap(); setCountyView({ fips: c.fips, name: c.name, stateCode: stateView.code }) }
+                const fac = facilityByFips[c.fips]
+                if (fac) {
+                  sfx.tap()
+                  const city = cityById.get(fac.cityId)   // where the houses actually sit
+                  setTurfView({ center: city ? [city.lat, city.lng] : null, label: `${c.name} County` })
+                }
               }}
               height="58vh"
             />
@@ -587,12 +596,13 @@ export default function MapScreen() {
         </div>
       )}
 
-      {countyView && (
-        <CountyTopDown
-          county={countyView}
-          entries={countyEntries}
-          onBack={() => setCountyView(null)}
+      {turfView && (
+        <TurfMap
+          houses={turfHouses}
+          center={turfView.center}
+          label={turfView.label}
           onScout={(f) => setSelectedFacility(f)}
+          onBack={() => setTurfView(null)}
         />
       )}
 
