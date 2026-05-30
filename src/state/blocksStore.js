@@ -27,7 +27,7 @@ const POACH_MULT       = 1.10          // +10% per takeover
 const PAYOUT_CUT       = 0.5           // displaced owner gets stake + this share of the premium
 const DECAY_PER_HR     = 0.02          // loyalty decays 2%/hr toward its base when uncontested
 const COOLDOWN_MS      = 60 * 1000     // re-poach lock after a takeover
-const MAX_BLOCKS       = 25            // anti-whale: max blocks you can hold
+export const MAX_BLOCKS = 25           // anti-whale: max blocks you can hold
 const INCOME_CAP_HRS   = 24
 export const HOME_RADIUS_DEG = 0.06    // ~4mi home-turf radius
 const HOME_INCOME_MULT = 1.25
@@ -225,4 +225,31 @@ export function collect(gx, gy) {
   o.lastCollectedAt = Date.now()
   commit()
   return got
+}
+
+// ---- home-screen "Your Turf" aggregates ----------------------------
+
+// Total Hustle/hr across every block you hold.
+export function yourBlockIncomePerHr() {
+  return yourBlocks().reduce((sum, b) => sum + (b.incomePerHr || 0), 0)
+}
+
+// Total uncollected (pending) Hustle waiting across all your blocks.
+export function yourPendingIncome() {
+  return yourBlocks().reduce((sum, b) => sum + pendingIncome(b.gx, b.gy), 0)
+}
+
+// Bank pending income from ALL your blocks in one pass (single credit + commit).
+// Returns the total Hustle banked.
+export function collectAllBlocks() {
+  let total = 0
+  const now = Date.now()
+  for (const [k, o] of Object.entries(overrides)) {
+    if (o.owner !== 'you') continue
+    const [gx, gy] = k.split('_').map(Number)
+    const got = pendingIncome(gx, gy)
+    if (got > 0) { total += got; o.lastCollectedAt = now }
+  }
+  if (total > 0) { addHustle(total); commit() }
+  return total
 }
