@@ -11,6 +11,7 @@
 import React, { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { GRID, getBlock, subscribeBlocks, CREW_COLORS } from '../state/blocksStore'
 
 const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -34,13 +35,15 @@ function markerHtml(h) {
   </div>`
 }
 
-export function TurfMap({ houses, center, label, onScout, onBack }) {
+export function TurfMap({ houses, center, label, onScout, onBlockTap, onBack }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const housesRef = useRef(houses)
   const onScoutRef = useRef(onScout)
+  const onBlockTapRef = useRef(onBlockTap)
   housesRef.current = houses
   onScoutRef.current = onScout
+  onBlockTapRef.current = onBlockTap
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
@@ -68,10 +71,6 @@ export function TurfMap({ houses, center, label, onScout, onBack }) {
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    const GRID = 0.004
-    const COLORS = { red: '#e74c3c', blue: '#4a9eff', purple: '#9b59b6' }
-    const rng = (gx, gy) => Math.abs(Math.sin(gx * 12.9898 + gy * 78.233) * 43758.5453) % 1
-    const ownerOf = (gx, gy) => { const h = rng(gx, gy); return h < 0.08 ? 'red' : h < 0.15 ? 'blue' : h < 0.2 ? 'purple' : null }
     let layer = null
     const draw = () => {
       if (layer) { try { map.removeLayer(layer) } catch {}; layer = null }
@@ -82,19 +81,26 @@ export function TurfMap({ houses, center, label, onScout, onBack }) {
       if ((x1 - x0) * (y1 - y0) > 700) return   // safety cap
       layer = L.layerGroup().addTo(map)
       for (let gx = x0; gx < x1; gx++) for (let gy = y0; gy < y1; gy++) {
+        const blk = getBlock(gx, gy)
+        const owner = blk.owner
+        const color = owner ? (owner === 'you' ? CREW_COLORS.you : blk.color) : '#3a3a4a'
         const w = gx * GRID, s = gy * GRID
-        const owner = ownerOf(gx, gy)
-        const color = owner ? COLORS[owner] : '#3a3a4a'
-        L.rectangle([[s, w], [s + GRID, w + GRID]], { color, weight: owner ? 1.5 : 0.5, opacity: owner ? 0.9 : 0.3, fillColor: color, fillOpacity: owner ? 0.16 : 0, interactive: false }).addTo(layer)
+        const rect = L.rectangle([[s, w], [s + GRID, w + GRID]], {
+          color, weight: owner ? 1.5 : 0.5, opacity: owner ? 0.9 : 0.3,
+          fillColor: owner ? color : '#888', fillOpacity: owner ? 0.18 : 0.04, interactive: true,
+        }).addTo(layer)
+        rect.on('click', () => onBlockTapRef.current && onBlockTapRef.current(gx, gy))
         if (owner) {
           const npc = L.divIcon({ className: '', iconSize: [28, 36], iconAnchor: [14, 30], html: `<div style="text-align:center"><div style="width:24px;height:24px;border-radius:50%;background:${color};border:2px solid #0a0a0f;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,.7);margin:0 auto">🕴️</div></div>` })
-          L.marker([s + GRID / 2, w + GRID / 2], { icon: npc, interactive: false }).addTo(layer)
+          L.marker([s + GRID / 2, w + GRID / 2], { icon: npc })
+            .on('click', () => onBlockTapRef.current && onBlockTapRef.current(gx, gy)).addTo(layer)
         }
       }
     }
     map.on('moveend zoomend', draw)
+    const unsub = subscribeBlocks(draw)   // redraw when blocks change
     draw()
-    return () => { map.off('moveend zoomend', draw); if (layer) { try { map.removeLayer(layer) } catch {} } }
+    return () => { map.off('moveend zoomend', draw); unsub(); if (layer) { try { map.removeLayer(layer) } catch {} } }
   }, [])
 
   // Draw / redraw house markers when the set changes.

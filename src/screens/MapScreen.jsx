@@ -5,6 +5,8 @@ import { USCountryMap } from '../components/USCountryMap'
 import { USStateMap } from '../components/USStateMap'
 import { ScoutScreen } from '../components/ScoutScreen'
 import { TurfMap } from '../components/TurfMap'
+import { BlockSheet } from '../components/BlockSheet'
+import { cellCenter, HOME_RADIUS_DEG } from '../state/blocksStore'
 import { useMapData, buildCityCountyMap, STATE_CODE_TO_FIPS } from '../state/mapData'
 import { useDisplayName } from '../state/profileStore'
 import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
@@ -225,6 +227,7 @@ function useAiOffense() {
 export default function MapScreen() {
   const [stateView, setStateView] = useState(null)          // null = country view
   const [turfView, setTurfView] = useState(null)            // Map 2 (turf map): { center:[lat,lng], label }
+  const [blockSel, setBlockSel] = useState(null)            // tapped block { gx, gy }
   const [selectedFacility, setSelectedFacility] = useState(null)
   const [relocating, setRelocating] = useState(false)       // picking a relocate target
   const [moveConfirm, setMoveConfirm] = useState(null)      // { fips, name, state, miles, sec }
@@ -314,6 +317,16 @@ export default function MapScreen() {
   const homeFips  = houseCounty(homeHouse)
   const moving    = !!homeHouse?.moving_until
   const moveRemaining = moving ? Math.max(0, Math.ceil((homeHouse.moving_until - Date.now()) / 1000)) : 0
+
+  // Is the tapped block inside the home-turf radius of your trap house?
+  const blockHomeTurf = useMemo(() => {
+    if (!blockSel) return false
+    const hc = houseCoords(homeHouse)   // [lng, lat]
+    if (!hc) return false
+    const [clat, clng] = cellCenter(blockSel.gx, blockSel.gy)
+    return Math.hypot(clat - hc[1], clng - hc[0]) <= HOME_RADIUS_DEG
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blockSel, homeHouse, mapData])
 
   // All trap houses positioned by real coordinates for the turf map (Map 2):
   // business → its facility city; personal/mansion → county centroid or city.
@@ -615,8 +628,13 @@ export default function MapScreen() {
           center={turfView.center}
           label={turfView.label}
           onScout={(f) => setSelectedFacility(f)}
+          onBlockTap={(gx, gy) => setBlockSel({ gx, gy })}
           onBack={() => setTurfView(null)}
         />
+      )}
+
+      {blockSel && (
+        <BlockSheet gx={blockSel.gx} gy={blockSel.gy} homeTurf={blockHomeTurf} onClose={() => setBlockSel(null)} />
       )}
 
       {selectedFacility && (

@@ -1,0 +1,159 @@
+// blocksStore — the block / loyalty-market economy (v1).
+//
+// The map is an infinite uniform grid of ~440m blocks. We do NOT store every
+// block — that's billions of cells. Instead:
+//   - blockDefault(gx,gy) gives every cell a DETERMINISTIC ambient state
+//     (procedural rival crews hold turf everywhere, with a base value/income).
+//   - `overrides` (localStorage) records only the blocks the player has changed
+//     (recruited onto, poached). getBlock merges override over default.
+//
+// Loop: recruit a member onto a vacant block (Hustle) → it earns Hustle/hr →
+// poach a held block for loyalty x1.10 (loyalty ratchets +10% each takeover) →
+// the displaced owner gets their stake back + a cut (a payday, not a robbery;
+// only credited for real players — ambient AI has no recipient) → loyalty
+// decays slowly when uncontested → a re-poach cooldown + a per-player cap keep
+// whales in check. Blocks near your trap house get a home-turf bonus.
+//
+// Map-roam: you can claim/poach anywhere; no GPS. Home-turf is anchored to your
+// in-game trap house location (passed in by the caller), not the phone's GPS.
+
+import { useEffect, useState } from 'react'
+import { addHustle, spendHustle } from './profileStore'
+
+export const GRID = 0.004              // ~440m block — MUST match the TurfMap grid
+const KEY = 'pe_blocks_v1'
+
+const POACH_MULT       = 1.10          // +10% per takeover
+const DECAY_PER_HR     = 0.02          // loyalty decays 2%/hr toward its base when uncontested
+const COOLDOWN_MS      = 60 * 1000     // re-poach lock after a takeover
+const MAX_BLOCKS       = 25            // anti-whale: max blocks you can hold
+const INCOME_CAP_HRS   = 24
+export const HOME_RADIUS_DEG = 0.06    // ~4mi home-turf radius
+const HOME_INCOME_MULT = 1.25
+const HOME_COST_MULT   = 0.85
+
+export const CREW_COLORS = { red: '#e74c3c', blue: '#4a9eff', purple: '#9b59b6', you: '#c9a84c' }
+const NPC_NAMES = ['Tre', 'Paco', 'Big L', 'Smoke', 'Reek', 'Vinnie', 'Tommy', 'Los', 'Deuce', 'Mac', 'Cash', 'Slim', 'Boomer', 'Rico', 'Tank']
+
+// ---- grid helpers --------------------------------------------------
+
+function frac(x) { return x - Math.floor(x) }
+function cellRng(gx, gy, salt) { return Math.abs(frac(Math.sin(gx * 12.9898 + gy * 78.233 + salt * 37.719) * 43758.5453)) }
+export function cellKey(gx, gy) { return gx + '_' + gy }
+export function cellCenter(gx, gy) { return [gy * GRID + GRID / 2, gx * GRID + GRID / 2] }  // [lat,lng]
+export function cellOf(lng, lat) { return [Math.floor(lng / GRID), Math.floor(lat / GRID)] }
+function hoursSince(ts) { return Math.max(0, (Date.now() - ts) / 3_600_000) }
+
+// Ambient (procedural) state for any cell — rival crews hold turf everywhere.
+function blockDefault(gx, gy) {
+  const h = cellRng(gx, gy, 0)
+  const owner = h < 0.08 ? 'red' : h < 0.15 ? 'blue' : h < 0.20 ? 'purple' : null
+  const tier = Math.floor(cellRng(gx, gy, 1) * 3)        // 0..2
+  const baseLoyalty = 600 + tier * 700                   // 600 / 1300 / 2000
+  const incomePerHr = 20 + tier * 40                     // 20 / 60 / 100
+  const npc = NPC_NAMES[Math.floor(cellRng(gx, gy, 2) * NPC_NAMES.length)]
+  return {
+    owner, ownerKind: owner ? 'ai' : null, color: owner ? CREW_COLORS[owner] : null,
+    loyalty: owner ? baseLoyalty : 0, baseLoyalty, incomePerHr, npc,
+  }
+}
+
+// ---- store ---------------------------------------------------------
+
+let overrides = load()
+const listeners = new Set()
+function load() { try { const r = localStorage.getItem(KEY); if (r) return JSON.parse(r) || {} } catch {} return {} }
+function commit() { try { localStorage.setItem(KEY, JSON.stringify(overrides)) } catch {}; listeners.forEach(f => f(overrides)) }
+
+export function subscribeBlocks(fn) { listeners.add(fn); return () => listeners.delete(fn) }
+export function useBlocksVersion() {
+  const [, set] = useState(0)
+  useEffect(() => subscribeBlocks(() => set(v => v + 1)), [])
+}
+
+// Loyalty with decay applied (decays toward base once past the cooldown).
+export function effectiveLoyalty(b) {
+  if (!b.lastPoachAt) return b.loyalty
+  const decayed = b.loyalty * Math.pow(1 - DECAY_PER_HR, hoursSince(b.lastPoachAt))
+  return Math.max(b.baseLoyalty, Math.round(decayed))
+}
+
+export function getBlock(gx, gy) {
+  const def = blockDefault(gx, gy)
+  const o = overrides[cellKey(gx, gy)]
+  const b = o ? { ...def, ...o } : def
+  b.gx = gx; b.gy = gy
+  b.color = b.owner ? CREW_COLORS[b.owner] : null
+  return b
+}
+
+export function yourBlockCount() { return Object.values(overrides).filter(b => b.owner === 'you').length }
+
+export function poachPrice(b, homeTurf) {
+  return Math.round(effectiveLoyalty(b) * POACH_MULT * (homeTurf ? HOME_COST_MULT : 1))
+}
+export function recruitCost(b, homeTurf) {
+  return Math.round(b.baseLoyalty * (homeTurf ? HOME_COST_MULT : 1))
+}
+export function onCooldown(b) { return b.lastPoachAt ? (Date.now() - b.lastPoachAt) < COOLDOWN_MS : false }
+export function cooldownLeft(b) { return b.lastPoachAt ? Math.max(0, Math.ceil((COOLDOWN_MS - (Date.now() - b.lastPoachAt)) / 1000)) : 0 }
+
+export function pendingIncome(gx, gy) {
+  const b = getBlock(gx, gy)
+  if (b.owner !== 'you') return 0
+  const hrs = Math.min(INCOME_CAP_HRS, hoursSince(b.lastCollectedAt || Date.now()))
+  return Math.floor(b.incomePerHr * hrs)
+}
+
+// ---- actions -------------------------------------------------------
+
+// Recruit a member onto a VACANT block. Returns { ok, reason?, cost }.
+export function recruit(gx, gy, homeTurf) {
+  const b = getBlock(gx, gy)
+  if (b.owner) return { ok: false, reason: 'taken' }
+  if (yourBlockCount() >= MAX_BLOCKS) return { ok: false, reason: 'cap' }
+  const cost = recruitCost(b, homeTurf)
+  if (!spendHustle(cost)) return { ok: false, reason: 'broke', cost }
+  const now = Date.now()
+  overrides[cellKey(gx, gy)] = {
+    owner: 'you', ownerKind: 'you', npc: b.npc, baseLoyalty: b.baseLoyalty,
+    incomePerHr: Math.round(b.incomePerHr * (homeTurf ? HOME_INCOME_MULT : 1)),
+    loyalty: cost, basePaid: cost, lastCollectedAt: now, lastPoachAt: now,
+  }
+  commit()
+  return { ok: true, cost }
+}
+
+// Poach a HELD block (buy out the member's loyalty for +10%). Returns
+// { ok, reason?, cost }. The displaced owner is credited only if a real player
+// (ambient AI has no recipient — the spend is a Hustle sink).
+export function poach(gx, gy, homeTurf) {
+  const b = getBlock(gx, gy)
+  if (!b.owner || b.owner === 'you') return { ok: false, reason: 'own' }
+  if (onCooldown(b)) return { ok: false, reason: 'cooldown' }
+  if (yourBlockCount() >= MAX_BLOCKS) return { ok: false, reason: 'cap' }
+  const cost = poachPrice(b, homeTurf)
+  if (!spendHustle(cost)) return { ok: false, reason: 'broke', cost }
+  const now = Date.now()
+  // A displaced REAL player gets their stake back + a 50% cut of the premium (a
+  // payday, not a robbery) — wired in the multiplayer phase. Ambient AI owners
+  // have no recipient, so their loss is just a Hustle sink.
+  overrides[cellKey(gx, gy)] = {
+    owner: 'you', ownerKind: 'you', npc: b.npc, baseLoyalty: b.baseLoyalty,
+    incomePerHr: Math.round(b.incomePerHr * (homeTurf ? HOME_INCOME_MULT : 1)),
+    loyalty: cost, basePaid: cost, lastCollectedAt: now, lastPoachAt: now,
+  }
+  commit()
+  return { ok: true, cost }
+}
+
+// Bank a held block's accrued income.
+export function collect(gx, gy) {
+  const got = pendingIncome(gx, gy)
+  const o = overrides[cellKey(gx, gy)]
+  if (!o || o.owner !== 'you') return 0
+  if (got > 0) addHustle(got)
+  o.lastCollectedAt = Date.now()
+  commit()
+  return got
+}
