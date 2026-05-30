@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { PLAYER, SKILLS } from '../data/gameData'
 import { sfx } from '../sounds'
 import { Avatar } from './Avatar'
+import { usePlayerCard } from '../state/profileStore'
 
 const GOLD   = '#c9a84c'
 const BLUE   = '#4a9eff'
@@ -50,7 +51,12 @@ function opponentSkillLoadout(opp) {
 //   onRoll    — fires each time the player clicks ROLL (caller deducts stamina)
 //   onWin     — fires when the player KOs the opponent (caller does side-effects
 //               like incrementing daily-kill counters, granting card drops, etc.)
-export function BattleDiceModal({ opponent, cost, rewards, onClose, onRoll, onWin }) {
+//   onResult  — fires once when the fight resolves (win | lose | draw) with
+//               { result, damageTaken, maxHp }. damageTaken is on the same scale
+//               as global vitals health, so the caller can spendHealth(damageTaken)
+//               to make a fight cost real, shared health.
+export function BattleDiceModal({ opponent, cost, rewards, onClose, onRoll, onWin, onResult }) {
+  const me = usePlayerCard()   // live player card (look + name), synced everywhere
   const [phase, setPhase]     = useState('idle')    // idle | rolling | resolved
   const [diceA, setDiceA]     = useState(1)
   const [diceB, setDiceB]     = useState(1)
@@ -203,6 +209,10 @@ export function BattleDiceModal({ opponent, cost, rewards, onClose, onRoll, onWi
       sfx.clash()
     }
 
+    // Report the resolved fight so the caller can apply real, shared health loss
+    // (damageTaken is on the global vitals-health scale: toughness × 25).
+    if (result && onResult) onResult({ result, damageTaken: maxPlayerHp - newPlayerHp, maxHp: maxPlayerHp })
+
     setLog(prev => [...prev, ...roundLog])
     setOutcome(result)
     setPhase(result ? 'resolved' : 'idle')
@@ -238,7 +248,7 @@ export function BattleDiceModal({ opponent, cost, rewards, onClose, onRoll, onWi
 
         {/* VS row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <FighterBlock name={PLAYER.name} emoji={PLAYER.card.emoji} avatar={PLAYER.card.avatar} level={PLAYER.level}
+          <FighterBlock name={me.name} emoji={me.emoji} avatar={me.avatar} level={PLAYER.level}
             attack={stats.playerBaseAttack} defense={stats.playerBaseDefense}
             hp={playerHp} maxHp={maxPlayerHp} color={BLUE}
             hit={playerHit}

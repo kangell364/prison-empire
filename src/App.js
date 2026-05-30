@@ -12,6 +12,7 @@ import { ensureAuth } from './state/profileStore'
 import { ensureCardsLoaded } from './state/cardsStore'
 import { ensureUpgradesLoaded } from './state/upgradesStore'
 import { useBlockPayoutTicker } from './state/blocksStore'
+import { usePlayerCard } from './state/profileStore'
 
 // Profile lives on the header avatar (top-right) so the bottom nav stays at 6.
 const NAV_ITEMS = [
@@ -29,6 +30,9 @@ export default function App() {
 
   // Global hourly block-income payout — runs app-wide regardless of screen.
   useBlockPayoutTicker()
+  // Live player card (look + name) for the header avatar — stays in sync with SWAP.
+  const playerCard = usePlayerCard()
+  const initials = (playerCard.name || 'SR').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   useEffect(() => subscribeMuted(setMutedState), [])
   useEffect(() => {
@@ -82,7 +86,11 @@ export default function App() {
             <i className="ti ti-bell" aria-hidden="true" />
             <div className="notif-dot" />
           </button>
-          <div className="user-avatar" onClick={() => handleNav('profile')}>SR</div>
+          <div className="user-avatar" onClick={() => handleNav('profile')} style={{ overflow: 'hidden', padding: 0 }}>
+            {playerCard.avatar
+              ? <img src={playerCard.avatar} alt={playerCard.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
+              : initials}
+          </div>
         </div>
       </div>
 

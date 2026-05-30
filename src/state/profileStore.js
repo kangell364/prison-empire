@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../supabase'
-import { RESOURCES, PLAYER, DEFAULT_LOOK_ID } from '../data/gameData'
+import { RESOURCES, PLAYER, PLAYER_LOOKS, DEFAULT_LOOK_ID } from '../data/gameData'
 
 const PROFILE_KEY        = 'pe_profile_v1'
 const LEGACY_HUSTLE_KEY  = 'pe_hustle_v1'
@@ -54,6 +54,18 @@ export function useProfile() {
 export function useHustle()       { return useProfile().hustle }
 export function useSteel()        { return useProfile().steel }
 export function useDisplayName()  { return useProfile().display_name }
+
+// The player's LIVE card identity (cosmetic look + name) — the ONE source every
+// screen should use to show the player. Reflects SWAP + rename everywhere it's
+// used. When adding any new view that shows the player, pull from here (not the
+// static PLAYER.card / PLAYER.name) so it stays in sync. See the player-identity
+// single-source memory note.
+export function resolveLook(lookId) { return PLAYER_LOOKS.find(l => l.id === lookId) || PLAYER_LOOKS[0] }
+export function usePlayerCard() {
+  const p = useProfile()
+  const look = resolveLook(p.player_look_id)
+  return { name: p.display_name, avatar: look.avatar, emoji: look.emoji, rarity: look.rarity, lookId: look.id }
+}
 
 export function setHustle(v) {
   v = Math.max(0, Math.floor(v))
