@@ -19,6 +19,7 @@
 
 import { useEffect, useState } from 'react'
 import { addHustle, spendHustle } from './profileStore'
+import { PLAYER } from '../data/gameData'
 
 export const GRID = 0.004              // ~440m block — MUST match the TurfMap grid
 const KEY = 'pe_blocks_v1'
@@ -27,7 +28,12 @@ const POACH_MULT       = 1.10          // +10% per takeover
 const PAYOUT_CUT       = 0.5           // displaced owner gets stake + this share of the premium
 const DECAY_PER_HR     = 0.02          // loyalty decays 2%/hr toward its base when uncontested
 const COOLDOWN_MS      = 60 * 1000     // re-poach lock after a takeover
-export const MAX_BLOCKS = 25           // anti-whale: max blocks you can hold
+// Block cap scales with player level (25 per level) — a soft anti-whale ceiling
+// that doubles as a progression reward: low levels are gently capped, high
+// levels are effectively uncapped. Level is static (PLAYER.level) for now;
+// swap to the level store when it exists.
+export const BLOCKS_PER_LEVEL = 25
+export function blockCap() { return BLOCKS_PER_LEVEL * Math.max(1, PLAYER.level || 1) }
 const INCOME_CAP_HRS   = 24
 export const HOME_RADIUS_DEG = 0.06    // ~4mi home-turf radius
 const HOME_INCOME_MULT = 1.25
@@ -141,7 +147,7 @@ export function pendingIncome(gx, gy) {
 export function recruit(gx, gy, homeTurf) {
   const b = getBlock(gx, gy)
   if (b.owner) return { ok: false, reason: 'taken' }
-  if (yourBlockCount() >= MAX_BLOCKS) return { ok: false, reason: 'cap' }
+  if (yourBlockCount() >= blockCap()) return { ok: false, reason: 'cap' }
   const cost = recruitCost(b, homeTurf)
   if (!spendHustle(cost)) return { ok: false, reason: 'broke', cost }
   const now = Date.now()
@@ -161,7 +167,7 @@ export function poach(gx, gy, homeTurf) {
   const b = getBlock(gx, gy)
   if (!b.owner || b.owner === 'you') return { ok: false, reason: 'own' }
   if (onCooldown(b)) return { ok: false, reason: 'cooldown' }
-  if (yourBlockCount() >= MAX_BLOCKS) return { ok: false, reason: 'cap' }
+  if (yourBlockCount() >= blockCap()) return { ok: false, reason: 'cap' }
   const cost = poachPrice(b, homeTurf)
   if (!spendHustle(cost)) return { ok: false, reason: 'broke', cost }
   const now = Date.now()
@@ -260,7 +266,7 @@ export function collectAllBlocks() {
 // the "Your Turf" card + turf map have real data to play with. Guarded by a
 // localStorage flag so it only runs once and never fights the player's own
 // recruit/poach/collect. Each block is left ~2h "uncollected" so the Collect
-// flow has something to bank. Bypasses MAX_BLOCKS on purpose (it's a seed).
+// flow has something to bank. Bypasses the block cap on purpose (it's a seed).
 ;(function devSeedBlocks() {
   const FLAG = 'pe_blocks_devseed_50_v1'
   try {
