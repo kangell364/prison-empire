@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react'
-import { PLAYER, PLAYER_LOOKS, TRAITS, RARITY_COLORS, SKILLS } from '../data/gameData'
+import { PLAYER, PLAYER_LOOKS, CARDS_COLLECTION, TRAITS, RARITY_COLORS, SKILLS } from '../data/gameData'
 import { sfx } from '../sounds'
 import { useHustle, usePlayerLook, useDisplayName } from '../state/profileStore'
 import { useVitals, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
-import { baseAtk, baseDef } from '../state/crewStore'
+import { baseAtk, baseDef, useCrew, atkOf, defOf } from '../state/crewStore'
+import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
 
 const GOLD  = '#c9a84c'
 const RED   = '#e74c3c'
@@ -69,6 +70,14 @@ function StatusBar({ poolMax, onBack }) {
   const name = useDisplayName()
   const xpPct = Math.round((PLAYER.xp / PLAYER.xpNext) * 100)
   const cardColor = RARITY_COLORS[look.rarity] || GOLD
+  // Crew combat bonus — the player's 12-card roster totals (with upgrades), the
+  // muscle they roll with. Shown as a "Bonus" on top of the player's own ATK/DEF.
+  const crew = useCrew()
+  const flat = flatAtLevel(useUpgrades(), 1)
+  const cardById = new Map(CARDS_COLLECTION.map(c => [c.id, c]))
+  const crewCards = [crew.leader, ...crew.members].map(id => id != null ? cardById.get(id) : null).filter(Boolean)
+  const crewAtk = crewCards.reduce((s, c) => s + atkOf(c, flat), 0)
+  const crewDef = crewCards.reduce((s, c) => s + defOf(c, flat), 0)
 
   return (
     <div style={{ padding: '14px 16px 0' }}>
@@ -139,6 +148,13 @@ function StatusBar({ poolMax, onBack }) {
               <div style={{ color: BLUE, fontSize: 16, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{baseDef(PLAYER).toLocaleString()}</div>
               <div style={{ color: '#888', fontSize: 9, fontWeight: 500, letterSpacing: 0.5, marginTop: 4, textTransform: 'uppercase' }}>Defense</div>
             </div>
+          </div>
+
+          {/* Crew bonus — the roster's combined ATK/DEF stacked on top. */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 12, fontSize: 11, color: '#888' }}>
+            <span style={{ color: '#666', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Bonus</span>
+            <span><span style={{ color: RED, fontWeight: 700 }}>+{crewAtk.toLocaleString()}</span> Crew ATK</span>
+            <span><span style={{ color: BLUE, fontWeight: 700 }}>+{crewDef.toLocaleString()}</span> Crew DEF</span>
           </div>
 
         {/* Pool bars. Health + stamina come from the regenerating vitals
