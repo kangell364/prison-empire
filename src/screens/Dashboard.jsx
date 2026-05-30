@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { PLAYER, PLAYER_LOOKS, RESOURCES, CARDS_COLLECTION, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
 import { useHustle, useSteel, useDisplayName, usePlayerLook } from '../state/profileStore'
-import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, collectAllBlocks, blockCap } from '../state/blocksStore'
+import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, useBlockPayout, blockCap } from '../state/blocksStore'
 import { useCrew, baseAtk, baseDef } from '../state/crewStore'
 import { useVitals, msToNextStamina, msToNextHealth, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
 import { Avatar } from '../components/Avatar'
@@ -22,6 +22,9 @@ export default function Dashboard({ onNavigate }) {
   const blocksOwned = yourBlockCount()
   const blockIncomeHr = yourBlockIncomePerHr()
   const blockPending  = yourPendingIncome()
+  // Global hourly payout clock (UTC-aligned — same countdown for everyone).
+  const { msLeft: payoutMsLeft, paid: payoutPaid } = useBlockPayout()
+  useEffect(() => { if (payoutPaid > 0) sfx.buy() }, [payoutPaid])
   // Live crew — the real 12-slot roster (1 Leader + 11 Members) from crewStore,
   // resolved against the card catalog. Mirrors the Cards → My Crew screen.
   const crew = useCrew()
@@ -169,7 +172,7 @@ export default function Dashboard({ onNavigate }) {
               <div style={{ color: '#666', fontSize: 11 }}>{blocksOwned}/{blockCap()} blocks</div>
             </div>
             <div style={{ color: '#555', fontSize: 11, marginTop: 2 }}>
-              {blocksOwned === 0 ? 'Claim turf on the map to start earning passive Hustle.' : 'Passive Hustle from the blocks you run'}
+              {blocksOwned === 0 ? 'Claim turf on the map to start earning passive Hustle.' : 'Auto-pays every hour — same clock for every player'}
             </div>
             <div style={{ display: 'flex', gap: 22, marginTop: 12 }}>
               <div>
@@ -180,15 +183,21 @@ export default function Dashboard({ onNavigate }) {
                 <div style={{ color: '#c9a84c', fontSize: 15, fontWeight: 500 }}>+{blockIncomeHr.toLocaleString()}</div>
                 <div style={{ color: '#444', fontSize: 10 }}>Hustle/hr</div>
               </div>
-              <div>
-                <div style={{ color: blockPending > 0 ? '#c9a84c' : '#666', fontSize: 15, fontWeight: 500 }}>{blockPending.toLocaleString()}</div>
-                <div style={{ color: '#444', fontSize: 10 }}>To Collect</div>
+            </div>
+            {/* Global hourly payout — same countdown for everyone, auto-banks at 0. */}
+            <div style={{ marginTop: 14, padding: '10px 12px', borderRadius: 12, background: '#1a1510', border: '0.5px solid #c9a84c33', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <i className="ti ti-clock-hour-4" style={{ color: '#c9a84c', fontSize: 18 }} />
+                <div>
+                  <div style={{ color: '#888', fontSize: 9, letterSpacing: 0.5, fontWeight: 600 }}>NEXT PAYOUT</div>
+                  <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmtCountdown(payoutMsLeft)}</div>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ color: '#888', fontSize: 9, letterSpacing: 0.5, fontWeight: 600 }}>PAYING OUT</div>
+                <div style={{ color: '#c9a84c', fontSize: 16, fontWeight: 700 }}>+{blockPending.toLocaleString()}</div>
               </div>
             </div>
-            <button className="btn btn-gold btn-full" style={{ marginTop: 14, padding: 12 }} disabled={blockPending <= 0}
-              onClick={() => { const got = collectAllBlocks(); got > 0 ? sfx.buy() : sfx.deny() }}>
-              <i className="ti ti-coin" style={{ fontSize: 15 }} /> {blockPending > 0 ? `Collect ${blockPending.toLocaleString()} Hustle` : 'Nothing to Collect'}
-            </button>
           </div>
         </div>
       </div>

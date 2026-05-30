@@ -260,6 +260,49 @@ export function collectAllBlocks() {
   return total
 }
 
+// ---- global hourly payout clock ------------------------------------
+// Block income pays out on a GLOBAL hourly tick — aligned to the top of every
+// UTC hour, so the countdown is identical for every player worldwide (not a
+// per-account timer). When the hour rolls over, accrued income is auto-banked.
+// Income still accrues continuously underneath (capped 24h), so being away just
+// means the next boundary you're present for banks the backlog.
+const PAYOUT_PERIOD_MS  = 3_600_000               // 1 hour
+const PAYOUT_BUCKET_KEY = 'pe_block_payout_bucket_v1'
+
+// ms remaining until the next top-of-hour payout (same instant for everyone).
+export function msToNextPayout() { return PAYOUT_PERIOD_MS - (Date.now() % PAYOUT_PERIOD_MS) }
+
+function payoutBucket() { return Math.floor(Date.now() / PAYOUT_PERIOD_MS) }
+
+// If the global hour rolled over since our last payout, auto-bank all block
+// income. First ever run just starts the clock (no payout). Returns Hustle paid.
+export function runDueBlockPayout() {
+  let last = null
+  try { const raw = localStorage.getItem(PAYOUT_BUCKET_KEY); if (raw != null) last = parseInt(raw, 10) } catch {}
+  const bucket = payoutBucket()
+  if (last == null || Number.isNaN(last)) {            // first run — start the clock
+    try { localStorage.setItem(PAYOUT_BUCKET_KEY, String(bucket)) } catch {}
+    return 0
+  }
+  if (bucket <= last) return 0
+  const paid = collectAllBlocks()
+  try { localStorage.setItem(PAYOUT_BUCKET_KEY, String(bucket)) } catch {}
+  return paid
+}
+
+// Drives the countdown UI + fires the hourly auto-payout. Ticks every second;
+// returns { msLeft, paid } — paid > 0 only on the tick a payout banked.
+export function useBlockPayout() {
+  const [s, setS] = useState({ msLeft: msToNextPayout(), paid: 0 })
+  useEffect(() => {
+    const tick = () => { const paid = runDueBlockPayout(); setS({ msLeft: msToNextPayout(), paid }) }
+    tick()
+    const iv = setInterval(tick, 1000)
+    return () => clearInterval(iv)
+  }, [])
+  return s
+}
+
 // ---- DEV SEED (temporary) ------------------------------------------
 // TODO REMOVE BEFORE LAUNCH. One-time-per-device seed that hands the player a
 // starter empire of 50 owned blocks (a contiguous 10×5 patch around Houston) so
