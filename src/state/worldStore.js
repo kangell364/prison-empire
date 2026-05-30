@@ -278,6 +278,25 @@ export function arriveHouse(houseId) {
   return dest
 }
 
+// An enemy raid landed on your PERSONAL trap house — chip its hp. At 0 you're
+// knocked out: the house is NOT captured (personal houses can't be owned), you
+// scatter to a random live county and respawn at full hp. respawnFips is chosen
+// by the caller (which has the map data). Returns { ko, gang, county, hp }.
+export function applyHomeRaid(houseId, gang, respawnFips) {
+  const h = world.houses[houseId]
+  if (!h || h.kind !== 'personal') return { ko: false, gang }
+  const next = effectiveHp(h) - HIT_DAMAGE
+  if (next <= 0) {
+    commit(setHouse(houseId, {
+      county_fips: respawnFips ?? h.county_fips, cityId: respawnFips ? null : h.cityId,
+      hp: h.hp_max, hpAt: Date.now(), moving_until: null, moving_to_fips: null,
+    }))
+    return { ko: true, gang, county: respawnFips, hp: h.hp_max }
+  }
+  commit(setHouse(houseId, { hp: next, hpAt: Date.now() }))
+  return { ko: false, gang, hp: next }
+}
+
 // Pending uncollected income for a business house you hold (capped).
 export function housePendingIncome(houseId) {
   const h = world.houses[houseId]

@@ -8,7 +8,7 @@ import { CountyTopDown } from '../components/CountyTopDown'
 import { useMapData, buildCityCountyMap, STATE_CODE_TO_FIPS } from '../state/mapData'
 import { useDisplayName } from '../state/profileStore'
 import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
-import { useWorld, moveHouse, arriveHouse } from '../state/worldStore'
+import { useWorld, moveHouse, arriveHouse, getHouse, applyHomeRaid } from '../state/worldStore'
 import { geoCentroid } from 'd3-geo'
 import { sfx } from '../sounds'
 
@@ -107,7 +107,7 @@ function loadAttacks() {
 // applyRaid (chips your defense, loses the facility at 0). `territories` is
 // passed so spawning re-evaluates as ownership changes.
 // ---------------------------------------------------------------------
-function useRaids(territories) {
+function useRaids(territories, homeId, liveFips) {
   const [raids, setRaids]   = useState(loadRaids)
   const [landed, setLanded] = useState([])
   const [, tick] = useState(0)
@@ -137,7 +137,13 @@ function useRaids(territories) {
       }
 
       if (completed.length > 0) {
-        const results = completed.map(r => ({ ...r, ...applyRaid(r.facilityId, r.gang) }))
+        const results = completed.map(r => {
+          if (r.kind === 'personal') {
+            const dest = liveFips && liveFips.length ? liveFips[Math.floor(Math.random() * liveFips.length)] : null
+            return { ...r, ...applyHomeRaid(r.facilityId, r.gang, dest) }
+          }
+          return { ...r, ...applyRaid(r.facilityId, r.gang) }
+        })
         setRaids(active)
         setLanded(L => [...L, ...results])
         sfx.boom()
@@ -146,7 +152,7 @@ function useRaids(territories) {
       }
     }, 1000)
     return () => clearInterval(iv)
-  }, [raids])
+  }, [raids, liveFips])
 
   // Spawn loop — periodically pick one of your facilities to threaten.
   useEffect(() => {
@@ -155,19 +161,23 @@ function useRaids(territories) {
       if (owned.length < MIN_HOLD_TO_RAID) return
       setRaids(cur => {
         const underRaid = new Set(cur.map(r => r.facilityId))
-        const eligible = owned.filter(f => !underRaid.has(f.id))
+        // Eligible targets: your business facilities + your personal home house
+        // (unless it's mid-relocation). Weighted by tier — richer = more heat.
+        const targets = owned.map(f => ({ id: f.id, tier: f.tier, kind: 'business' }))
+        const home = homeId ? getHouse(homeId) : null
+        if (home && !home.moving_until) targets.push({ id: homeId, tier: 2, kind: 'personal' })
+        const eligible = targets.filter(t => !underRaid.has(t.id))
         if (!eligible.length) return cur
-        // Weight by tier — richer facilities draw more heat.
-        const pool = eligible.flatMap(f => Array(f.tier).fill(f))
+        const pool = eligible.flatMap(t => Array(t.tier).fill(t))
         const target = pool[Math.floor(Math.random() * pool.length)]
         const gang = AI_GANGS[Math.floor(Math.random() * AI_GANGS.length)]
         const now = Date.now()
-        return [...cur, { id: `raid-${target.id}-${now}`, facilityId: target.id, gang, endsAt: now + ATTACK_DURATION_MS }]
+        return [...cur, { id: `raid-${target.id}-${now}`, facilityId: target.id, kind: target.kind, gang, endsAt: now + ATTACK_DURATION_MS }]
       })
     }, RAID_SPAWN_MS)
     return () => clearInterval(iv)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [territories])
+  }, [territories, homeId])
 
   const dismissLanded = (id) => setLanded(L => L.filter(r => r.id !== id))
   return { raids, landed, dismissLanded }
@@ -198,14 +208,20 @@ export default function MapScreen() {
   const { data: mapData } = useMapData()
   const territories = useTerritories()
   const world = useWorld()
-  const { raids, landed: raidLanded, dismissLanded: dismissRaid } = useRaids(territories)
+  const cityById = useMemo(() => new Map(ALL_CITIES.map(c => [c.id, c])), [])
+  // Facility → county FIPS (via its anchor city's coordinates).
+  const cityCounty = useMemo(() => mapData ? buildCityCountyMap(mapData, ALL_CITIES) : {}, [mapData])
+  // Live counties (KO respawn targets) = the curated facility counties.
+  const liveFips = useMemo(() => {
+    const s = new Set()
+    FACILITIES.forEach(f => { const fp = cityCounty[f.cityId]; if (fp) s.add(fp) })
+    return [...s]
+  }, [cityCounty])
+
+  const { raids, landed: raidLanded, dismissLanded: dismissRaid } = useRaids(territories, world.player.home_house_id, liveFips)
 
   const attackingSet = useMemo(() => new Set(attacks.map(a => a.facilityId)), [attacks])
   const raidByFacility = useMemo(() => new Map(raids.map(r => [r.facilityId, r])), [raids])
-  const cityById = useMemo(() => new Map(ALL_CITIES.map(c => [c.id, c])), [])
-
-  // Facility → county FIPS (via its anchor city's coordinates).
-  const cityCounty = useMemo(() => mapData ? buildCityCountyMap(mapData, ALL_CITIES) : {}, [mapData])
   const facilityByFips = useMemo(() => {
     const m = {}
     FACILITIES.forEach(f => { const fips = cityCounty[f.cityId]; if (fips) m[fips] = f })
@@ -355,10 +371,12 @@ export default function MapScreen() {
       {/* Incoming enemy raids (most urgent — render first) */}
       {raids.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 16px 0' }}>
-          {raids.map(r => (
-            <RaidBanner key={r.id} raid={r} facility={FACILITY_BY_ID.get(r.facilityId)} city={cityById.get(FACILITY_BY_ID.get(r.facilityId)?.cityId)}
-              onDefend={() => setSelectedFacility(FACILITY_BY_ID.get(r.facilityId))} />
-          ))}
+          {raids.map(r => r.kind === 'personal'
+            ? <RaidBanner key={r.id} raid={r} isHome facility={{ name: 'Your Trap House' }} city={null}
+                onDefend={() => { sfx.tap(); setRelocating(true); setCountyView(null) }} />
+            : <RaidBanner key={r.id} raid={r} facility={FACILITY_BY_ID.get(r.facilityId)} city={cityById.get(FACILITY_BY_ID.get(r.facilityId)?.cityId)}
+                onDefend={() => setSelectedFacility(FACILITY_BY_ID.get(r.facilityId))} />
+          )}
         </div>
       )}
 
@@ -570,12 +588,17 @@ export default function MapScreen() {
         />
       )}
 
-      {currentRaidLanded && (
-        <RaidLandedModal
-          facility={FACILITY_BY_ID.get(currentRaidLanded.facilityId)}
-          result={currentRaidLanded}
-          onClose={() => dismissRaid(currentRaidLanded.id)}
-        />
+      {currentRaidLanded && (currentRaidLanded.kind === 'personal'
+        ? <HomeRaidModal
+            result={currentRaidLanded}
+            countyName={countyNameByFips[currentRaidLanded.county] || ''}
+            onClose={() => dismissRaid(currentRaidLanded.id)}
+          />
+        : <RaidLandedModal
+            facility={FACILITY_BY_ID.get(currentRaidLanded.facilityId)}
+            result={currentRaidLanded}
+            onClose={() => dismissRaid(currentRaidLanded.id)}
+          />
       )}
     </div>
   )
@@ -622,7 +645,7 @@ function AttackBanner({ attack, facility, city }) {
 
 // Incoming enemy raid banner — red, urgent. Tapping it opens the facility so
 // the player can reinforce before it lands.
-function RaidBanner({ raid, facility, city, onDefend }) {
+function RaidBanner({ raid, facility, city, onDefend, isHome }) {
   const total = Math.ceil(ATTACK_DURATION_MS / 1000)
   const remaining = Math.max(0, Math.ceil((raid.endsAt - Date.now()) / 1000))
   const label = facility ? facility.name : 'Your facility'
@@ -636,12 +659,12 @@ function RaidBanner({ raid, facility, city, onDefend }) {
       <CountdownRing remaining={remaining} total={total} size={64} strokeWidth={4} variant="incoming" />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ color: RED, fontSize: 13, fontWeight: 600, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <i className="ti ti-alert-triangle-filled" /> Incoming Raid
+          <i className="ti ti-alert-triangle-filled" /> {isHome ? 'Trap House Under Fire' : 'Incoming Raid'}
         </div>
         <div style={{ color: '#fff', fontSize: 13, marginBottom: 2 }}>{raid.gang} → {label}{city ? `, ${city.state}` : ''}</div>
-        <div style={{ color: GOLD, fontSize: 10, fontWeight: 600 }}>Tap to reinforce — hold your ground</div>
+        <div style={{ color: GOLD, fontSize: 10, fontWeight: 600 }}>{isHome ? 'Tap to relocate — dodge the hit' : 'Tap to reinforce — hold your ground'}</div>
       </div>
-      <i className="ti ti-shield-half-filled" style={{ color: RED, fontSize: 20 }} />
+      <i className={`ti ${isHome ? 'ti-home-bolt' : 'ti-shield-half-filled'}`} style={{ color: RED, fontSize: 20 }} />
     </div>
   )
 }
@@ -684,6 +707,40 @@ function RaidLandedModal({ facility, result, onClose }) {
             <div style={{ color: DIM, fontSize: 11, textAlign: 'center', marginTop: 6 }}>Defense {loyalty}/100</div>
           </div>
         )}
+
+        <button className="btn btn-gold btn-full" style={{ padding: 14 }} onClick={onClose}>Continue</button>
+      </div>
+    </div>
+  )
+}
+
+// Shown when an enemy raid lands on YOUR personal trap house: either you held
+// (chipped) or you got knocked out and scattered to a random county.
+function HomeRaidModal({ result, countyName, onClose }) {
+  const ko = !!result.ko
+  const gang = result.gang || 'A rival mob'
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'stretch', justifyContent: 'center', zIndex: 250 }}>
+      <div style={{ background: '#13131f', padding: 24, width: '100%', maxWidth: 390, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', paddingTop: 80 }}>
+        <div className="landing-stamp" style={{ textAlign: 'center', marginBottom: 18 }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 84, height: 84, borderRadius: '50%',
+            background: `${RED}22`, border: `2px solid ${RED}`, color: RED, fontSize: 40, boxShadow: `0 0 32px ${RED}66`,
+          }}>
+            <i className={`ti ${ko ? 'ti-skull' : 'ti-alert-triangle-filled'}`} />
+          </div>
+        </div>
+
+        <div style={{ color: RED, fontSize: 13, fontWeight: 600, letterSpacing: 3, textAlign: 'center', marginBottom: 6 }}>
+          {ko ? 'KNOCKED OUT' : 'TRAP HOUSE HIT'}
+        </div>
+        <div style={{ color: '#fff', fontSize: 24, fontWeight: 600, textAlign: 'center', marginBottom: 6 }}>Your Trap House</div>
+        <div style={{ color: '#888', fontSize: 13, fontStyle: 'italic', textAlign: 'center', marginBottom: 22 }}>
+          {ko
+            ? `${gang} overran it — you scattered to ${countyName || 'a new'} County`
+            : `${gang} hit your trap house — relocate or lie low before they finish the job`}
+        </div>
 
         <button className="btn btn-gold btn-full" style={{ padding: 14 }} onClick={onClose}>Continue</button>
       </div>
