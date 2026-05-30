@@ -7,6 +7,7 @@ import { ScoutScreen } from '../components/ScoutScreen'
 import { useMapData, buildCityCountyMap, STATE_CODE_TO_FIPS } from '../state/mapData'
 import { useDisplayName } from '../state/profileStore'
 import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
+import { useWorld } from '../state/worldStore'
 import { sfx } from '../sounds'
 
 const GOLD = '#c9a84c'
@@ -190,6 +191,7 @@ export default function MapScreen() {
   const { attacks, landed, launch, dismissLanded } = useDriveBys()
   const { data: mapData } = useMapData()
   const territories = useTerritories()
+  const world = useWorld()
   const { raids, landed: raidLanded, dismissLanded: dismissRaid } = useRaids(territories)
 
   const attackingSet = useMemo(() => new Set(attacks.map(a => a.facilityId)), [attacks])
@@ -210,20 +212,39 @@ export default function MapScreen() {
     return m
   }, [mapData])
 
-  // Per-state facility ownership tallies (drives the country-map color scale).
-  const stateOwnership = useMemo(() => {
+  // Mob id → its map color (drives the Map-1 overview projection).
+  const mobColorById = useMemo(() => {
+    const m = {}
+    Object.values(world.mobs).forEach(mob => { m[mob.id] = mob.color })
+    return m
+  }, [world.mobs])
+
+  // facilityId → controlling color: house → owner → (you | its mob | vacant).
+  // This IS the Phase-B projection — Map 1's color is computed from the houses.
+  const facilityControl = useMemo(() => {
+    const out = {}
+    FACILITIES.forEach(f => {
+      const h = world.houses[f.id]
+      if (!h || !h.owner_player_id) out[f.id] = { kind: 'vacant', color: '#2ecc71' }
+      else if (h.owner_player_id === 'you') out[f.id] = { kind: 'you', color: GOLD }
+      else out[f.id] = { kind: 'mob', mobId: h.owner_mob_id, color: mobColorById[h.owner_mob_id] || RED }
+    })
+    return out
+  }, [world.houses, mobColorById])
+
+  // Per-state tallies + dominant mob (drives the country-map color scale).
+  const stateControl = useMemo(() => {
     const m = {}
     FACILITIES.forEach(f => {
       const city = cityById.get(f.cityId); if (!city) return
-      const o = territories[f.id]?.owner ?? null
-      if (!m[city.state]) m[city.state] = { yours: 0, enemy: 0, vacant: 0, total: 0 }
-      m[city.state].total++
-      if (o === 'you') m[city.state].yours++
-      else if (o) m[city.state].enemy++
-      else m[city.state].vacant++
+      const c = facilityControl[f.id]
+      const s = m[city.state] || (m[city.state] = { yours: 0, total: 0, mobCounts: {} })
+      s.total++
+      if (c.kind === 'you') s.yours++
+      else if (c.kind === 'mob' && c.mobId) s.mobCounts[c.mobId] = (s.mobCounts[c.mobId] || 0) + 1
     })
     return m
-  }, [territories, cityById])
+  }, [facilityControl, cityById])
 
   const summary = useMemo(() => {
     let yours = 0, enemy = 0, vacant = 0
@@ -338,7 +359,7 @@ export default function MapScreen() {
             <USStateMap
               stateFips={stateView.fips}
               stateName={stateView.name}
-              colorFor={(fips) => countyColorFor(facilityByFips, territories, fips)}
+              colorFor={(fips) => { const f = facilityByFips[fips]; return f ? facilityControl[f.id].color : '#15151f' }}
               strokeFor={(fips) => facilityByFips[fips] ? '#fff' : `${GOLD}59`}
               strokeWidthFor={(fips) => facilityByFips[fips] ? 1.5 : 0.7}
               onCountyClick={(c) => { const f = facilityByFips[c.fips]; if (f) { sfx.tap(); setSelectedFacility(f) } }}
@@ -346,7 +367,7 @@ export default function MapScreen() {
             />
           ) : (
             <USCountryMap
-              colorFor={(fips, code) => stateColorFor(stateOwnership, code)}
+              colorFor={(fips, code) => stateColorFor(stateControl[code], mobColorById)}
               onStateClick={(s) => setStateView(s)}
               height="58vh"
             />
@@ -354,7 +375,7 @@ export default function MapScreen() {
           <div style={{ display: 'flex', justifyContent: 'center', gap: 16, padding: '10px 12px', borderTop: `0.5px solid ${GOLD}22` }}>
             {[
               { color: GOLD, label: 'Yours' },
-              { color: RED, label: 'Enemy' },
+              { color: RED, label: 'Rival Mobs' },
               { color: '#2ecc71', label: 'Vacant' },
             ].map(l => (
               <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -590,23 +611,21 @@ function FacilityLandedModal({ facility, result, onClose }) {
 // Color helpers
 // ---------------------------------------------------------------------
 
-// State fill (country view): gold if you hold any facility there, red if an
-// enemy does and you don't, faint green if only vacant facilities, dark if none.
-function stateColorFor(stateOwnership, code) {
-  const s = stateOwnership[code]
-  if (!s || s.total === 0) return '#1e1e2a'
-  if (s.yours > 0) return `rgba(201,168,76,${(0.3 + Math.min(1, s.yours / s.total) * 0.5).toFixed(2)})`
-  if (s.enemy > 0) return `rgba(231,76,60,${(0.3 + Math.min(1, s.enemy / s.total) * 0.5).toFixed(2)})`
-  return 'rgba(46,204,113,0.35)'
+function hexToRgba(hex, a) {
+  const h = hex.replace('#', '')
+  const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h
+  const n = parseInt(full, 16)
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a.toFixed(2)})`
 }
 
-// County fill (state view): facility counties colored by owner; the rest are
-// dark backdrop so the facilities pop as the only interactive nodes.
-function countyColorFor(facilityByFips, territories, fips) {
-  const f = facilityByFips[fips]
-  if (!f) return '#15151f'
-  const o = territories[f.id]?.owner ?? null
-  if (o === 'you') return 'rgba(201,168,76,0.9)'
-  if (o)           return 'rgba(231,76,60,0.9)'
-  return 'rgba(46,204,113,0.7)'
+// State fill (country view): gold if you hold any facility there; otherwise the
+// DOMINANT rival mob's color (intensity scales with its share); faint green if
+// only vacant; dark if no facilities. Colors by MOB — the Phase-B projection.
+function stateColorFor(s, mobColorById) {
+  if (!s || s.total === 0) return '#1e1e2a'
+  if (s.yours > 0) return `rgba(201,168,76,${(0.3 + Math.min(1, s.yours / s.total) * 0.5).toFixed(2)})`
+  let domId = null, domN = 0
+  for (const id in s.mobCounts) if (s.mobCounts[id] > domN) { domN = s.mobCounts[id]; domId = id }
+  if (domId) return hexToRgba(mobColorById[domId] || '#e74c3c', 0.3 + Math.min(1, domN / s.total) * 0.5)
+  return 'rgba(46,204,113,0.35)'
 }
