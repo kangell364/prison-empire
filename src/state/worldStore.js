@@ -24,6 +24,7 @@ import {
 } from '../data/gameData'
 import { AI_MOBS } from '../data/mobs'
 import { addHustle, addSteel, spendSteel } from './profileStore'
+import { scatterToBlock } from './blocksStore'
 
 const KEY                   = 'pe_world_v1'
 const LEGACY_TERRITORIES_KEY = 'pe_territories_v1'
@@ -337,21 +338,34 @@ export function arriveHouse(houseId) {
   const h = world.houses[houseId]
   if (!h || !h.moving_to_fips) return null
   const dest = h.moving_to_fips
-  commit(setHouse(houseId, { county_fips: dest, cityId: null, moving_to_fips: null, moving_until: null }))
+  // Clear any KO block-pin so a voluntary move resolves to the destination
+  // county centroid (not the old scatter block).
+  commit(setHouse(houseId, { county_fips: dest, cityId: null, block_lat: null, block_lng: null, moving_to_fips: null, moving_until: null }))
   return dest
 }
 
-// An enemy raid landed on your PERSONAL trap house — chip its hp. At 0 you're
-// knocked out: the house is NOT captured (personal houses can't be owned), you
-// scatter to a random live county and respawn at full hp. respawnFips is chosen
-// by the caller (which has the map data). Returns { ko, gang, county, hp }.
-export function applyHomeRaid(houseId, gang, respawnFips) {
+// An enemy raid landed on a KO-able-not-ownable house — your PERSONAL trap house
+// OR a mob MANSION. Chip its hp. At 0 it's knocked out: NOT captured (these
+// can't be owned), it scatters to a random live county and respawns at full hp.
+// respawnFips + respawnCoords ([lng,lat] county centroid) are chosen by the
+// caller (which has the map data). On landing it touches down on an OPEN block
+// near the destination — or, if every block there is owned, takes over the
+// cheapest one (see blocksStore.scatterToBlock). The resulting block center is
+// pinned as block_lat/block_lng so it sits exactly on that block.
+// Returns { ko, gang, county, hp }.
+export function applyHomeRaid(houseId, gang, respawnFips, respawnCoords) {
   const h = world.houses[houseId]
-  if (!h || h.kind !== 'personal') return { ko: false, gang }
+  if (!h || (h.kind !== 'personal' && h.kind !== 'mansion')) return { ko: false, gang }
   const next = effectiveHp(h) - HIT_DAMAGE
   if (next <= 0) {
+    let block_lat = null, block_lng = null
+    if (respawnCoords) {
+      const [lat, lng] = scatterToBlock(respawnCoords[0], respawnCoords[1])   // returns [lat,lng]
+      block_lat = lat; block_lng = lng
+    }
     commit(setHouse(houseId, {
       county_fips: respawnFips ?? h.county_fips, cityId: respawnFips ? null : h.cityId,
+      block_lat, block_lng,
       hp: h.hp_max, hpAt: Date.now(), moving_until: null, moving_to_fips: null,
     }))
     return { ko: true, gang, county: respawnFips, hp: h.hp_max }

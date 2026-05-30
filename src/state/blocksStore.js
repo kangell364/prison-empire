@@ -27,7 +27,7 @@ const POACH_MULT       = 1.10          // +10% per takeover
 const PAYOUT_CUT       = 0.5           // displaced owner gets stake + this share of the premium
 const DECAY_PER_HR     = 0.02          // loyalty decays 2%/hr toward its base when uncontested
 const COOLDOWN_MS      = 60 * 1000     // re-poach lock after a takeover
-const MAX_BLOCKS       = 25            // anti-whale: max blocks you can hold
+export const MAX_BLOCKS = 25           // anti-whale: max blocks you can hold
 const INCOME_CAP_HRS   = 24
 export const HOME_RADIUS_DEG = 0.06    // ~4mi home-turf radius
 const HOME_INCOME_MULT = 1.25
@@ -177,6 +177,45 @@ export function poach(gx, gy, homeTurf) {
   return { ok: true, cost }
 }
 
+// ---- KO / scatter landing ------------------------------------------
+
+// Where a KO'd / scattered movable house (personal trap house OR mob mansion)
+// touches down. Spiral outward from the destination point for the nearest
+// VACANT block and plant on it (free — a forced landing isn't a purchase). If
+// EVERY block in range is already owned, take over the CHEAPEST one (lowest
+// takeover price) so the house always has somewhere to land. Returns the chosen
+// cell center [lat, lng] so the caller can pin the house exactly on that block.
+export function scatterToBlock(lng, lat, maxRing = 14) {
+  const [bx, by] = cellOf(lng, lat)
+  let cheapest = null, cheapestCost = Infinity
+  for (let r = 0; r <= maxRing; r++) {
+    for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) {
+      if (r > 0 && Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue   // ring r only
+      const gx = bx + dx, gy = by + dy
+      const b = getBlock(gx, gy)
+      if (!b.owner) return claimLanding(gx, gy)                  // vacant — land here, free
+      const cost = poachPrice(b, false)                          // owned — remember the cheapest
+      if (cost < cheapestCost) { cheapestCost = cost; cheapest = [gx, gy] }
+    }
+  }
+  // 100% of blocks in range are owned → take over the cheapest one.
+  return cheapest ? claimLanding(cheapest[0], cheapest[1]) : cellCenter(bx, by)
+}
+
+// Plant your flag on a cell (a forced KO landing — no Hustle charged, ignores
+// the block cap). Returns the cell center [lat, lng].
+function claimLanding(gx, gy) {
+  const b = getBlock(gx, gy)
+  const now = Date.now()
+  overrides[cellKey(gx, gy)] = {
+    owner: 'you', ownerKind: 'you', npc: b.npc, baseLoyalty: b.baseLoyalty,
+    incomePerHr: b.incomePerHr, loyalty: b.baseLoyalty, basePaid: 0,
+    lastCollectedAt: now, lastPoachAt: now,
+  }
+  commit()
+  return cellCenter(gx, gy)
+}
+
 // Bank a held block's accrued income.
 export function collect(gx, gy) {
   const got = pendingIncome(gx, gy)
@@ -186,4 +225,31 @@ export function collect(gx, gy) {
   o.lastCollectedAt = Date.now()
   commit()
   return got
+}
+
+// ---- home-screen "Your Turf" aggregates ----------------------------
+
+// Total Hustle/hr across every block you hold.
+export function yourBlockIncomePerHr() {
+  return yourBlocks().reduce((sum, b) => sum + (b.incomePerHr || 0), 0)
+}
+
+// Total uncollected (pending) Hustle waiting across all your blocks.
+export function yourPendingIncome() {
+  return yourBlocks().reduce((sum, b) => sum + pendingIncome(b.gx, b.gy), 0)
+}
+
+// Bank pending income from ALL your blocks in one pass (single credit + commit).
+// Returns the total Hustle banked.
+export function collectAllBlocks() {
+  let total = 0
+  const now = Date.now()
+  for (const [k, o] of Object.entries(overrides)) {
+    if (o.owner !== 'you') continue
+    const [gx, gy] = k.split('_').map(Number)
+    const got = pendingIncome(gx, gy)
+    if (got > 0) { total += got; o.lastCollectedAt = now }
+  }
+  if (total > 0) { addHustle(total); commit() }
+  return total
 }

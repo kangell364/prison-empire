@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { PLAYER, PLAYER_LOOKS, RESOURCES, CITY, INCOMING_ATTACK, CREW, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
+import { PLAYER, PLAYER_LOOKS, RESOURCES, INCOMING_ATTACK, CREW, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
 import { useHustle, useSteel, useDisplayName, usePlayerLook } from '../state/profileStore'
+import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, collectAllBlocks, MAX_BLOCKS } from '../state/blocksStore'
 import { useVitals, msToNextStamina, msToNextHealth, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
 import { CountdownRing } from '../components/CountdownRing'
 import { Avatar } from '../components/Avatar'
@@ -33,6 +34,12 @@ export default function Dashboard({ onNavigate }) {
   const xpPct = Math.round((PLAYER.xp / PLAYER.xpNext) * 100)
   const hustle = useHustle()
   const steel  = useSteel()
+  // Live "Your Turf" block economy — re-renders when blocks change (recruit /
+  // poach / collect / AI poach).
+  useBlocksVersion()
+  const blocksOwned = yourBlockCount()
+  const blockIncomeHr = yourBlockIncomePerHr()
+  const blockPending  = yourPendingIncome()
   const playerName = useDisplayName()
   const lookId = usePlayerLook()
   // The home-screen player card is now a cosmetic "look" (see SWAP). Level, XP
@@ -194,49 +201,35 @@ export default function Dashboard({ onNavigate }) {
 
       {/* City */}
       <div className="section">
-        <div className="section-label">Your City</div>
+        <div className="section-label">Your Turf</div>
         <div className="card">
-          {/* Mini Map */}
-          <div style={{ height: 96, background: '#0d1520', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', inset: 0, opacity: 0.12, backgroundImage: 'linear-gradient(#c9a84c 1px, transparent 1px), linear-gradient(90deg, #c9a84c 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
-            <div style={{ position: 'absolute', top: 8, left: 12, color: '#c9a84c', fontSize: 10, letterSpacing: 1, fontWeight: 500 }}>TEXAS — ACTIVE</div>
-            {[
-              { x: '45%', y: '70%', owned: true  },
-              { x: '60%', y: '55%', owned: false },
-              { x: '68%', y: '25%', owned: true  },
-              { x: '25%', y: '75%', owned: null  },
-              { x: '78%', y: '45%', owned: false },
-            ].map((dot, i) => (
-              <div key={i} style={{
-                position: 'absolute',
-                left: dot.x, top: dot.y,
-                width: 10, height: 10,
-                borderRadius: '50%',
-                background: dot.owned === true ? '#c9a84c' : dot.owned === false ? '#e74c3c' : '#555',
-                boxShadow: dot.owned === true ? '0 0 0 4px rgba(201,168,76,0.2)' : dot.owned === false ? '0 0 0 4px rgba(231,76,60,0.2)' : 'none',
-                transform: 'translate(-50%, -50%)',
-              }} />
-            ))}
-          </div>
-
-          {/* City Info */}
-          <div style={{ padding: '14px 16px 0' }}>
-            <div style={{ color: '#fff', fontSize: 16, fontWeight: 500 }}>{CITY.name}, {CITY.state}</div>
-            <div style={{ color: '#555', fontSize: 11, marginTop: 2 }}>Controlled by you — {CITY.days_held}d {CITY.hours_held}h</div>
-            <div style={{ display: 'flex', gap: 16, marginTop: 10 }}>
+          {/* Live block economy — total Hustle/hr from every block you run. */}
+          <div style={{ padding: '16px 16px 0' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <div style={{ color: '#fff', fontSize: 16, fontWeight: 500 }}>Block Income</div>
+              <div style={{ color: '#666', fontSize: 11 }}>{blocksOwned}/{MAX_BLOCKS} blocks</div>
+            </div>
+            <div style={{ color: '#555', fontSize: 11, marginTop: 2 }}>
+              {blocksOwned === 0 ? 'Claim turf on the map to start earning passive Hustle.' : 'Passive Hustle from the blocks you run'}
+            </div>
+            <div style={{ display: 'flex', gap: 22, marginTop: 12 }}>
               <div>
-                <div style={{ color: '#c9a84c', fontSize: 14, fontWeight: 500 }}>+{CITY.hustle_per_hr}</div>
+                <div style={{ color: '#c9a84c', fontSize: 15, fontWeight: 500 }}>{blocksOwned}</div>
+                <div style={{ color: '#444', fontSize: 10 }}>Blocks</div>
+              </div>
+              <div>
+                <div style={{ color: '#c9a84c', fontSize: 15, fontWeight: 500 }}>+{blockIncomeHr.toLocaleString()}</div>
                 <div style={{ color: '#444', fontSize: 10 }}>Hustle/hr</div>
               </div>
               <div>
-                <div style={{ color: '#4a9eff', fontSize: 14, fontWeight: 500 }}>+{CITY.steel_per_hr}</div>
-                <div style={{ color: '#444', fontSize: 10 }}>Steel/hr</div>
-              </div>
-              <div>
-                <div style={{ color: '#888', fontSize: 14, fontWeight: 500 }}>{CITY.tierName}</div>
-                <div style={{ color: '#444', fontSize: 10 }}>Tier {CITY.tier}</div>
+                <div style={{ color: blockPending > 0 ? '#c9a84c' : '#666', fontSize: 15, fontWeight: 500 }}>{blockPending.toLocaleString()}</div>
+                <div style={{ color: '#444', fontSize: 10 }}>To Collect</div>
               </div>
             </div>
+            <button className="btn btn-gold btn-full" style={{ marginTop: 14, padding: 12 }} disabled={blockPending <= 0}
+              onClick={() => { const got = collectAllBlocks(); got > 0 ? sfx.buy() : sfx.deny() }}>
+              <i className="ti ti-coin" style={{ fontSize: 15 }} /> {blockPending > 0 ? `Collect ${blockPending.toLocaleString()} Hustle` : 'Nothing to Collect'}
+            </button>
           </div>
 
           {/* Actions */}
