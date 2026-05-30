@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
-import { PLAYER, PLAYER_LOOKS, RESOURCES, CREW, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
+import { PLAYER, PLAYER_LOOKS, RESOURCES, CARDS_COLLECTION, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
 import { useHustle, useSteel, useDisplayName, usePlayerLook } from '../state/profileStore'
 import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, collectAllBlocks, MAX_BLOCKS } from '../state/blocksStore'
+import { useCrew, baseAtk, baseDef } from '../state/crewStore'
 import { useVitals, msToNextStamina, msToNextHealth, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
@@ -21,6 +22,15 @@ export default function Dashboard({ onNavigate }) {
   const blocksOwned = yourBlockCount()
   const blockIncomeHr = yourBlockIncomePerHr()
   const blockPending  = yourPendingIncome()
+  // Live crew — the real 12-slot roster (1 Leader + 11 Members) from crewStore,
+  // resolved against the card catalog. Mirrors the Cards → My Crew screen.
+  const crew = useCrew()
+  const cardById = new Map(CARDS_COLLECTION.map(c => [c.id, c]))
+  const crewSlots = [
+    { card: crew.leader != null ? cardById.get(crew.leader) : null, isLeader: true },
+    ...crew.members.map(id => ({ card: id != null ? cardById.get(id) : null, isLeader: false })),
+  ]
+  const crewFilled = crewSlots.filter(s => s.card).length
   const playerName = useDisplayName()
   const lookId = usePlayerLook()
   // The home-screen player card is now a cosmetic "look" (see SWAP). Level, XP
@@ -183,28 +193,40 @@ export default function Dashboard({ onNavigate }) {
         </div>
       </div>
 
-      {/* Crew */}
+      {/* Crew — the real 12-slot roster (Leader + 11 Members) from crewStore */}
       <div className="section">
-        <div className="section-label">Your Crew ({CREW.filter(c => !c.locked).length}/{CREW.length})</div>
+        <div className="section-label">Your Crew ({crewFilled}/{crewSlots.length})</div>
         <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 4 }}>
-          {CREW.map(member => (
-            <div key={member.id} style={{
-              flexShrink: 0, width: 72,
-              background: '#13131f',
-              border: `0.5px solid ${member.locked ? '#1e1e2a' : '#2a2a3a'}`,
-              borderRadius: 14, padding: '10px 8px',
-              textAlign: 'center',
-              opacity: member.locked ? 0.5 : 1,
-            }}>
-              <div style={{ width: 40, height: 40, borderRadius: 12, background: '#1e1e2a', margin: '0 auto 6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: member.locked ? 16 : 20 }}>
-                {member.locked ? <i className="ti ti-lock" style={{ color: '#333' }} /> : member.emoji}
+          {crewSlots.map((slot, i) => {
+            const c = slot.card
+            const rc = c ? (RARITY_COLORS[c.rarity] || '#c9a84c') : '#1e1e2a'
+            const power = c ? baseAtk(c) + baseDef(c) : 0
+            return (
+              <div key={i} style={{
+                position: 'relative', flexShrink: 0, width: 72,
+                background: '#13131f',
+                border: `0.5px solid ${c ? rc + '55' : '#1e1e2a'}`,
+                borderRadius: 14, padding: '10px 8px',
+                textAlign: 'center',
+                opacity: c ? 1 : 0.5,
+              }}>
+                {slot.isLeader && (
+                  <div style={{ position: 'absolute', top: -6, right: -4, width: 20, height: 20, borderRadius: '50%', background: '#c9a84c', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,.6)' }}>
+                    <i className="ti ti-crown" style={{ color: '#0a0a0f', fontSize: 12 }} />
+                  </div>
+                )}
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: '#1e1e2a', margin: '0 auto 6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, overflow: 'hidden' }}>
+                  {c ? <Avatar src={c.avatar} emoji={c.emoji} size={40} radius={12} /> : <i className="ti ti-plus" style={{ color: '#333' }} />}
+                </div>
+                <div style={{ color: c ? '#888' : '#333', fontSize: 9, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {c ? c.name : (slot.isLeader ? 'Leader' : 'Empty')}
+                </div>
+                {c
+                  ? <div style={{ color: '#c9a84c', fontSize: 11, marginTop: 2 }}>+{power}</div>
+                  : <div style={{ color: '#333', fontSize: 9, marginTop: 2 }}>{slot.isLeader ? 'slot' : 'open'}</div>}
               </div>
-              <div style={{ color: member.locked ? '#333' : '#888', fontSize: 9, fontWeight: 500 }}>
-                {member.locked ? `Lv ${member.unlockLevel}` : member.name}
-              </div>
-              {!member.locked && <div style={{ color: '#c9a84c', fontSize: 11, marginTop: 2 }}>+{member.power}</div>}
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
