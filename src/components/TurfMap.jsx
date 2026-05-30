@@ -46,7 +46,7 @@ export function TurfMap({ houses, center, label, onScout, onBack }) {
     if (!containerRef.current || mapRef.current) return
     const map = L.map(containerRef.current, {
       center: center || [39.8283, -98.5795],
-      zoom: center ? 12 : 5,
+      zoom: center ? 14 : 5,
       minZoom: 4, maxZoom: 18,
       maxBounds: [[15, -170], [72, -50]], maxBoundsViscosity: 0.7,
       zoomControl: true, attributionControl: false,
@@ -58,6 +58,43 @@ export function TurfMap({ houses, center, label, onScout, onBack }) {
     const t = setTimeout(() => { try { map.invalidateSize() } catch {} }, 150)
     return () => { clearTimeout(t); try { map.remove() } catch {}; mapRef.current = null }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Block grid (street-zoom economic layer). A large uniform ~440m grid laid
+  // over the map; blocks held by a crew are colored + have an NPC standing on
+  // them, vacant blocks are faint claimable outlines. Only drawn at street zoom.
+  // NOTE: owners are deterministic placeholders for now — the real loyalty-market
+  // data model (recruit / poach / income) wires in next.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const GRID = 0.004
+    const COLORS = { red: '#e74c3c', blue: '#4a9eff', purple: '#9b59b6' }
+    const rng = (gx, gy) => Math.abs(Math.sin(gx * 12.9898 + gy * 78.233) * 43758.5453) % 1
+    const ownerOf = (gx, gy) => { const h = rng(gx, gy); return h < 0.08 ? 'red' : h < 0.15 ? 'blue' : h < 0.2 ? 'purple' : null }
+    let layer = null
+    const draw = () => {
+      if (layer) { try { map.removeLayer(layer) } catch {}; layer = null }
+      if (map.getZoom() < 13) return
+      const b = map.getBounds()
+      const x0 = Math.floor(b.getWest() / GRID), x1 = Math.ceil(b.getEast() / GRID)
+      const y0 = Math.floor(b.getSouth() / GRID), y1 = Math.ceil(b.getNorth() / GRID)
+      if ((x1 - x0) * (y1 - y0) > 700) return   // safety cap
+      layer = L.layerGroup().addTo(map)
+      for (let gx = x0; gx < x1; gx++) for (let gy = y0; gy < y1; gy++) {
+        const w = gx * GRID, s = gy * GRID
+        const owner = ownerOf(gx, gy)
+        const color = owner ? COLORS[owner] : '#3a3a4a'
+        L.rectangle([[s, w], [s + GRID, w + GRID]], { color, weight: owner ? 1.5 : 0.5, opacity: owner ? 0.9 : 0.3, fillColor: color, fillOpacity: owner ? 0.16 : 0, interactive: false }).addTo(layer)
+        if (owner) {
+          const npc = L.divIcon({ className: '', iconSize: [28, 36], iconAnchor: [14, 30], html: `<div style="text-align:center"><div style="width:24px;height:24px;border-radius:50%;background:${color};border:2px solid #0a0a0f;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,.7);margin:0 auto">🕴️</div></div>` })
+          L.marker([s + GRID / 2, w + GRID / 2], { icon: npc, interactive: false }).addTo(layer)
+        }
+      }
+    }
+    map.on('moveend zoomend', draw)
+    draw()
+    return () => { map.off('moveend zoomend', draw); if (layer) { try { map.removeLayer(layer) } catch {} } }
   }, [])
 
   // Draw / redraw house markers when the set changes.
