@@ -3,6 +3,7 @@ import { PLAYER, PLAYER_LOOKS, TRAITS, RARITY_COLORS, SKILLS } from '../data/gam
 import { sfx } from '../sounds'
 import { useHustle, usePlayerLook, useDisplayName } from '../state/profileStore'
 import { useVitals, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
+import { baseAtk, baseDef } from '../state/crewStore'
 
 const GOLD  = '#c9a84c'
 const RED   = '#e74c3c'
@@ -124,6 +125,19 @@ function StatusBar({ poolMax, onBack }) {
                 background: `linear-gradient(90deg, ${GOLD}, #f0d080)`,
                 borderRadius: 2,
               }} />
+            </div>
+          </div>
+
+          {/* Combat stats — the player's own ATK/DEF, derived from Power (same
+              formula the cards use). Distinct from the Crew ATK/DEF totals. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+            <div style={{ background: '#1e1e2a', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
+              <div style={{ color: RED, fontSize: 16, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{baseAtk(PLAYER).toLocaleString()}</div>
+              <div style={{ color: '#888', fontSize: 9, fontWeight: 500, letterSpacing: 0.5, marginTop: 4, textTransform: 'uppercase' }}>Attack</div>
+            </div>
+            <div style={{ background: '#1e1e2a', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
+              <div style={{ color: BLUE, fontSize: 16, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{baseDef(PLAYER).toLocaleString()}</div>
+              <div style={{ color: '#888', fontSize: 9, fontWeight: 500, letterSpacing: 0.5, marginTop: 4, textTransform: 'uppercase' }}>Defense</div>
             </div>
           </div>
 
