@@ -339,8 +339,8 @@ export default function MapScreen() {
               stateFips={stateView.fips}
               stateName={stateView.name}
               colorFor={(fips) => countyColorFor(facilityByFips, territories, fips)}
-              strokeFor={(fips) => facilityByFips[fips] ? '#fff' : '#1e1e2a'}
-              strokeWidthFor={(fips) => facilityByFips[fips] ? 1.5 : undefined}
+              strokeFor={(fips) => facilityByFips[fips] ? '#fff' : `${GOLD}59`}
+              strokeWidthFor={(fips) => facilityByFips[fips] ? 1.5 : 0.7}
               onCountyClick={(c) => { const f = facilityByFips[c.fips]; if (f) { sfx.tap(); setSelectedFacility(f) } }}
               height="58vh"
             />
