@@ -213,14 +213,14 @@ export default function Dashboard({ onNavigate }) {
       {/* Crew — the real 12-slot roster (Leader + 11 Members) from crewStore */}
       <div className="section">
         <div className="section-label">Your Crew ({crewFilled}/{crewSlots.length})</div>
-        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
           {crewSlots.map((slot, i) => {
             const c = slot.card
             const rc = c ? (RARITY_COLORS[c.rarity] || '#c9a84c') : '#1e1e2a'
             const power = c ? baseAtk(c) + baseDef(c) : 0
             return (
               <div key={i} style={{
-                position: 'relative', flexShrink: 0, width: 72,
+                position: 'relative',
                 background: '#13131f',
                 border: `0.5px solid ${c ? rc + '55' : '#1e1e2a'}`,
                 borderRadius: 14, padding: '10px 8px',
