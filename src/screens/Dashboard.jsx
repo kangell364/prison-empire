@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { PLAYER, PLAYER_LOOKS, RESOURCES, CARDS_COLLECTION, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
 import { useHustle, useSteel, useDisplayName, usePlayerLook } from '../state/profileStore'
 import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, useNextPayoutCountdown, subscribePayout, blockCap, resetTurf } from '../state/blocksStore'
-import { useCrew, atkOf, defOf } from '../state/crewStore'
+import { useCrew, atkOf, defOf, baseAtk, baseDef } from '../state/crewStore'
 import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
 import { useVitals, msToNextStamina, msToNextHealth, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
 import { Avatar } from '../components/Avatar'
@@ -109,15 +109,15 @@ export default function Dashboard({ onNavigate }) {
               </div>
             </div>
 
-            {/* Stats */}
+            {/* Stats — the player's own ATK/DEF (from Power) + Knowledge. */}
             <div style={{ display: 'flex', gap: 8 }}>
               {[
-                { val: PLAYER.power,   lbl: 'Power'  },
-                { val: `${PLAYER.loyalty}%`, lbl: 'Loyalty' },
-                { val: `#${PLAYER.rank}`,    lbl: 'Texas'   },
+                { val: baseAtk(PLAYER).toLocaleString(), lbl: 'Attack',    color: '#e74c3c' },
+                { val: baseDef(PLAYER).toLocaleString(), lbl: 'Defense',   color: '#4a9eff' },
+                { val: PLAYER.pools.knowledge.toLocaleString(), lbl: 'Knowledge', color: '#a855f7' },
               ].map(s => (
                 <div key={s.lbl} style={{ background: '#1e1e2a', borderRadius: 8, padding: '5px 10px', textAlign: 'center' }}>
-                  <div style={{ color: '#c9a84c', fontSize: 13, fontWeight: 500 }}>{s.val}</div>
+                  <div style={{ color: s.color, fontSize: 13, fontWeight: 500 }}>{s.val}</div>
                   <div style={{ color: '#444', fontSize: 9 }}>{s.lbl}</div>
                 </div>
               ))}
