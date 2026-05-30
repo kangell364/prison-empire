@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { PLAYER, PLAYER_LOOKS, RESOURCES, CARDS_COLLECTION, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
 import { useHustle, useSteel, useDisplayName, usePlayerLook } from '../state/profileStore'
-import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, useBlockPayout, blockCap } from '../state/blocksStore'
+import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, useNextPayoutCountdown, subscribePayout, blockCap } from '../state/blocksStore'
 import { useCrew, baseAtk, baseDef } from '../state/crewStore'
 import { useVitals, msToNextStamina, msToNextHealth, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
 import { Avatar } from '../components/Avatar'
@@ -22,9 +22,11 @@ export default function Dashboard({ onNavigate }) {
   const blocksOwned = yourBlockCount()
   const blockIncomeHr = yourBlockIncomePerHr()
   const blockPending  = yourPendingIncome()
-  // Global hourly payout clock (UTC-aligned — same countdown for everyone).
-  const { msLeft: payoutMsLeft, paid: payoutPaid } = useBlockPayout()
-  useEffect(() => { if (payoutPaid > 0) sfx.buy() }, [payoutPaid])
+  // Global hourly payout clock (UTC-aligned — same countdown for everyone). The
+  // payout itself fires app-wide from App's useBlockPayoutTicker; here we just
+  // show the countdown and chime when one banks while you're on this screen.
+  const payoutMsLeft = useNextPayoutCountdown()
+  useEffect(() => subscribePayout(() => sfx.buy()), [])
   // Live crew — the real 12-slot roster (1 Leader + 11 Members) from crewStore,
   // resolved against the card catalog. Mirrors the Cards → My Crew screen.
   const crew = useCrew()

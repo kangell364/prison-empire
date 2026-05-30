@@ -11,6 +11,7 @@ import { isMuted, setMuted, subscribeMuted, sfx } from './sounds'
 import { ensureAuth } from './state/profileStore'
 import { ensureCardsLoaded } from './state/cardsStore'
 import { ensureUpgradesLoaded } from './state/upgradesStore'
+import { useBlockPayoutTicker } from './state/blocksStore'
 
 // Profile lives on the header avatar (top-right) so the bottom nav stays at 6.
 const NAV_ITEMS = [
@@ -25,6 +26,9 @@ const NAV_ITEMS = [
 export default function App() {
   const [screen, setScreen] = useState('home')
   const [muted, setMutedState] = useState(isMuted())
+
+  // Global hourly block-income payout — runs app-wide regardless of screen.
+  useBlockPayoutTicker()
 
   useEffect(() => subscribeMuted(setMutedState), [])
   useEffect(() => {
