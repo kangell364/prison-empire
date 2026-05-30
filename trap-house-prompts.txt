@@ -1,0 +1,41 @@
+PRISON EMPIRE — TRAP HOUSE / MAP BUILDING ART PROMPTS
+=====================================================
+Style anchor: TRAP HOUSE 1.png (the player PERSONAL trap house).
+Hand-drawn cartoon comic style, thick black outlines, weathered/cracked walls,
+slightly crooked exaggerated perspective, 3/4 front view, plain solid white
+background, soft drop shadow beneath. No text, no people.
+
+How to use: if the tool supports a style/reference image, feed it TRAP HOUSE 1.png
+and keep the prompt short — that locks the style best. Keep the WHITE background
+(the cutout step knocks out solid white cleanly). Send the PNGs over and they get
+cut out (transparent) + wired into the map as the `business` / `mansion` tiles —
+no other change.
+
+Three building types on the map:
+  personal — a player's home base.            (DONE: trap-house-personal.png)
+  business — the capturable county income node. (prompt #1 below)
+  mansion  — a mob's HQ, large + imposing.      (prompt #2 below)
+
+------------------------------------------------------------------
+
+1. BUSINESS TRAP HOUSE (capturable county income node — a run-down corner store)
+
+A single run-down corner store building in the exact same hand-drawn cartoon
+comic style as the reference image — thick black outlines, weathered cracked
+stucco walls, slightly crooked exaggerated perspective, 3/4 front view. Make it
+clearly a small business: a storefront with a large display window, a tattered
+striped awning over the door, a blank hand-painted shop sign above, security
+bars on the window, a couple of worn front steps. Grimy, low-rent, but standing.
+Plain solid white background, soft drop shadow beneath. No text, no people.
+
+------------------------------------------------------------------
+
+2. MOB MANSION (the org HQ — large and imposing)
+
+A large two-story mansion in the exact same hand-drawn cartoon comic style as
+the reference image — thick black outlines, slightly crooked exaggerated
+perspective, 3/4 front view. Make it grand and imposing: tall columns flanking a
+big front door, a balcony, ornate roof, arched windows, a short wrought-iron
+front gate or fence. Wealthy but a little sinister/run-down at the edges — old
+money gone crooked. Plain solid white background, soft drop shadow beneath. No
+text, no people.
