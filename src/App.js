@@ -55,7 +55,7 @@ export default function App() {
       case 'cards':   return <Cards />
       case 'yard':     return <Yard />
       case 'property': return <Property />
-      case 'profile':  return <Profile />
+      case 'profile':  return <Profile onBack={() => setScreen('home')} />
       default:         return <Dashboard onNavigate={setScreen} />
     }
   }
