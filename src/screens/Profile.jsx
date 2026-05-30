@@ -103,7 +103,7 @@ function StatusBar({ poolMax, onBack }) {
           ><i className="ti ti-x" /></button>
           {/* Identity overlaid bottom-left */}
           <div style={{ position: 'absolute', left: 16, right: 16, bottom: 12 }}>
-            <div style={{ color: cardColor, fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase' }}>{PLAYER.archetype} · Lv {PLAYER.level}</div>
+            <div style={{ color: cardColor, fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase' }}>Lv {PLAYER.level}</div>
             <div style={{ color: '#fff', fontSize: 26, fontWeight: 700, lineHeight: 1.1 }}>{name}</div>
             <div style={{ color: '#aaa', fontSize: 12, marginTop: 2 }}>{PLAYER.facility} — {PLAYER.state}</div>
           </div>
