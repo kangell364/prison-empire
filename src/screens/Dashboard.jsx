@@ -1,35 +1,16 @@
-import React, { useState, useEffect } from 'react'
-import { PLAYER, PLAYER_LOOKS, RESOURCES, INCOMING_ATTACK, CREW, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
+import React, { useState } from 'react'
+import { PLAYER, PLAYER_LOOKS, RESOURCES, CREW, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
 import { useHustle, useSteel, useDisplayName, usePlayerLook } from '../state/profileStore'
 import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, collectAllBlocks, MAX_BLOCKS } from '../state/blocksStore'
 import { useVitals, msToNextStamina, msToNextHealth, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
-import { CountdownRing } from '../components/CountdownRing'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { SwapLookModal } from '../components/SwapLookModal'
 import { sfx } from '../sounds'
 
 export default function Dashboard({ onNavigate }) {
-  const [timer, setTimer] = useState(INCOMING_ATTACK.timer_seconds)
-  const [snitchUsed, setSnitchUsed] = useState(false)
-  const [showSnitchModal, setShowSnitchModal] = useState(false)
   const [detailChar, setDetailChar] = useState(null)
   const [showSwap, setShowSwap] = useState(false)
-
-  useEffect(() => {
-    if (timer <= 0 || snitchUsed) return
-    const interval = setInterval(() => {
-      setTimer(t => {
-        const next = Math.max(0, t - 1)
-        // Tick sounds escalate as the attack closes in. Quiet above 60s,
-        // normal tick under 60s, hot tick under 30s.
-        if (next > 0 && next <= 30)      sfx.hotTick()
-        else if (next > 0 && next <= 60) sfx.tick()
-        return next
-      })
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [timer, snitchUsed])
 
   const xpPct = Math.round((PLAYER.xp / PLAYER.xpNext) * 100)
   const hustle = useHustle()
@@ -52,38 +33,6 @@ export default function Dashboard({ onNavigate }) {
 
       {/* Vitals HUD — health + stamina with live regen countdown */}
       <VitalsHud />
-
-      {/* Attack Alert */}
-      {!snitchUsed && (
-        <div className="attack-alert">
-          <div className="alert-icon">
-            <i className="ti ti-alert-triangle" />
-          </div>
-          <div className="alert-content">
-            <div className="alert-title">INCOMING DRIVE BY</div>
-            <div className="alert-sub">{INCOMING_ATTACK.attacker} moving on {INCOMING_ATTACK.city}</div>
-          </div>
-          <CountdownRing
-            remaining={timer}
-            total={INCOMING_ATTACK.timer_seconds}
-            size={48}
-            strokeWidth={3.5}
-            variant="incoming"
-          />
-        </div>
-      )}
-
-      {snitchUsed && (
-        <div style={{ margin: '12px 16px 4px', background: '#0d1a0d', border: '1px solid #2d6a2d', borderRadius: 16, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 40, height: 40, background: 'rgba(46,204,113,0.15)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <i className="ti ti-shield-check" style={{ color: '#2ecc71', fontSize: 20 }} />
-          </div>
-          <div>
-            <div style={{ color: '#2ecc71', fontSize: 13, fontWeight: 500 }}>HOUSTON PROTECTED</div>
-            <div style={{ color: '#555', fontSize: 11, marginTop: 2 }}>Cops on alert — drive by blocked for 4 hours</div>
-          </div>
-        </div>
-      )}
 
       {/* Player Card */}
       <div className="section" style={{ marginTop: 14 }}>
@@ -204,7 +153,7 @@ export default function Dashboard({ onNavigate }) {
         <div className="section-label">Your Turf</div>
         <div className="card">
           {/* Live block economy — total Hustle/hr from every block you run. */}
-          <div style={{ padding: '16px 16px 0' }}>
+          <div style={{ padding: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
               <div style={{ color: '#fff', fontSize: 16, fontWeight: 500 }}>Block Income</div>
               <div style={{ color: '#666', fontSize: 11 }}>{blocksOwned}/{MAX_BLOCKS} blocks</div>
@@ -229,19 +178,6 @@ export default function Dashboard({ onNavigate }) {
             <button className="btn btn-gold btn-full" style={{ marginTop: 14, padding: 12 }} disabled={blockPending <= 0}
               onClick={() => { const got = collectAllBlocks(); got > 0 ? sfx.buy() : sfx.deny() }}>
               <i className="ti ti-coin" style={{ fontSize: 15 }} /> {blockPending > 0 ? `Collect ${blockPending.toLocaleString()} Hustle` : 'Nothing to Collect'}
-            </button>
-          </div>
-
-          {/* Actions */}
-          <div style={{ display: 'flex', gap: 8, padding: '14px 16px' }}>
-            <button className="btn btn-dark" style={{ flex: 1 }} onClick={() => onNavigate('map')}>
-              <i className="ti ti-shield" style={{ fontSize: 15 }} /> Defend
-            </button>
-            <button className="btn btn-red" style={{ flex: 1 }} onClick={() => setShowSnitchModal(true)} disabled={snitchUsed}>
-              <i className="ti ti-eye-off" style={{ fontSize: 15 }} /> {snitchUsed ? 'Snitched' : 'Snitch'}
-            </button>
-            <button className="btn btn-gold" style={{ flex: 1 }} onClick={() => onNavigate('map')}>
-              <i className="ti ti-sword" style={{ fontSize: 15 }} /> Drive By
             </button>
           </div>
         </div>
@@ -295,34 +231,6 @@ export default function Dashboard({ onNavigate }) {
           ))}
         </div>
       </div>
-
-      {/* Snitch Modal */}
-      {showSnitchModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }} onClick={() => setShowSnitchModal(false)}>
-          <div style={{ background: '#13131f', borderRadius: '24px 24px 0 0', padding: 24, width: '100%', maxWidth: 390 }} onClick={e => e.stopPropagation()}>
-            <div style={{ width: 40, height: 4, background: '#2a2a3a', borderRadius: 2, margin: '0 auto 20px' }} />
-            <div style={{ textAlign: 'center', marginBottom: 20 }}>
-              <div style={{ fontSize: 40, marginBottom: 8 }}>🚔</div>
-              <div style={{ color: '#fff', fontSize: 18, fontWeight: 500, marginBottom: 4 }}>Call the Cops?</div>
-              <div style={{ color: '#888', fontSize: 13, lineHeight: 1.5 }}>Using a snitch will block all incoming drive bys for 4 hours — but everyone will know you snitched.</div>
-            </div>
-            <div style={{ background: '#1a0808', border: '0.5px solid #8b1a1a', borderRadius: 12, padding: 12, marginBottom: 16 }}>
-              <div style={{ color: '#e74c3c', fontSize: 12, fontWeight: 500, marginBottom: 4 }}>CONSEQUENCES</div>
-              <div style={{ color: '#888', fontSize: 12, lineHeight: 1.6 }}>• -5 Street Cred permanently<br />• "Snitch" badge on your profile<br />• City marked on map for all to see<br />• Drive bys resume when protection expires</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <div style={{ color: '#888', fontSize: 12 }}>Snitches remaining:</div>
-              <div style={{ color: '#e74c3c', fontSize: 14, fontWeight: 500 }}>1 / 3 free this week</div>
-            </div>
-            <button className="btn btn-red btn-full" style={{ marginBottom: 10, padding: 14 }} onClick={() => { setSnitchUsed(true); setShowSnitchModal(false); sfx.snitch() }}>
-              <i className="ti ti-eye-off" /> Snitch — Block Drive By (Free)
-            </button>
-            <button className="btn btn-dark btn-full" style={{ padding: 14 }} onClick={() => setShowSnitchModal(false)}>
-              Hold Off — I'll Defend
-            </button>
-          </div>
-        </div>
-      )}
 
       {detailChar && (
         <CharacterDetailModal character={detailChar} onClose={() => setDetailChar(null)} />
