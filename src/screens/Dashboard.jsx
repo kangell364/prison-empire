@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { PLAYER, PLAYER_LOOKS, RESOURCES, CARDS_COLLECTION, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
 import { useHustle, useSteel, useDisplayName, usePlayerLook } from '../state/profileStore'
-import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, collectAllBlocks, MAX_BLOCKS } from '../state/blocksStore'
+import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, collectAllBlocks, blockCap } from '../state/blocksStore'
 import { useCrew, baseAtk, baseDef } from '../state/crewStore'
 import { useVitals, msToNextStamina, msToNextHealth, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
 import { Avatar } from '../components/Avatar'
@@ -166,7 +166,7 @@ export default function Dashboard({ onNavigate }) {
           <div style={{ padding: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
               <div style={{ color: '#fff', fontSize: 16, fontWeight: 500 }}>Block Income</div>
-              <div style={{ color: '#666', fontSize: 11 }}>{blocksOwned}/{MAX_BLOCKS} blocks</div>
+              <div style={{ color: '#666', fontSize: 11 }}>{blocksOwned}/{blockCap()} blocks</div>
             </div>
             <div style={{ color: '#555', fontSize: 11, marginTop: 2 }}>
               {blocksOwned === 0 ? 'Claim turf on the map to start earning passive Hustle.' : 'Passive Hustle from the blocks you run'}
