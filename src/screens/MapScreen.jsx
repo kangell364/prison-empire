@@ -407,43 +407,10 @@ export default function MapScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blockSel, homeHouse, mapData])
 
-  // All trap houses positioned by real coordinates for the turf map (Map 2):
-  // business → its facility city; personal/mansion → county centroid or city.
-  const turfHouses = useMemo(() => {
-    const out = []
-    Object.values(world.houses).forEach(h => {
-      let lng = null, lat = null
-      // A KO scatter pins the house to an exact block — keep it there (fixed),
-      // don't spread it. Otherwise county centroid, else its city.
-      const fixed = h.block_lat != null && h.block_lng != null
-      if (fixed) { lng = h.block_lng; lat = h.block_lat }
-      if (lng == null && h.county_fips) { const f = findCountyFeature(mapData, h.county_fips); if (f) { const c = geoCentroid(f); lng = c[0]; lat = c[1] } }
-      if (lng == null && h.cityId != null) { const c = cityById.get(h.cityId); if (c) { lng = c.lng; lat = c.lat } }
-      if (lng == null) return
-      if (h.kind === 'business') out.push({ id: h.id, kind: 'business', name: h.name, color: facilityControl[h.id]?.color, facility: FACILITY_BY_ID.get(h.id), lat, lng, fixed })
-      else if (h.kind === 'personal') {
-        const isYou = h.owner_player_id === 'you'
-        const color = isYou ? GOLD : (world.mobs[world.players[h.owner_player_id]?.mob_id]?.color || '#888')
-        out.push({ id: h.id, kind: 'personal', name: world.players[h.owner_player_id]?.name || h.name, isYou, color, lat, lng, fixed })
-      }
-      else if (h.kind === 'mansion') { const mob = world.mobs[h.owner_mob_id]; out.push({ id: h.id, kind: 'mansion', name: mob?.name || h.name, color: mob?.color || RED, lat, lng, fixed }) }
-    })
-    // Spread houses that share a location onto adjacent parcels (no overlap) —
-    // grid them around the shared point so they tile like Atlas-Earth lots.
-    // Block-pinned (KO-scattered) houses are excluded — they stay on their block.
-    const groups = {}
-    out.forEach(e => { if (e.fixed) return; const k = `${e.lat.toFixed(3)},${e.lng.toFixed(3)}`; (groups[k] || (groups[k] = [])).push(e) })
-    const SPACING = 0.014
-    Object.values(groups).forEach(g => {
-      if (g.length < 2) return
-      const cols = Math.ceil(Math.sqrt(g.length)), rows = Math.ceil(g.length / cols)
-      g.forEach((e, i) => {
-        e.lat += (Math.floor(i / cols) - (rows - 1) / 2) * SPACING
-        e.lng += ((i % cols) - (cols - 1) / 2) * SPACING
-      })
-    })
-    return out
-  }, [world.houses, world.players, world.mobs, mapData, cityById, facilityControl])
+  // NOTE: trap houses / businesses / mansions are intentionally NOT rendered on
+  // the Turf Map — it's the clean block / NPC-takeover surface. The house layer
+  // moves to its own map tab. (Positioning logic lived here; recover from git
+  // history — commit that added block_lat snapping — when building that tab.)
 
   const summary = useMemo(() => {
     let yours = 0, enemy = 0, vacant = 0
@@ -724,10 +691,9 @@ export default function MapScreen() {
 
       {turfView && (
         <TurfMap
-          houses={turfHouses}
           center={turfView.center}
           label={turfView.label}
-          onScout={(f) => setSelectedFacility(f)}
+          counties={mapData?.counties}
           onBlockTap={(gx, gy) => setBlockSel({ gx, gy })}
           onBack={() => setTurfView(null)}
         />
