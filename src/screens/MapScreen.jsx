@@ -6,7 +6,7 @@ import { USStateMap } from '../components/USStateMap'
 import { ScoutScreen } from '../components/ScoutScreen'
 import { TurfMap } from '../components/TurfMap'
 import { BlockSheet } from '../components/BlockSheet'
-import { cellCenter, HOME_RADIUS_DEG } from '../state/blocksStore'
+import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock } from '../state/blocksStore'
 import { useMapData, buildCityCountyMap, STATE_CODE_TO_FIPS } from '../state/mapData'
 import { useDisplayName } from '../state/profileStore'
 import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
@@ -39,6 +39,14 @@ const MIN_HOLD_TO_RAID   = 2
 // (NOT yours — your houses are defended via raids). This makes the map evolve
 // and creates the contested races where most-damage-wins (Phase D).
 const AI_OFFENSE_MS = IS_TEST ? 4 * 1000 : 60 * 1000
+
+// AI block poaching — rivals occasionally buy out one of YOUR blocks. Tuned
+// GENTLE so the player never feels wiped: slow cadence, only ~50% of ticks act,
+// home-turf blocks are immune, freshly-taken blocks have a grace window, and it
+// always leaves you at least MIN_KEEP blocks. Losing a block PAYS you out.
+const AI_BLOCK_POACH_MS = IS_TEST ? 8 * 1000 : 5 * 60 * 1000
+const BLOCK_GRACE_MS    = IS_TEST ? 4 * 1000 : 8 * 60 * 1000
+const MIN_KEEP_BLOCKS   = 3
 
 const FACILITY_BY_ID = new Map(FACILITIES.map(f => [f.id, f]))
 
@@ -221,6 +229,36 @@ function useAiOffense() {
   }, [])
 }
 
+// AI block poaching with anti-frustration guardrails (see constants above).
+// homeCoords = [lng,lat] of your trap house (home-turf is immune).
+function useBlockRaids(homeCoords) {
+  const [lost, setLost] = useState([])
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const mine = yourBlocks()
+      if (mine.length <= MIN_KEEP_BLOCKS) return            // never wipe out
+      const now = Date.now()
+      const eligible = mine.filter(b => {
+        if (now - (b.lastPoachAt || 0) < BLOCK_GRACE_MS) return false   // grace
+        if (homeCoords) {
+          const [clat, clng] = cellCenter(b.gx, b.gy)
+          if (Math.hypot(clat - homeCoords[1], clng - homeCoords[0]) <= HOME_RADIUS_DEG) return false  // home-turf immune
+        }
+        return true
+      })
+      if (!eligible.length || Math.random() > 0.5) return   // most ticks pass
+      const target = eligible[Math.floor(Math.random() * eligible.length)]
+      const crew = ['red', 'blue', 'purple'][Math.floor(Math.random() * 3)]
+      const r = aiPoachBlock(target.gx, target.gy, crew)
+      if (r) { sfx.deny?.(); setLost(L => [{ id: `${target.gx}_${target.gy}_${now}`, ...r }, ...L].slice(0, 3)) }
+    }, AI_BLOCK_POACH_MS)
+    return () => clearInterval(iv)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [homeCoords])
+  const dismiss = (id) => setLost(L => L.filter(e => e.id !== id))
+  return { lost, dismiss }
+}
+
 // ---------------------------------------------------------------------
 // MapScreen
 // ---------------------------------------------------------------------
@@ -317,6 +355,11 @@ export default function MapScreen() {
   const homeFips  = houseCounty(homeHouse)
   const moving    = !!homeHouse?.moving_until
   const moveRemaining = moving ? Math.max(0, Math.ceil((homeHouse.moving_until - Date.now()) / 1000)) : 0
+
+  // Home coords (stable) → AI block poaching (gentle; home-turf is immune).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const homeCoords = useMemo(() => houseCoords(homeHouse), [homeHouse, mapData])
+  const { lost: blockLost, dismiss: dismissBlockLost } = useBlockRaids(homeCoords)
 
   // Is the tapped block inside the home-turf radius of your trap house?
   const blockHomeTurf = useMemo(() => {
@@ -441,6 +484,22 @@ export default function MapScreen() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 16px 0' }}>
           {attacks.map(a => (
             <AttackBanner key={a.id} attack={a} facility={FACILITY_BY_ID.get(a.facilityId)} city={cityById.get(FACILITY_BY_ID.get(a.facilityId)?.cityId)} />
+          ))}
+        </div>
+      )}
+
+      {/* Blocks a rival crew bought out from you (you got paid) */}
+      {blockLost.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 16px 0' }}>
+          {blockLost.map(e => (
+            <div key={e.id} onClick={() => dismissBlockLost(e.id)} style={{ background: 'linear-gradient(135deg, #1a0d00, #100a02)', border: `1px solid ${GOLD}44`, borderRadius: 14, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: `${RED}1f`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><i className="ti ti-user-x" style={{ color: RED, fontSize: 18 }} /></div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: RED, fontSize: 11, fontWeight: 600, letterSpacing: 0.5 }}>{e.crew.toUpperCase()} CREW MUSCLED IN</div>
+                <div style={{ color: '#fff', fontSize: 13 }}>Bought out {e.npc} — you cashed out {e.payout.toLocaleString()} Hustle</div>
+              </div>
+              <i className="ti ti-x" style={{ color: DIM, fontSize: 16 }} />
+            </div>
           ))}
         </div>
       )}

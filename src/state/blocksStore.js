@@ -24,6 +24,7 @@ export const GRID = 0.004              // ~440m block — MUST match the TurfMap
 const KEY = 'pe_blocks_v1'
 
 const POACH_MULT       = 1.10          // +10% per takeover
+const PAYOUT_CUT       = 0.5           // displaced owner gets stake + this share of the premium
 const DECAY_PER_HR     = 0.02          // loyalty decays 2%/hr toward its base when uncontested
 const COOLDOWN_MS      = 60 * 1000     // re-poach lock after a takeover
 const MAX_BLOCKS       = 25            // anti-whale: max blocks you can hold
@@ -88,6 +89,35 @@ export function getBlock(gx, gy) {
 }
 
 export function yourBlockCount() { return Object.values(overrides).filter(b => b.owner === 'you').length }
+
+// The blocks you currently hold (for the AI-poach picker).
+export function yourBlocks() {
+  return Object.entries(overrides).filter(([, b]) => b.owner === 'you').map(([k, b]) => {
+    const [gx, gy] = k.split('_').map(Number)
+    return { gx, gy, ...b }
+  })
+}
+
+// AI crew takes one of YOUR blocks. You (a real displaced owner) get the payout
+// — stake back + a cut of the premium — so a loss is a payday, not a wipeout.
+// Returns { payout, crew, npc }.
+export function aiPoachBlock(gx, gy, crew) {
+  const key = cellKey(gx, gy)
+  const o = overrides[key]
+  if (!o || o.owner !== 'you') return null
+  const b = getBlock(gx, gy)
+  const stake = effectiveLoyalty(b)
+  const price = Math.round(stake * POACH_MULT)
+  const payout = Math.round(stake + (price - stake) * PAYOUT_CUT)
+  addHustle(payout)
+  overrides[key] = {
+    owner: crew, ownerKind: 'ai', npc: b.npc, baseLoyalty: b.baseLoyalty,
+    incomePerHr: b.incomePerHr, loyalty: price, basePaid: price,
+    lastCollectedAt: Date.now(), lastPoachAt: Date.now(),
+  }
+  commit()
+  return { payout, crew, npc: b.npc }
+}
 
 export function poachPrice(b, homeTurf) {
   return Math.round(effectiveLoyalty(b) * POACH_MULT * (homeTurf ? HOME_COST_MULT : 1))
