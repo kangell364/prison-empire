@@ -269,13 +269,19 @@ export function collectAllBlocks() {
 const PAYOUT_PERIOD_MS  = 3_600_000               // 1 hour
 const PAYOUT_BUCKET_KEY = 'pe_block_payout_bucket_v1'
 
+// Payout event bus — fired with the Hustle amount whenever a payout banks, so
+// any screen (e.g. the home card's chime) can react without owning the ticker.
+const payoutListeners = new Set()
+export function subscribePayout(fn) { payoutListeners.add(fn); return () => payoutListeners.delete(fn) }
+
 // ms remaining until the next top-of-hour payout (same instant for everyone).
 export function msToNextPayout() { return PAYOUT_PERIOD_MS - (Date.now() % PAYOUT_PERIOD_MS) }
 
 function payoutBucket() { return Math.floor(Date.now() / PAYOUT_PERIOD_MS) }
 
 // If the global hour rolled over since our last payout, auto-bank all block
-// income. First ever run just starts the clock (no payout). Returns Hustle paid.
+// income. First ever run just starts the clock (no payout). Returns Hustle paid
+// and notifies payout subscribers when paid > 0.
 export function runDueBlockPayout() {
   let last = null
   try { const raw = localStorage.getItem(PAYOUT_BUCKET_KEY); if (raw != null) last = parseInt(raw, 10) } catch {}
@@ -287,20 +293,30 @@ export function runDueBlockPayout() {
   if (bucket <= last) return 0
   const paid = collectAllBlocks()
   try { localStorage.setItem(PAYOUT_BUCKET_KEY, String(bucket)) } catch {}
+  if (paid > 0) payoutListeners.forEach(fn => fn(paid))
   return paid
 }
 
-// Drives the countdown UI + fires the hourly auto-payout. Ticks every second;
-// returns { msLeft, paid } — paid > 0 only on the tick a payout banked.
-export function useBlockPayout() {
-  const [s, setS] = useState({ msLeft: msToNextPayout(), paid: 0 })
+// APP-ROOT ticker — fires the hourly payout regardless of which screen is open.
+// Holds NO state, so it never re-renders its host every second; payouts reach
+// the UI via the block store's own listeners (commit) + subscribePayout.
+export function useBlockPayoutTicker() {
   useEffect(() => {
-    const tick = () => { const paid = runDueBlockPayout(); setS({ msLeft: msToNextPayout(), paid }) }
-    tick()
-    const iv = setInterval(tick, 1000)
+    runDueBlockPayout()                          // catch up on mount (e.g. after being away)
+    const iv = setInterval(runDueBlockPayout, 1000)
     return () => clearInterval(iv)
   }, [])
-  return s
+}
+
+// DISPLAY-ONLY countdown for the Your Turf card. Re-renders each second to tick
+// the clock; does NOT fire the payout (the app-root ticker owns that).
+export function useNextPayoutCountdown() {
+  const [ms, setMs] = useState(msToNextPayout())
+  useEffect(() => {
+    const iv = setInterval(() => setMs(msToNextPayout()), 1000)
+    return () => clearInterval(iv)
+  }, [])
+  return ms
 }
 
 // ---- DEV SEED (temporary) ------------------------------------------
