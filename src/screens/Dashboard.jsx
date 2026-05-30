@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { PLAYER, PLAYER_LOOKS, RESOURCES, CARDS_COLLECTION, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
 import { useHustle, useSteel, useDisplayName, usePlayerLook } from '../state/profileStore'
-import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, useNextPayoutCountdown, subscribePayout, blockCap } from '../state/blocksStore'
+import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, useNextPayoutCountdown, subscribePayout, blockCap, resetTurf } from '../state/blocksStore'
 import { useCrew, baseAtk, baseDef } from '../state/crewStore'
 import { useVitals, msToNextStamina, msToNextHealth, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
 import { Avatar } from '../components/Avatar'
@@ -200,6 +200,12 @@ export default function Dashboard({ onNavigate }) {
                 <div style={{ color: '#c9a84c', fontSize: 16, fontWeight: 700 }}>+{blockPending.toLocaleString()}</div>
               </div>
             </div>
+            {/* DEV — TODO REMOVE BEFORE LAUNCH: wipe your turf back to zero. */}
+            <button
+              onClick={() => { if (window.confirm('Reset ALL your blocks back to zero?')) { resetTurf(); sfx.deny?.() } }}
+              style={{ marginTop: 10, width: '100%', background: 'transparent', border: '0.5px dashed #3a2a2a', color: '#7a4a4a', fontSize: 10, padding: 7, borderRadius: 8, letterSpacing: 0.5, cursor: 'pointer' }}>
+              <i className="ti ti-trash" /> Reset Turf (dev)
+            </button>
           </div>
         </div>
       </div>

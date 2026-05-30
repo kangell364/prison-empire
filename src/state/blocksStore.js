@@ -260,6 +260,14 @@ export function collectAllBlocks() {
   return total
 }
 
+// DEV (TODO REMOVE BEFORE LAUNCH): wipe ALL block overrides — every block you
+// recruited/poached (and any AI poaches) — back to the procedural default, so
+// your turf resets to zero owned blocks. Backs the in-app "Reset Turf" button.
+export function resetTurf() {
+  overrides = {}
+  commit()
+}
+
 // ---- global hourly payout clock ------------------------------------
 // Block income pays out on a GLOBAL hourly tick — aligned to the top of every
 // UTC hour, so the countdown is identical for every player worldwide (not a
