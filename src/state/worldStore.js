@@ -228,25 +228,57 @@ export function useWorld() {
 
 // ---- mutators ------------------------------------------------------
 
-// An attack landed on a business house — chip its hp; flip to the player at 0.
-// Vacant → claim outright. Returns { flipped, loyalty } (loyalty kept for the
-// legacy facade's shape).
-export function hitHouse(houseId) {
+// Owner patch for a winning attacker: 'you' → you (+ your mob); a mob id → that
+// mob's AI holder (+ the mob).
+function ownerPatchFor(attackerId) {
+  if (attackerId === 'you') return { owner_player_id: 'you', owner_mob_id: world.player.mob_id }
+  return { owner_player_id: aiHolderId(attackerId), owner_mob_id: attackerId }
+}
+function topContributor(contest, fallback) {
+  let winner = fallback, max = -1
+  for (const k in contest) if (contest[k] > max) { max = contest[k]; winner = k }
+  return winner
+}
+
+// CONTESTED ATTACK on a business house (Phase D). attackerId = 'you' or a mob
+// id. Damage ACCUMULATES per attacker in house.contest; when hp hits 0 the
+// MOST-DAMAGE attacker wins — NOT whoever landed the final hit. Vacant houses
+// are claimed on first hit. Returns { captured, winner, leader, contest, ... }.
+export function attackHouse(houseId, attackerId, dmg = HIT_DAMAGE) {
   const h = world.houses[houseId]
-  if (!h || h.kind !== 'business') return { flipped: false, loyalty: 0 }
+  if (!h || h.kind !== 'business') return { captured: false }
+  if (h.owner_player_id === attackerId || (attackerId !== 'you' && h.owner_mob_id === attackerId)) {
+    return { captured: false, own: true }   // don't attack what you already hold
+  }
   const now = Date.now()
   if (!h.owner_player_id) {
-    commit(setHouse(houseId, { owner_player_id: 'you', owner_mob_id: world.player.mob_id, hp: FLIP_HP, hpAt: now, lastCollectedAt: now }))
-    return { flipped: true, loyalty: FLIP_HP }
+    commit(setHouse(houseId, { ...ownerPatchFor(attackerId), hp: FLIP_HP, hpAt: now, lastCollectedAt: now, contest: {} }))
+    return { captured: true, winner: attackerId, vacant: true }
   }
-  if (h.owner_player_id === 'you') return { flipped: false, loyalty: effectiveHp(h) }
-  const next = effectiveHp(h) - HIT_DAMAGE
-  if (next <= 0) {
-    commit(setHouse(houseId, { owner_player_id: 'you', owner_mob_id: world.player.mob_id, hp: FLIP_HP, hpAt: now, lastCollectedAt: now }))
-    return { flipped: true, loyalty: FLIP_HP }
+  const contest = { ...(h.contest || {}) }
+  contest[attackerId] = (contest[attackerId] || 0) + dmg
+  const hp = effectiveHp(h) - dmg
+  if (hp <= 0) {
+    const winner = topContributor(contest, attackerId)
+    commit(setHouse(houseId, { ...ownerPatchFor(winner), hp: FLIP_HP, hpAt: now, lastCollectedAt: now, contest: {} }))
+    return { captured: true, winner, finalHitter: attackerId, contest }
   }
-  commit(setHouse(houseId, { hp: next, hpAt: now }))
-  return { flipped: false, loyalty: next }
+  commit(setHouse(houseId, { hp, hpAt: now, contest }))
+  return { captured: false, hp, leader: topContributor(contest, attackerId), contest }
+}
+
+// Your drive-by landing — routes through the contest model. Returns the legacy
+// { flipped, loyalty } shape (+ takenBy when a rival out-damaged you and grabbed
+// the house even though you landed the final hit).
+export function hitHouse(houseId) {
+  const r = attackHouse(houseId, 'you')
+  if (r.own) return { flipped: false, loyalty: effectiveHp(world.houses[houseId]) }
+  if (r.captured) {
+    if (r.winner === 'you') return { flipped: true, loyalty: FLIP_HP }
+    const mob = world.mobs[r.winner]
+    return { flipped: false, loyalty: FLIP_HP, takenBy: mob ? mob.name : 'a rival mob' }
+  }
+  return { flipped: false, loyalty: r.hp }
 }
 
 // An enemy raid landed on a business house YOU hold — chip its hp; lose it to

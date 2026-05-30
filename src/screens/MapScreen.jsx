@@ -8,7 +8,8 @@ import { CountyTopDown } from '../components/CountyTopDown'
 import { useMapData, buildCityCountyMap, STATE_CODE_TO_FIPS } from '../state/mapData'
 import { useDisplayName } from '../state/profileStore'
 import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
-import { useWorld, moveHouse, arriveHouse, getHouse, applyHomeRaid } from '../state/worldStore'
+import { useWorld, moveHouse, arriveHouse, getHouse, applyHomeRaid, attackHouse } from '../state/worldStore'
+import { AI_MOBS } from '../data/mobs'
 import { geoCentroid } from 'd3-geo'
 import { sfx } from '../sounds'
 
@@ -31,6 +32,11 @@ const TICK_THRESHOLDS    = IS_TEST ? [20, 10, 5] : [60, 30, 10]
 const RAID_STORAGE_KEY   = IS_TEST ? 'pe_raids_test_v1' : 'pe_raids_v1'
 const RAID_SPAWN_MS      = IS_TEST ? 12 * 1000 : 90 * 1000
 const MIN_HOLD_TO_RAID   = 2
+
+// AI offense: rival mobs attack vacant / rival-held business houses on a cadence
+// (NOT yours — your houses are defended via raids). This makes the map evolve
+// and creates the contested races where most-damage-wins (Phase D).
+const AI_OFFENSE_MS = IS_TEST ? 4 * 1000 : 60 * 1000
 
 const FACILITY_BY_ID = new Map(FACILITIES.map(f => [f.id, f]))
 
@@ -195,6 +201,25 @@ function loadRaids() {
 }
 
 // ---------------------------------------------------------------------
+// AI offense — rival mobs expand. While the map is open, a random AI mob
+// periodically attacks a vacant or rival-held business house (never yours —
+// your houses are defended via raids), routing through the contest model so
+// ownership shifts and you race them. Most-damage-wins decides ties.
+// ---------------------------------------------------------------------
+function useAiOffense() {
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const targets = FACILITIES.filter(f => { const h = getHouse(f.id); return h && h.owner_player_id !== 'you' })
+      if (!targets.length) return
+      const t = targets[Math.floor(Math.random() * targets.length)]
+      const mob = AI_MOBS[Math.floor(Math.random() * AI_MOBS.length)]
+      attackHouse(t.id, mob.id)
+    }, AI_OFFENSE_MS)
+    return () => clearInterval(iv)
+  }, [])
+}
+
+// ---------------------------------------------------------------------
 // MapScreen
 // ---------------------------------------------------------------------
 export default function MapScreen() {
@@ -219,6 +244,7 @@ export default function MapScreen() {
   }, [cityCounty])
 
   const { raids, landed: raidLanded, dismissLanded: dismissRaid } = useRaids(territories, world.player.home_house_id, liveFips)
+  useAiOffense()
 
   const attackingSet = useMemo(() => new Set(attacks.map(a => a.facilityId)), [attacks])
   const raidByFacility = useMemo(() => new Map(raids.map(r => [r.facilityId, r])), [raids])
@@ -753,6 +779,7 @@ function FacilityLandedModal({ facility, result, onClose }) {
   const playerName = useDisplayName()
   if (!facility) return null
   const flipped = !!result.flipped
+  const takenBy = result.takenBy           // a rival out-damaged you and grabbed it
   const loyalty = result.loyalty ?? 0
 
   return (
@@ -764,18 +791,22 @@ function FacilityLandedModal({ facility, result, onClose }) {
             background: flipped ? `${GOLD}22` : `${RED}22`, border: `2px solid ${flipped ? GOLD : RED}`,
             color: flipped ? GOLD : RED, fontSize: 40, boxShadow: `0 0 32px ${(flipped ? GOLD : RED)}66`,
           }}>
-            <i className={`ti ${flipped ? 'ti-flag-filled' : 'ti-target-arrow'}`} />
+            <i className={`ti ${flipped ? 'ti-flag-filled' : takenBy ? 'ti-flag-off' : 'ti-target-arrow'}`} />
           </div>
         </div>
 
         <div style={{ color: flipped ? GOLD : RED, fontSize: 13, fontWeight: 600, letterSpacing: 3, textAlign: 'center', marginBottom: 6 }}>
-          {flipped ? 'TERRITORY CAPTURED' : 'DRIVE BY LANDED'}
+          {flipped ? 'TERRITORY CAPTURED' : takenBy ? 'OUT-MUSCLED' : 'DRIVE BY LANDED'}
         </div>
         <div style={{ color: '#fff', fontSize: 24, fontWeight: 600, textAlign: 'center', marginBottom: 6 }}>{facility.name}</div>
 
         {flipped ? (
           <div style={{ color: '#888', fontSize: 13, fontStyle: 'italic', textAlign: 'center', marginBottom: 22 }}>
             is now under {playerName}'s flag — collect its income on the scout screen
+          </div>
+        ) : takenBy ? (
+          <div style={{ color: '#888', fontSize: 13, fontStyle: 'italic', textAlign: 'center', marginBottom: 22 }}>
+            you landed the final hit, but {takenBy} did more damage and grabbed it — most damage wins
           </div>
         ) : (
           <div style={{ marginBottom: 22 }}>
