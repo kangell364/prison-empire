@@ -18,20 +18,19 @@ const GOLD = '#c9a84c'
 
 function markerHtml(h) {
   const label = (txt, color = '#fff') =>
-    `<div style="font:700 10px system-ui;color:${color};text-shadow:0 0 3px #000,0 0 3px #000,0 0 3px #000;margin-top:1px;white-space:nowrap">${txt}</div>`
+    `<div style="font:700 9px system-ui;color:${color};text-shadow:0 0 3px #000,0 0 3px #000;margin-top:1px;white-space:nowrap">${txt}</div>`
 
   if (h.kind === 'personal') {
-    return `<div style="text-align:center;transform:translateY(-6px)">
-      <img src="/trap-house-personal.png" style="width:46px;height:auto;display:block;margin:0 auto;filter:drop-shadow(0 2px 3px rgba(0,0,0,.7))"/>
+    return `<div style="text-align:center;transform:translateY(-4px)">
+      <img src="/trap-house-personal.png" style="width:34px;height:auto;display:block;margin:0 auto;filter:drop-shadow(0 2px 3px rgba(0,0,0,.7))"/>
       ${label(h.name + (h.isYou ? ' <span style="color:' + GOLD + '">(YOU)</span>' : ''))}
     </div>`
   }
   const glyph = h.kind === 'business' ? '🏪' : '🏛️'
   const color = h.color || GOLD
   return `<div style="text-align:center">
-    <div style="width:40px;height:40px;border-radius:9px;background:#13131f;border:2px solid ${color};display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto;box-shadow:0 2px 5px rgba(0,0,0,.7)">${glyph}</div>
+    <div style="width:32px;height:32px;border-radius:8px;background:#13131f;border:2px solid ${color};display:flex;align-items:center;justify-content:center;font-size:18px;margin:0 auto;box-shadow:0 2px 5px rgba(0,0,0,.7)">${glyph}</div>
     ${label(h.name)}
-    ${label(h.kind === 'business' ? 'BUSINESS' : 'MANSION', color)}
   </div>`
 }
 
@@ -47,7 +46,7 @@ export function TurfMap({ houses, center, label, onScout, onBack }) {
     if (!containerRef.current || mapRef.current) return
     const map = L.map(containerRef.current, {
       center: center || [39.8283, -98.5795],
-      zoom: center ? 11 : 5,
+      zoom: center ? 12 : 5,
       minZoom: 4, maxZoom: 18,
       maxBounds: [[15, -170], [72, -50]], maxBoundsViscosity: 0.7,
       zoomControl: true, attributionControl: false,
@@ -69,12 +68,12 @@ export function TurfMap({ houses, center, label, onScout, onBack }) {
     houses.forEach(h => {
       if (typeof h.lat !== 'number' || typeof h.lng !== 'number') return
       const color = h.color || GOLD
-      const d = 0.011   // ~1.2km half-side — a visible claimed plot
+      const d = 0.002   // ~220m half-side — a tight, Atlas-Earth-style lot
       const onTap = (h.kind === 'business' && h.facility) ? () => onScoutRef.current && onScoutRef.current(h.facility) : null
 
       // Glowing claimed parcel (soft halo + brighter plot) under the house.
-      L.rectangle([[h.lat - d * 1.7, h.lng - d * 1.7], [h.lat + d * 1.7, h.lng + d * 1.7]],
-        { stroke: false, fillColor: color, fillOpacity: 0.1, interactive: false }).addTo(layer)
+      L.rectangle([[h.lat - d * 1.5, h.lng - d * 1.5], [h.lat + d * 1.5, h.lng + d * 1.5]],
+        { stroke: false, fillColor: color, fillOpacity: 0.12, interactive: false }).addTo(layer)
       const plot = L.rectangle([[h.lat - d, h.lng - d], [h.lat + d, h.lng + d]],
         { color, weight: 2, opacity: 0.95, fillColor: color, fillOpacity: 0.22 }).addTo(layer)
       if (onTap) plot.on('click', onTap)

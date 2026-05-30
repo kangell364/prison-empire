@@ -332,6 +332,19 @@ export default function MapScreen() {
       }
       else if (h.kind === 'mansion') { const mob = world.mobs[h.owner_mob_id]; out.push({ id: h.id, kind: 'mansion', name: mob?.name || h.name, color: mob?.color || RED, lat, lng }) }
     })
+    // Spread houses that share a location onto adjacent parcels (no overlap) —
+    // grid them around the shared point so they tile like Atlas-Earth lots.
+    const groups = {}
+    out.forEach(e => { const k = `${e.lat.toFixed(3)},${e.lng.toFixed(3)}`; (groups[k] || (groups[k] = [])).push(e) })
+    const SPACING = 0.014
+    Object.values(groups).forEach(g => {
+      if (g.length < 2) return
+      const cols = Math.ceil(Math.sqrt(g.length)), rows = Math.ceil(g.length / cols)
+      g.forEach((e, i) => {
+        e.lat += (Math.floor(i / cols) - (rows - 1) / 2) * SPACING
+        e.lng += ((i % cols) - (cols - 1) / 2) * SPACING
+      })
+    })
     return out
   }, [world.houses, world.players, world.mobs, mapData, cityById, facilityControl])
 
