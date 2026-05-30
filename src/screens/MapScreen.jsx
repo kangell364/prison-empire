@@ -8,7 +8,8 @@ import { CountyTopDown } from '../components/CountyTopDown'
 import { useMapData, buildCityCountyMap, STATE_CODE_TO_FIPS } from '../state/mapData'
 import { useDisplayName } from '../state/profileStore'
 import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
-import { useWorld } from '../state/worldStore'
+import { useWorld, moveHouse, arriveHouse } from '../state/worldStore'
+import { geoCentroid } from 'd3-geo'
 import { sfx } from '../sounds'
 
 const GOLD = '#c9a84c'
@@ -190,6 +191,9 @@ export default function MapScreen() {
   const [stateView, setStateView] = useState(null)          // null = country view
   const [countyView, setCountyView] = useState(null)        // Map 2 (top-down) target
   const [selectedFacility, setSelectedFacility] = useState(null)
+  const [relocating, setRelocating] = useState(false)       // picking a relocate target
+  const [moveConfirm, setMoveConfirm] = useState(null)      // { fips, name, state, miles, sec }
+  const [, setMoveTick] = useState(0)                       // ticks the move countdown
   const { attacks, landed, launch, dismissLanded } = useDriveBys()
   const { data: mapData } = useMapData()
   const territories = useTerritories()
@@ -248,6 +252,27 @@ export default function MapScreen() {
     return m
   }, [facilityControl, cityById])
 
+  // County name lookup (for the home-house status + relocation labels).
+  const countyNameByFips = useMemo(() => {
+    const m = {}
+    if (mapData) mapData.counties.features.forEach(f => { m[String(f.id).padStart(5, '0')] = f.properties.name })
+    return m
+  }, [mapData])
+
+  // Current county of a movable house: explicit county_fips, else via its city.
+  const houseCounty = (h) => h?.county_fips || (h?.cityId != null ? cityCounty[h.cityId] : null)
+  // Geographic coords [lng,lat] of a house (county centroid, else its city).
+  const houseCoords = (h) => {
+    if (!h) return null
+    if (h.county_fips) { const f = findCountyFeature(mapData, h.county_fips); return f ? geoCentroid(f) : null }
+    const c = cityById.get(h.cityId); return c ? [c.lng, c.lat] : null
+  }
+
+  const homeHouse = world.houses[world.player.home_house_id]
+  const homeFips  = houseCounty(homeHouse)
+  const moving    = !!homeHouse?.moving_until
+  const moveRemaining = moving ? Math.max(0, Math.ceil((homeHouse.moving_until - Date.now()) / 1000)) : 0
+
   // Trap houses sitting in the focused county (drives the top-down view).
   const countyEntries = useMemo(() => {
     if (!countyView) return []
@@ -256,7 +281,8 @@ export default function MapScreen() {
     if (biz) out.push({ id: biz.id, kind: 'business', facility: biz, name: biz.name, color: facilityControl[biz.id].color })
     Object.values(world.houses).forEach(h => {
       if (h.kind === 'business') return
-      if ((h.cityId != null ? cityCounty[h.cityId] : null) !== countyView.fips) return
+      const fips = h.county_fips || (h.cityId != null ? cityCounty[h.cityId] : null)
+      if (fips !== countyView.fips) return
       if (h.kind === 'personal') out.push({ id: h.id, kind: 'personal', name: world.players[h.owner_player_id]?.name || h.name })
       else if (h.kind === 'mansion') { const mob = world.mobs[h.owner_mob_id]; out.push({ id: h.id, kind: 'mansion', name: mob?.name || h.name, color: mob?.color || RED }) }
     })
@@ -298,6 +324,29 @@ export default function MapScreen() {
     setSelectedFacility(f)
   }
 
+  // Tick the relocation countdown and land the move when the timer elapses.
+  useEffect(() => {
+    if (!homeHouse?.moving_until) return
+    const iv = setInterval(() => {
+      if (Date.now() >= homeHouse.moving_until) { arriveHouse(homeHouse.id); sfx.boom?.() }
+      else setMoveTick(t => t + 1)
+    }, 1000)
+    return () => clearInterval(iv)
+  }, [homeHouse?.moving_until, homeHouse?.id])
+
+  // Relocation: tapping a county in relocate mode computes the real travel time.
+  const beginMoveTo = (fips, name) => {
+    const feat = findCountyFeature(mapData, fips)
+    const miles = haversineMiles(houseCoords(homeHouse), feat ? geoCentroid(feat) : null)
+    const sec = Math.round(Math.min(1800, Math.max(30, miles * 0.4)) / (IS_TEST ? 30 : 1))
+    setMoveConfirm({ fips, name, state: stateView?.code, miles: Math.round(miles), sec })
+  }
+  const confirmMove = () => {
+    moveHouse(homeHouse.id, moveConfirm.fips, moveConfirm.sec * 1000)
+    sfx.launch?.()
+    setMoveConfirm(null); setRelocating(false)
+  }
+
   const currentLanded = landed[0] || null
   const currentRaidLanded = raidLanded[0] || null
 
@@ -329,6 +378,39 @@ export default function MapScreen() {
           <SummaryStat label="Enemy Held"      value={summary.enemy} color={RED} />
           <SummaryStat label="Vacant"          value={summary.vacant} color="#2ecc71" />
         </div>
+      </div>
+
+      {/* Your trap house — current location + relocate control */}
+      <div style={{ padding: '10px 16px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#13131f', border: `0.5px solid ${moving ? GOLD + '66' : '#2a2a3a'}`, borderRadius: 14, padding: '10px 12px' }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: `${GOLD}1f`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <i className={`ti ${moving ? 'ti-arrows-move' : 'ti-home'}`} style={{ color: GOLD, fontSize: 16 }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ color: GOLD, fontSize: 10, letterSpacing: 1, fontWeight: 600 }}>YOUR TRAP HOUSE</div>
+            <div style={{ color: '#fff', fontSize: 13, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {moving
+                ? `Relocating to ${countyNameByFips[homeHouse.moving_to_fips] || 'destination'} County · ${fmtClock(moveRemaining)}`
+                : (homeFips ? `${countyNameByFips[homeFips] || 'Unknown'} County` : 'Unplaced')}
+            </div>
+          </div>
+          {!moving && !relocating && (
+            <button className="btn" onClick={() => { sfx.tap(); setRelocating(true); setCountyView(null) }}
+              style={{ padding: '7px 11px', background: GOLD, color: '#0a0a0f', border: 'none', borderRadius: 9, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>
+              <i className="ti ti-arrows-move" /> Relocate
+            </button>
+          )}
+          {relocating && (
+            <button className="btn btn-dark" onClick={() => { sfx.tap(); setRelocating(false) }} style={{ padding: '7px 11px', fontSize: 11 }}>
+              Cancel
+            </button>
+          )}
+        </div>
+        {relocating && (
+          <div style={{ color: GOLD, fontSize: 11, marginTop: 8, textAlign: 'center' }}>
+            Tap a state, then tap any county to move your trap house there.
+          </div>
+        )}
       </div>
 
       {/* Recommended target */}
@@ -379,7 +461,10 @@ export default function MapScreen() {
               colorFor={(fips) => { const f = facilityByFips[fips]; return f ? facilityControl[f.id].color : '#15151f' }}
               strokeFor={(fips) => facilityByFips[fips] ? '#fff' : `${GOLD}59`}
               strokeWidthFor={(fips) => facilityByFips[fips] ? 1.5 : 0.7}
-              onCountyClick={(c) => { if (facilityByFips[c.fips]) { sfx.tap(); setCountyView({ fips: c.fips, name: c.name, stateCode: stateView.code }) } }}
+              onCountyClick={(c) => {
+                if (relocating) { sfx.tap(); beginMoveTo(c.fips, c.name); return }
+                if (facilityByFips[c.fips]) { sfx.tap(); setCountyView({ fips: c.fips, name: c.name, stateCode: stateView.code }) }
+              }}
               height="58vh"
             />
           ) : (
@@ -436,6 +521,24 @@ export default function MapScreen() {
                 No facilities in {stateView.name} yet.
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {moveConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 260 }} onClick={() => setMoveConfirm(null)}>
+          <div style={{ background: '#13131f', borderRadius: 16, padding: 22, width: '100%', maxWidth: 320, margin: 16 }} onClick={e => e.stopPropagation()}>
+            <div style={{ color: GOLD, fontSize: 11, letterSpacing: 2, fontWeight: 600, textAlign: 'center' }}>RELOCATE TRAP HOUSE</div>
+            <div style={{ color: '#fff', fontSize: 20, fontWeight: 600, textAlign: 'center', marginTop: 6 }}>{moveConfirm.name} County</div>
+            <div style={{ color: '#888', fontSize: 12, textAlign: 'center', marginTop: 2 }}>{moveConfirm.state}</div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 24, margin: '18px 0' }}>
+              <div style={{ textAlign: 'center' }}><div style={{ color: '#fff', fontSize: 18, fontWeight: 600 }}>{moveConfirm.miles}</div><div style={{ color: DIM, fontSize: 10, letterSpacing: 0.5 }}>MILES</div></div>
+              <div style={{ textAlign: 'center' }}><div style={{ color: GOLD, fontSize: 18, fontWeight: 600 }}>{fmtClock(moveConfirm.sec)}</div><div style={{ color: DIM, fontSize: 10, letterSpacing: 0.5 }}>TRAVEL</div></div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-dark" style={{ flex: 1, padding: 12 }} onClick={() => setMoveConfirm(null)}>Cancel</button>
+              <button className="btn btn-gold" style={{ flex: 1, padding: 12 }} onClick={confirmMove}>Move</button>
+            </div>
           </div>
         </div>
       )}
@@ -636,6 +739,23 @@ function FacilityLandedModal({ facility, result, onClose }) {
 // ---------------------------------------------------------------------
 // Color helpers
 // ---------------------------------------------------------------------
+
+function findCountyFeature(mapData, fips) {
+  if (!mapData || !fips) return null
+  return mapData.counties.features.find(f => String(f.id).padStart(5, '0') === fips) || null
+}
+function haversineMiles(a, b) {
+  if (!a || !b) return 0
+  const R = 3959, toRad = d => d * Math.PI / 180
+  const [lng1, lat1] = a, [lng2, lat2] = b
+  const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1)
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(s))
+}
+function fmtClock(sec) {
+  const m = Math.floor(sec / 60), s = Math.max(0, sec % 60)
+  return `${m}:${String(s).padStart(2, '0')}`
+}
 
 function hexToRgba(hex, a) {
   const h = hex.replace('#', '')

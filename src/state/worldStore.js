@@ -256,6 +256,28 @@ export function collectHouse(houseId, got) {
   return got
 }
 
+// ---- movement (Phase C) --------------------------------------------
+
+// Begin relocating a movable house (personal/mansion) to a destination county.
+// travelMs scales with real distance (computed by the caller from coordinates).
+export function moveHouse(houseId, destFips, travelMs) {
+  const h = world.houses[houseId]
+  if (!h || h.kind === 'business') return { ok: false }
+  if (h.moving_until) return { ok: false, reason: 'already-moving' }
+  commit(setHouse(houseId, { moving_to_fips: destFips, moving_until: Date.now() + travelMs }))
+  return { ok: true }
+}
+
+// Complete an in-flight move (called when the timer elapses). The house's
+// location becomes the destination county (county_fips takes over from cityId).
+export function arriveHouse(houseId) {
+  const h = world.houses[houseId]
+  if (!h || !h.moving_to_fips) return null
+  const dest = h.moving_to_fips
+  commit(setHouse(houseId, { county_fips: dest, cityId: null, moving_to_fips: null, moving_until: null }))
+  return dest
+}
+
 // Pending uncollected income for a business house you hold (capped).
 export function housePendingIncome(houseId) {
   const h = world.houses[houseId]
