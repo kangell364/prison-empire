@@ -103,12 +103,11 @@ export default function Crew() {
 
   return (
     <>
-      {/* Header: combined stats + Hustle balance */}
+      {/* Header: combined crew ATK / DEF */}
       <div style={{ padding: '14px 16px 0' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <Stat label="Crew ATK"  value={totals.atk.toLocaleString()} color={RED} />
           <Stat label="Crew DEF"  value={totals.def.toLocaleString()} color="#4a9eff" />
-          <Stat label="Hustle"    value={hustle.toLocaleString()}     color={GOLD} />
         </div>
         <div style={{
           color: DIM, fontSize: 11, marginTop: 8, textAlign: 'center',

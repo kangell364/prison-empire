@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { PLAYER, PLAYER_LOOKS, RESOURCES, CARDS_COLLECTION, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
 import { useHustle, useSteel, useDisplayName, usePlayerLook } from '../state/profileStore'
 import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, useNextPayoutCountdown, subscribePayout, blockCap, resetTurf } from '../state/blocksStore'
-import { useCrew, baseAtk, baseDef } from '../state/crewStore'
+import { useCrew, atkOf, defOf } from '../state/crewStore'
+import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
 import { useVitals, msToNextStamina, msToNextHealth, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
@@ -30,12 +31,18 @@ export default function Dashboard({ onNavigate }) {
   // Live crew — the real 12-slot roster (1 Leader + 11 Members) from crewStore,
   // resolved against the card catalog. Mirrors the Cards → My Crew screen.
   const crew = useCrew()
+  const flat = flatAtLevel(useUpgrades(), 1)   // Level-1 ATK/DEF upgrades, same as My Crew
   const cardById = new Map(CARDS_COLLECTION.map(c => [c.id, c]))
   const crewSlots = [
     { card: crew.leader != null ? cardById.get(crew.leader) : null, isLeader: true },
     ...crew.members.map(id => ({ card: id != null ? cardById.get(id) : null, isLeader: false })),
   ]
   const crewFilled = crewSlots.filter(s => s.card).length
+  // Combined crew ATK/DEF (with upgrades) — mirrors the My Crew header totals.
+  const crewTotals = crewSlots.reduce((acc, s) => {
+    if (s.card) { acc.atk += atkOf(s.card, flat); acc.def += defOf(s.card, flat) }
+    return acc
+  }, { atk: 0, def: 0 })
   const playerName = useDisplayName()
   const lookId = usePlayerLook()
   // The home-screen player card is now a cosmetic "look" (see SWAP). Level, XP
@@ -224,11 +231,22 @@ export default function Dashboard({ onNavigate }) {
       {/* Crew — the real 12-slot roster (Leader + 11 Members) from crewStore */}
       <div className="section">
         <div className="section-label">Your Crew ({crewFilled}/{crewSlots.length})</div>
+        {/* Combined crew ATK / DEF — same totals as the My Crew header. */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+          <div style={{ background: '#13131f', border: '0.5px solid #2a2a3a', borderRadius: 14, padding: '12px 10px', textAlign: 'center' }}>
+            <div style={{ color: '#e74c3c', fontSize: 18, fontWeight: 600, lineHeight: 1 }}>{crewTotals.atk.toLocaleString()}</div>
+            <div style={{ color: '#555', fontSize: 10, marginTop: 5, letterSpacing: 0.5 }}>Crew ATK</div>
+          </div>
+          <div style={{ background: '#13131f', border: '0.5px solid #2a2a3a', borderRadius: 14, padding: '12px 10px', textAlign: 'center' }}>
+            <div style={{ color: '#4a9eff', fontSize: 18, fontWeight: 600, lineHeight: 1 }}>{crewTotals.def.toLocaleString()}</div>
+            <div style={{ color: '#555', fontSize: 10, marginTop: 5, letterSpacing: 0.5 }}>Crew DEF</div>
+          </div>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
           {crewSlots.map((slot, i) => {
             const c = slot.card
             const rc = c ? (RARITY_COLORS[c.rarity] || '#c9a84c') : '#1e1e2a'
-            const power = c ? baseAtk(c) + baseDef(c) : 0
+            const power = c ? atkOf(c, flat) + defOf(c, flat) : 0
             return (
               <div key={i} style={{
                 position: 'relative',
