@@ -38,6 +38,12 @@ const INCOME_CAP_HRS = 24              // max hours of income that accrue uncoll
 
 const FACILITY_BY_ID = new Map(FACILITIES.map(f => [f.id, f]))
 
+// AI player handles — each gets a personal trap house on the map (Phase C3).
+const AI_HANDLES = [
+  'Ghost', 'TreyDeuce', 'BigSmoke', 'Lil_Capo', 'D-Loc', 'MamboMarco', 'SlickVic',
+  'Reyes99', 'TonyGz', 'FatSammy', 'KingKutt', 'BabyFace', 'OldmanRudy', 'Domino',
+]
+
 // ---- helpers -------------------------------------------------------
 
 function hash(str) {
@@ -142,6 +148,25 @@ function buildWorld() {
     }
   })
 
+  // AI member players with their own personal houses, scattered across facility
+  // counties so counties have MULTIPLE occupants (Phase C3). Anchored to facility
+  // cities (so they resolve into those counties); cycling i % 10 clusters a few
+  // into the same county. They belong to AI mobs.
+  AI_HANDLES.forEach((handle, i) => {
+    const mob = AI_MOBS[i % AI_MOBS.length]
+    const fac = FACILITIES[i % Math.min(10, FACILITIES.length)]
+    const pid = 'ai_' + handle.toLowerCase()
+    players[pid] = { id: pid, name: handle, mob_id: mob.id, is_ai: true }
+    const id = 'home_' + pid
+    houses[id] = {
+      id, kind: 'personal', cityId: fac.cityId, tier: null, name: handle,
+      county_fips: null, x: null, y: null,
+      owner_player_id: pid, owner_mob_id: mob.id,
+      hp: HP_MAX, hp_max: HP_MAX, hpAt: now, income_per_hr: 0,
+      lastCollectedAt: now, moving_until: null, moving_to_fips: null,
+    }
+  })
+
   const player = {
     id: 'you', name: PLAYER.name, player_look_id: DEFAULT_LOOK_ID,
     gang_card_ids: [...(STARTER_CARD_IDS || [])], mob_id: null,
@@ -158,8 +183,14 @@ function readInitial() {
     if (raw) {
       const parsed = JSON.parse(raw)
       const base = buildWorld()
-      // Merge so facilities added to the catalog since last save appear.
-      w = { ...base, ...parsed, houses: { ...base.houses, ...parsed.houses } }
+      // Merge so entities added to the catalog since last save appear (new
+      // facilities, AI players/mobs, their houses), while keeping saved state.
+      w = {
+        ...base, ...parsed,
+        mobs:    { ...base.mobs, ...parsed.mobs },
+        players: { ...base.players, ...parsed.players },
+        houses:  { ...base.houses, ...parsed.houses },
+      }
     }
   } catch {}
   if (!w) w = buildWorld()

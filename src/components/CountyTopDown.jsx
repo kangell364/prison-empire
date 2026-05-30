@@ -93,7 +93,7 @@ export function CountyTopDown({ county, entries, onBack, onScout }) {
 }
 
 function HouseTile({ entry, onTap }) {
-  const { kind, name, color = GOLD, x, y } = entry
+  const { kind, name, color = GOLD, x, y, isYou } = entry
   const clickable = !!onTap
 
   return (
@@ -123,6 +123,12 @@ function HouseTile({ entry, onTap }) {
         <text x={0} y={46} textAnchor="middle" fill={color} fontSize={12} fontWeight="600"
           style={{ paintOrder: 'stroke', stroke: '#0a0a0f', strokeWidth: 3, letterSpacing: 1 }}>
           {kind === 'business' ? 'BUSINESS' : 'MOB MANSION'}
+        </text>
+      )}
+      {kind === 'personal' && isYou && (
+        <text x={0} y={46} textAnchor="middle" fill={GOLD} fontSize={12} fontWeight="700"
+          style={{ paintOrder: 'stroke', stroke: '#0a0a0f', strokeWidth: 3, letterSpacing: 1 }}>
+          YOU
         </text>
       )}
     </g>

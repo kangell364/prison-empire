@@ -299,7 +299,7 @@ export default function MapScreen() {
       if (h.kind === 'business') return
       const fips = h.county_fips || (h.cityId != null ? cityCounty[h.cityId] : null)
       if (fips !== countyView.fips) return
-      if (h.kind === 'personal') out.push({ id: h.id, kind: 'personal', name: world.players[h.owner_player_id]?.name || h.name })
+      if (h.kind === 'personal') out.push({ id: h.id, kind: 'personal', name: world.players[h.owner_player_id]?.name || h.name, isYou: h.owner_player_id === 'you' })
       else if (h.kind === 'mansion') { const mob = world.mobs[h.owner_mob_id]; out.push({ id: h.id, kind: 'mansion', name: mob?.name || h.name, color: mob?.color || RED }) }
     })
     return out
