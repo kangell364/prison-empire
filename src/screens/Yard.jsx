@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react'
-import { RANKED_PLAYERS, HIT_LIST, streetRep, PLAYER } from '../data/gameData'
+import { RANKED_PLAYERS, HIT_LIST, streetRep } from '../data/gameData'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
+import { usePlayerCard } from '../state/profileStore'
 
 const GOLD   = '#c9a84c'
 const SILVER = '#b0b0b0'
@@ -196,6 +197,9 @@ function HitCard({ hit, openDetail }) {
 // ---------------------------------------------------------------------
 
 function YardKingsView({ openDetail }) {
+  const me = usePlayerCard()   // live player card (look + name), synced with SWAP/rename
+  // The "you" leaderboard row, with live name/avatar over the static seed.
+  const youRow = () => { const p = RANKED_PLAYERS.find(x => x.isYou); return { ...p, name: me.name, avatar: me.avatar, emoji: me.emoji } }
   // Top 3 overall by Street Rep
   const podium = useMemo(() => (
     RANKED_PLAYERS
@@ -234,11 +238,11 @@ function YardKingsView({ openDetail }) {
           padding: '10px 14px',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           cursor: 'pointer',
-        }} onClick={() => openDetail({ character: RANKED_PLAYERS.find(p => p.isYou) })}>
+        }} onClick={() => openDetail({ character: youRow() })}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Avatar src={PLAYER.card.avatar} emoji={PLAYER.card.emoji} size={28} radius={6} />
+            <Avatar src={me.avatar} emoji={me.emoji} size={28} radius={6} />
             <div>
-              <div style={{ color: GOLD, fontSize: 12, fontWeight: 500 }}>You — {PLAYER.name}</div>
+              <div style={{ color: GOLD, fontSize: 12, fontWeight: 500 }}>You — {me.name}</div>
               <div style={{ color: DIM, fontSize: 10 }}>Street Rep: {streetRep(RANKED_PLAYERS.find(p => p.isYou)).toLocaleString()}</div>
             </div>
           </div>
@@ -291,15 +295,18 @@ function Podium({ top3, openDetail }) {
 }
 
 function PodiumColumn({ p, place, height, color, isWinner, openDetail }) {
+  const me = usePlayerCard()
+  // Live name/avatar for the player's own podium slot.
+  const pc = p.isYou ? { ...p, name: me.name, avatar: me.avatar, emoji: me.emoji } : p
   return (
     <div
-      onClick={() => openDetail({ character: p })}
+      onClick={() => openDetail({ character: pc })}
       style={{
         flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
         minWidth: 0, maxWidth: 110, cursor: 'pointer',
       }}>
       {/* Avatar */}
-      <Avatar src={p.avatar} emoji={p.emoji}
+      <Avatar src={pc.avatar} emoji={pc.emoji}
         size={isWinner ? 60 : 48}
         radius={12}
         style={{
@@ -312,7 +319,7 @@ function PodiumColumn({ p, place, height, color, isWinner, openDetail }) {
         color: '#fff', fontSize: 12, fontWeight: 500,
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         maxWidth: '100%', textAlign: 'center',
-      }}>{p.name}</div>
+      }}>{pc.name}</div>
       <div style={{ color, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>
         {streetRep(p).toLocaleString()}
       </div>
@@ -337,6 +344,10 @@ function PodiumColumn({ p, place, height, color, isWinner, openDetail }) {
 }
 
 function CategoryLeaderboard({ label, subtitle, metricLabel, metric, icon, openDetail }) {
+  const me = usePlayerCard()
+  const liveName = (p) => p.isYou ? me.name : p.name
+  const liveAvatar = (p) => p.isYou ? me.avatar : p.avatar
+  const liveEmoji = (p) => p.isYou ? me.emoji : p.emoji
   const ranked = useMemo(() => (
     RANKED_PLAYERS
       .slice()
@@ -371,7 +382,7 @@ function CategoryLeaderboard({ label, subtitle, metricLabel, metric, icon, openD
       <div className="card" style={{ padding: 0 }}>
         {ranked.map((p, i) => (
           <div key={p.id}
-            onClick={() => openDetail({ character: p })}
+            onClick={() => openDetail({ character: p.isYou ? { ...p, name: me.name, avatar: me.avatar, emoji: me.emoji } : p })}
             style={{
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '8px 12px',
@@ -384,14 +395,14 @@ function CategoryLeaderboard({ label, subtitle, metricLabel, metric, icon, openD
               fontSize: 12, fontWeight: 600, width: 18, textAlign: 'right',
               fontVariantNumeric: 'tabular-nums',
             }}>{i + 1}</div>
-            <Avatar src={p.avatar} emoji={p.emoji} size={28} radius={6} />
+            <Avatar src={liveAvatar(p)} emoji={liveEmoji(p)} size={28} radius={6} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
                 color: p.isYou ? GOLD : '#fff',
                 fontSize: 13, fontWeight: 500,
                 overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
               }}>
-                {p.name}{p.isYou ? ' (You)' : ''}
+                {liveName(p)}{p.isYou ? ' (You)' : ''}
               </div>
             </div>
             <div style={{

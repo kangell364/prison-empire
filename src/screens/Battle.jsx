@@ -3,7 +3,7 @@ import { BATTLE_ENEMIES } from '../data/gameData'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { BattleDiceModal } from '../components/BattleDiceModal'
-import { useVitals, spendStamina, STAMINA_MAX } from '../state/vitalsStore'
+import { useVitals, spendStamina, spendHealth, STAMINA_MAX } from '../state/vitalsStore'
 
 const STAMINA_COST = 5
 
@@ -117,6 +117,7 @@ export default function Battle() {
           onClose={() => setSelectedEnemy(null)}
           onRoll={() => spendStamina(STAMINA_COST)}
           onWin={onWin}
+          onResult={(r) => spendHealth(r.damageTaken)}
         />
       )}
 

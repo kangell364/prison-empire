@@ -3,7 +3,7 @@ import { PLAYER, RANKED_PLAYERS, PVP_LEVEL_RANGE, PVP_FIGHT_COST, pvpRewardMulti
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { BattleDiceModal } from '../components/BattleDiceModal'
-import { useVitals, spendStamina, STAMINA_MAX } from '../state/vitalsStore'
+import { useVitals, spendStamina, spendHealth, STAMINA_MAX } from '../state/vitalsStore'
 import Battle from './Battle'
 
 const GOLD   = '#c9a84c'
@@ -200,6 +200,7 @@ function PlayersScreen() {
             onClose={() => setTarget(null)}
             onRoll={onDiceRoll}
             onWin={onWin}
+            onResult={(r) => spendHealth(r.damageTaken)}
           />
         )
       })()}
