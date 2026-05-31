@@ -78,6 +78,7 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
   const [log, setLog]         = useState([])
   const [outcome, setOutcome] = useState(null)      // win | lose | wornout | draw
   const tickRef = useRef(null)
+  const logSeqRef = useRef(0)                        // stable per-line ids (newest log on top)
 
   const oppLoadout = useMemo(() => opponentSkillLoadout(opponent), [opponent])
   const oppLearned = useMemo(() => {
@@ -253,7 +254,13 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
     // Duel reports damage so the caller can spend shared health on resolve.
     if (!attrition && result && onResult) onResult({ result, damageTaken: maxPlayerHp - newPlayerHp, maxHp: maxPlayerHp })
 
-    setLog(prev => [...prev, ...roundLog])
+    // Newest round on top. Stamp each line with a stable id (so prepending
+    // doesn't re-key/re-animate the older lines below) and an in-round stagger
+    // delay (so a round still fades in top-to-bottom in reading order).
+    const startId = logSeqRef.current
+    const stamped = roundLog.map((line, idx) => ({ ...line, id: startId + idx, delay: idx * 0.12 }))
+    logSeqRef.current = startId + roundLog.length
+    setLog(prev => [...stamped, ...prev])
     setOutcome(result)
     setPhase(result ? 'resolved' : 'idle')
   }
@@ -309,6 +316,25 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
           <SlotGrid side="opp" equipped={oppEquippedMap} learned={oppLearned} highlight={highlight} landed={landedSlot} color={ORANGE} />
         </div>
 
+        {/* Duel (PvP) result button — sits directly under SKILLS and above the
+            fight log so the outcome reads with the board: win = green VICTORY,
+            player KO = red DEFEATED, mutual KO = DRAW. Tapping it banks and closes.
+            Bosses (attrition) keep their bottom-of-modal RETREAT/DONE layout. */}
+        {!attrition && fightOver && (
+          <button onClick={onClose} style={{
+            marginTop: 14, width: '100%',
+            background: outcome === 'win' ? GREEN : outcome === 'lose' ? RED : '#2a2a3a',
+            color: outcome === 'win' ? '#0a0a0f' : '#fff',
+            border: 'none', borderRadius: 10, padding: 14,
+            fontSize: 14, fontWeight: 800, letterSpacing: 1.5, cursor: 'pointer',
+            boxShadow: outcome === 'win' ? `0 0 20px ${GREEN}55` : outcome === 'lose' ? `0 0 20px ${RED}55` : 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}>
+            <i className={`ti ${outcome === 'win' ? 'ti-trophy' : outcome === 'lose' ? 'ti-skull' : 'ti-minus'}`} style={{ fontSize: 15 }} />
+            {outcome === 'win' ? 'VICTORY' : outcome === 'lose' ? 'DEFEATED' : 'DRAW'}
+          </button>
+        )}
+
         {!fightOver && (
           <div style={{ marginTop: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -348,22 +374,23 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
             {log.length === 0 && phase === 'rolling' && (
               <div style={{ color: '#888', fontSize: 12, textAlign: 'center', paddingTop: 18, animation: 'pulse 0.8s infinite' }}>Rolling…</div>
             )}
-            {log.map((line, i) => (
-              <div key={i} style={{ color: line.color, fontSize: 12, marginBottom: 4, opacity: 0, animation: `logLineIn 0.3s ease ${i * 0.12}s forwards`, fontWeight: line.side === 'result' ? 700 : 400 }}>{line.text}</div>
+            {log.map((line) => (
+              <div key={line.id} style={{ color: line.color, fontSize: 12, marginBottom: 4, opacity: 0, animation: `logLineIn 0.3s ease ${line.delay}s forwards`, fontWeight: line.side === 'result' ? 700 : 400 }}>{line.text}</div>
             ))}
           </div>
         )}
 
-        {/* Win — a single green VICTORY button. No "roll again" after a win:
-            the opponent is KO'd, so the only move is to bank it and head back. */}
-        {fightOver && outcome === 'win' && (
+        {/* Boss (attrition) win — a single green VICTORY button. No "roll again"
+            after a win: the boss is down, so the only move is to bank it and head
+            back. Duel wins are shown by the result button under SKILLS above. */}
+        {attrition && fightOver && outcome === 'win' && (
           <button onClick={onClose} style={{ marginTop: 14, width: '100%', background: GREEN, color: '#0a0a0f', border: 'none', borderRadius: 10, padding: 14, fontSize: 14, fontWeight: 800, letterSpacing: 1.5, cursor: 'pointer', boxShadow: `0 0 20px ${GREEN}55` }}>
             <i className="ti ti-trophy" style={{ fontSize: 15, marginRight: 6 }} />VICTORY
           </button>
         )}
-        {/* Attrition loss/boss not-yet-down handled by RETREAT; duel loss/draw
-            shows DONE. (Win is handled above for both modes.) */}
-        {fightOver && outcome !== 'win' && (
+        {/* Boss not-yet-down handled by RETREAT; a finished attrition fight shows
+            DONE. Duel outcomes are all handled by the result button above. */}
+        {attrition && fightOver && outcome !== 'win' && (
           <button onClick={onClose} style={{ marginTop: 14, width: '100%', background: GOLD, color: '#0a0a0f', border: 'none', borderRadius: 10, padding: 14, fontSize: 13, fontWeight: 800, letterSpacing: 1, cursor: 'pointer' }}>
             <i className="ti ti-check" style={{ fontSize: 14, marginRight: 4 }} />DONE
           </button>
@@ -377,9 +404,10 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
           </button>
         )}
 
-        {/* Status line for non-win outcomes — the green VICTORY button already
-            says it for a win, so don't stack a second "VICTORY" under it. */}
-        {outcome && outcome !== 'win' && (
+        {/* Status line for boss (attrition) non-win outcomes (WORN OUT). Duel
+            outcomes are spelled out by the result button under SKILLS, so no
+            redundant status line there. */}
+        {attrition && outcome && outcome !== 'win' && (
           <div style={{ marginTop: 10, textAlign: 'center', color: outcome === 'wornout' ? ORANGE : outcome === 'lose' ? RED : '#888', fontSize: 12, fontWeight: 700, letterSpacing: 1.5 }}>
             {outcome === 'wornout' ? 'WORN OUT' : outcome === 'lose' ? 'DEFEATED' : 'DRAW'}
           </div>
