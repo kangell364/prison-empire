@@ -39,8 +39,13 @@ export function PvpBattleModal({ opponent, bounty = 0, onKO, onClose }) {
     if (onKO) onKO(opp)
   }
 
+  // Spend real health per hit (live), so the fight bar — which is now the
+  // player's real Health pool — and the card stay one number. (Health was once
+  // spent in a lump at resolve; that over-charged once the duel started from
+  // current health instead of full.)
+  const handleHit = ({ dealtToPlayer }) => spendHealth(dealtToPlayer)
+
   const handleResult = (r) => {
-    spendHealth(r.damageTaken)
     if (r.result === 'lose') recordKoBy(opponent)
   }
 
@@ -56,6 +61,7 @@ export function PvpBattleModal({ opponent, bounty = 0, onKO, onClose }) {
       }}
       onRoll={() => spendStamina(PVP_FIGHT_COST)}
       onAttack={onAttack}
+      onHit={handleHit}
       onWin={handleKO}
       onResult={handleResult}
       onClose={onClose}

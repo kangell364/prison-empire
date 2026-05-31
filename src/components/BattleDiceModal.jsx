@@ -99,26 +99,38 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
   // health so a boss is ground down across sessions. Duel (PvP): use the level
   // curve HP so a fight is a quick, fair ~15-round bout — not a 170-round slog
   // against the full vitals pool.
-  const maxPlayerHp = attrition ? healthMax : combat.hp
-  const maxOppHp    = opponent.hp != null ? opponent.hp : Math.floor(opponent.power * 6 + 800)
-  // Seed: attrition keeps real, persistent HP; duel starts both full.
-  const [playerHp, setPlayerHp] = useState(attrition ? vitals.health : maxPlayerHp)
+  // Both modes now fight on the player's REAL health pool — the fight bar IS the
+  // card's Health, one source of truth. A duel used to use a separate small
+  // combat-HP scale (200 at Lv1), which neither matched the card nor reflected
+  // the real health it quietly drained. To keep a duel a snappy ~15-round bout
+  // against a fair opponent, scale the opponent's HP and all damage by the same
+  // factor the real pool is bigger than the level-curve combat HP the matchup
+  // was tuned on — the ratio (and round count) is preserved; only the numbers,
+  // and the real health spent, move onto the true scale. Attrition (bosses)
+  // already fights on real health, so its scale stays 1×.
+  const duelScale   = attrition ? 1 : (combat.hp > 0 ? healthMax / combat.hp : 1)
+  const maxPlayerHp = healthMax
+  const maxOppHp    = Math.round((opponent.hp != null ? opponent.hp : Math.floor(opponent.power * 6 + 800)) * duelScale)
+  // Seed: the player always starts at their real, current health (carry wounds
+  // in, spend them for real); the duel opponent starts full, a boss persists.
+  const [playerHp, setPlayerHp] = useState(vitals.health)
   const [oppHp, setOppHp]       = useState(attrition ? (oppStartHp ?? maxOppHp) : maxOppHp)
   const [playerHit, setPlayerHit] = useState({ amount: 0, key: 0 })
   const [oppHit,    setOppHit]    = useState({ amount: 0, key: 0 })
   const [landedSlot, setLandedSlot] = useState(null)
   const [sessionXp, setSessionXp] = useState(0)   // running net XP this PvP fight
 
-  const wornOut  = attrition && playerHp <= 0
+  // Worn out in either mode now: the player fights on real health, so hitting 0
+  // means back off and heal (a duel loss is the same "out of health" state).
+  const wornOut  = playerHp <= 0
   const canRoll  = stamina >= cost && !wornOut
 
   const roll = () => {
     if (phase === 'rolling') return
     if (!canRoll) { sfx.deny?.(); return }
-    // Duel resets for a fresh bout after a resolved fight. Attrition never resets.
-    if (phase === 'resolved' && !attrition) {
-      setPlayerHp(maxPlayerHp); setOppHp(maxOppHp); setLog([]); setOutcome(null); setSessionXp(0)
-    }
+    // No post-fight reset: a duel now runs on the player's real, continuous
+    // health (like attrition). Once someone's down the fight is over — you don't
+    // get a free fresh HP bar by rolling again.
     setPhase('rolling')
     setLandedSlot(null)
     if (onRoll) onRoll()
@@ -160,8 +172,10 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
 
     const playerAttack  = stats.playerBaseAttack + pSkillBonus
     const oppAttack     = stats.oppBaseAttack + oSkillBonus
-    const youDealt = dmg(playerAttack, stats.oppBaseDefense)
-    const oppDealt = dmg(oppAttack, stats.playerBaseDefense)
+    // Scale damage onto the real-health pool (see duelScale). Uniform on both
+    // sides, so the per-turn win/lose comparison and round count are unchanged.
+    const youDealt = Math.max(1, Math.round(dmg(playerAttack, stats.oppBaseDefense) * duelScale))
+    const oppDealt = Math.max(1, Math.round(dmg(oppAttack, stats.playerBaseDefense) * duelScale))
 
     const newOppHp    = Math.max(0, oppHp - youDealt)
     const newPlayerHp = Math.max(0, playerHp - oppDealt)
@@ -169,8 +183,11 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
     if (youDealt > 0) setOppHit(h    => ({ amount: youDealt, key: h.key + 1 }))
     if (oppDealt > 0) setPlayerHit(h => ({ amount: oppDealt, key: h.key + 1 }))
 
-    // Attrition: persist this hit immediately (boss HP down for good + real health spent).
-    if (attrition && onHit) onHit({ dealtToOpp: youDealt, dealtToPlayer: oppDealt })
+    // Persist this hit immediately, both modes: attrition also drops boss HP for
+    // good; a duel just spends the player's real health. Spending live (not once
+    // at resolve) means it's charged exactly as dealt and leaving mid-fight keeps
+    // the wounds you took.
+    if (onHit) onHit({ dealtToOpp: youDealt, dealtToPlayer: oppDealt })
 
     // PvP (duel) per-turn XP: whoever deals more damage WINS the turn. Win = +xp,
     // lose = −xp, even = nothing. Applied live so picking a bad matchup bleeds XP.
@@ -350,24 +367,13 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
             <i className="ti ti-check" style={{ fontSize: 14, marginRight: 4 }} />DONE
           </button>
         )}
-        {/* Attrition: you can bail out any time between rolls — the boss keeps
-            its wounds, so progress is never lost. Essential when you run dry on
-            stamina mid-grind. */}
-        {!fightOver && attrition && phase !== 'rolling' && (
+        {/* Bail out between rolls. Attrition keeps the boss's wounds (progress
+            saved); a duel just leaves — either way the player's real health that
+            was already spent stays spent. */}
+        {!fightOver && phase !== 'rolling' && (
           <button onClick={onClose} style={{ marginTop: 8, width: '100%', background: '#1e1e2a', color: '#888', border: '0.5px solid #2a2a3a', borderRadius: 10, padding: 12, fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: 'pointer' }}>
-            RETREAT (progress saved)
+            {attrition ? 'RETREAT (progress saved)' : 'LEAVE FIGHT'}
           </button>
-        )}
-        {/* Duel post-fight, NON-win only: let the player re-roll a fresh bout or
-            bail. After a win this is suppressed (see green VICTORY above). */}
-        {!attrition && phase === 'resolved' && outcome !== 'win' && (
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <button onClick={roll} disabled={!canRoll}
-              style={{ flex: 1, background: canRoll ? GOLD : '#1e1e2a', color: canRoll ? '#0a0a0f' : '#555', border: 'none', borderRadius: 10, padding: 14, fontSize: 12, fontWeight: 800, letterSpacing: 1, cursor: canRoll ? 'pointer' : 'not-allowed' }}>
-              <i className={`ti ${canRoll ? 'ti-refresh' : 'ti-bolt-off'}`} style={{ fontSize: 13, marginRight: 4 }} />{canRoll ? 'ROLL AGAIN' : 'NO STAMINA'}
-            </button>
-            <button onClick={onClose} style={{ flex: 1, background: '#1e1e2a', color: '#888', border: '0.5px solid #2a2a3a', borderRadius: 10, padding: 14, fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: 'pointer' }}>CLOSE</button>
-          </div>
         )}
 
         {/* Status line for non-win outcomes — the green VICTORY button already
