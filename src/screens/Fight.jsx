@@ -347,7 +347,10 @@ function HitListScreen() {
       </div>
 
       <div className="section" style={{ marginTop: 14 }}>
-        {/* Your own player — pinned on top. There's a price on your head too. */}
+        {/* Your own player — pinned on top while there's a price on your head.
+            When a rival collects it (KOs you), the bounty clears and this row
+            drops off until you build a new one by being notorious again. */}
+        {youBounty > 0 && (
         <div className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 12, borderColor: `${GOLD}66`, background: 'linear-gradient(135deg, #15110a, #13131f)', marginBottom: 10 }}>
           <Avatar src={me.avatar} emoji={me.emoji} size={48} radius={12} ko={vitals.ko} style={{ background: '#1e1e2a' }} />
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -362,6 +365,7 @@ function HitListScreen() {
           </div>
           <div style={{ color: DIM, fontSize: 9, textAlign: 'right', flexShrink: 0, maxWidth: 80, lineHeight: 1.4 }}>Rivals can collect this</div>
         </div>
+        )}
 
         {targets.length === 0 ? (
           <div className="card card-pad" style={{ textAlign: 'center', color: DIM, fontSize: 12, lineHeight: 1.6, padding: 24 }}>

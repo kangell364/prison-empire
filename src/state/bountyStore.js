@@ -49,10 +49,11 @@ export function addBounty(amount) {
 export function bumpForKo()   { addBounty(5_000 + level() * 2_000) }   // KO a rival
 export function bumpForBoss() { addBounty(20_000 + level() * 5_000) }  // clear a boss
 
-// A rival collects the price on your head when you go down — reset to the floor.
-// Returns the amount claimed.
+// A rival collects the price on your head when you go down — the bounty is
+// claimed and CLEARED (you come off the hit list until you build a new one by
+// being notorious again). Returns the amount claimed.
 export function collectBounty() {
   const collected = state.bounty
-  commit({ bounty: floor() })
+  commit({ bounty: 0 })
   return collected
 }
