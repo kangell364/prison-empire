@@ -6,6 +6,7 @@ import { useCrew, atkOf, defOf, baseAtk, baseDef } from '../state/crewStore'
 import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
 import { useVitals, msToNextStamina, msToNextHealth } from '../state/vitalsStore'
 import { useProgress } from '../state/progressionStore'
+import { usePlayerStats } from '../state/statsStore'
 import { xpForLevel } from '../data/bossLadder'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
@@ -48,6 +49,8 @@ export default function Dashboard({ onNavigate }) {
     return acc
   }, { atk: 0, def: 0 })
   const playerName = useDisplayName()
+  const liveStats = usePlayerStats()                 // real ATK/DEF/HP from traits
+  const livePower = liveStats.atk + liveStats.def    // leaderboard "power" = ATK+DEF
   const lookId = usePlayerLook()
   // The home-screen player card is now a cosmetic "look" (see SWAP). Level, XP
   // and stats are unaffected — only the art + name change.
@@ -281,15 +284,22 @@ export default function Dashboard({ onNavigate }) {
               display: 'flex', alignItems: 'center', gap: 12,
               borderColor: p.isYou ? '#c9a84c44' : '#2a2a3a',
               cursor: 'pointer',
-            }} onClick={() => setDetailChar(RANKED_PLAYERS.find(rp => rp.name === p.name) || p)}>
+            }} onClick={() => {
+              if (p.isYou) {
+                const base = RANKED_PLAYERS.find(rp => rp.isYou) || p
+                setDetailChar({ ...base, name: playerName, level: prog.level, atk: liveStats.atk, def: liveStats.def, hp: liveStats.hp, power: livePower })
+              } else {
+                setDetailChar(RANKED_PLAYERS.find(rp => rp.name === p.name) || p)
+              }
+            }}>
               <div style={{ color: p.rank === 1 ? '#c9a84c' : p.rank === 2 ? '#888' : p.rank === 3 ? '#8b6914' : '#555', fontSize: 14, fontWeight: 500, width: 20 }}>{p.rank}</div>
               <Avatar src={p.avatar} emoji={p.emoji} size={36} radius={10}
                 style={{ background: '#1e1e2a' }} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: p.isYou ? '#c9a84c' : '#fff', fontSize: 13, fontWeight: 500 }}>{p.name}{p.isYou ? ' (You)' : ''}</div>
+                <div style={{ color: p.isYou ? '#c9a84c' : '#fff', fontSize: 13, fontWeight: 500 }}>{p.isYou ? playerName : p.name}{p.isYou ? ' (You)' : ''}</div>
                 <div style={{ color: '#555', fontSize: 10 }}>{p.facility} — {p.state}</div>
               </div>
-              <div style={{ color: p.isYou ? '#c9a84c' : '#888', fontSize: 14, fontWeight: 500 }}>{p.power}</div>
+              <div style={{ color: p.isYou ? '#c9a84c' : '#888', fontSize: 14, fontWeight: 500 }}>{(p.isYou ? livePower : p.power).toLocaleString()}</div>
             </div>
           ))}
         </div>

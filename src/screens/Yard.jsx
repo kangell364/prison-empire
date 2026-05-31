@@ -3,6 +3,8 @@ import { RANKED_PLAYERS, streetRep } from '../data/gameData'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { usePlayerCard } from '../state/profileStore'
+import { useProgress } from '../state/progressionStore'
+import { usePlayerStats } from '../state/statsStore'
 import { useHitList } from '../state/hitListStore'
 import { BountyModal } from '../components/BountyModal'
 import { PvpBattleModal } from '../components/PvpBattleModal'
@@ -187,8 +189,15 @@ function HitCard({ target: t, onAddBounty, onMove }) {
 
 function YardKingsView({ openDetail }) {
   const me = usePlayerCard()   // live player card (look + name), synced with SWAP/rename
-  // The "you" leaderboard row, with live name/avatar over the static seed.
-  const youRow = () => { const p = RANKED_PLAYERS.find(x => x.isYou); return { ...p, name: me.name, avatar: me.avatar, emoji: me.emoji } }
+  const prog = useProgress()
+  const stats = usePlayerStats()   // real ATK/DEF/HP from traits
+  // The "you" leaderboard row: live name/avatar AND live combat stats (level,
+  // ATK/DEF/Life/power) over the static seed. Street Rep stays record-based.
+  const youRow = () => {
+    const p = RANKED_PLAYERS.find(x => x.isYou)
+    return { ...p, name: me.name, avatar: me.avatar, emoji: me.emoji,
+      level: prog.level, atk: stats.atk, def: stats.def, hp: stats.hp, power: stats.atk + stats.def }
+  }
   // Top 3 overall by Street Rep
   const podium = useMemo(() => (
     RANKED_PLAYERS
