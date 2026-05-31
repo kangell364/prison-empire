@@ -7,6 +7,8 @@ import { BattleDiceModal } from '../components/BattleDiceModal'
 import { useVitals, spendStamina, spendHealth, STAMINA_MAX } from '../state/vitalsStore'
 import { useProgress, usePlayerCombat, addXp, creditRival, reclaimRival } from '../state/progressionStore'
 import { useFightLog, recordKoBy, recordKo } from '../state/fightLogStore'
+import { useHitList } from '../state/hitListStore'
+import { BountyModal, formatHustle } from '../components/BountyModal'
 import Battle from './Battle'
 
 // PvP per-turn XP: whoever deals more damage that roll wins the turn.
@@ -44,9 +46,13 @@ export default function Fight() {
           <i className="ti ti-skull" style={{ marginRight: 5, fontSize: 13 }} />
           Bosses
         </SubTab>
+        <SubTab active={tab === 'hitlist'} onClick={() => setTab('hitlist')}>
+          <i className="ti ti-crosshair" style={{ marginRight: 5, fontSize: 13 }} />
+          Hit List
+        </SubTab>
       </div>
 
-      {tab === 'players' ? <PlayersScreen /> : <Battle />}
+      {tab === 'players' ? <PlayersScreen /> : tab === 'bosses' ? <Battle /> : <HitListScreen />}
     </>
   )
 }
@@ -78,6 +84,7 @@ function PlayersScreen() {
   const stamina = useVitals().stamina
   const [target, setTarget]         = useState(null)
   const [detailPlayer, setDetailPlayer] = useState(null)
+  const [bountyTarget, setBountyTarget] = useState(null)
 
   // Revenge targets (rivals who KO'd you) — regenerated from their stable ids so
   // they're always fightable and pinned to the top, even if they've since
@@ -198,6 +205,7 @@ function PlayersScreen() {
                 revenge={!!fightLog.revenge[opp.id]}
                 disabled={stamina < PVP_FIGHT_COST}
                 onFight={() => onFightOpened(opp)}
+                onHitList={() => setBountyTarget(opp)}
                 onShowDetail={() => setDetailPlayer(opp)}
               />
             ))}
@@ -228,18 +236,22 @@ function PlayersScreen() {
         <CharacterDetailModal
           character={detailPlayer}
           onClose={() => setDetailPlayer(null)}
-          actions={stamina >= PVP_FIGHT_COST ? [
-            { label: `FIGHT — ${PVP_FIGHT_COST} STAMINA`, icon: 'ti-sword', onClick: () => onFightOpened(detailPlayer) },
-          ] : [
-            { label: 'NOT ENOUGH STAMINA', icon: 'ti-bolt-off', onClick: () => {}, kind: 'secondary' },
+          actions={[
+            ...(stamina >= PVP_FIGHT_COST
+              ? [{ label: `FIGHT — ${PVP_FIGHT_COST} STAMINA`, icon: 'ti-sword', onClick: () => onFightOpened(detailPlayer) }]
+              : [{ label: 'NOT ENOUGH STAMINA', icon: 'ti-bolt-off', onClick: () => {}, kind: 'secondary' }]),
+            { label: 'PUT ON HIT LIST', icon: 'ti-crosshair', kind: 'secondary', onClick: () => { setBountyTarget(detailPlayer); setDetailPlayer(null) } },
           ]}
         />
       )}
+
+      {/* Place / add a Hustle bounty */}
+      {bountyTarget && <BountyModal opponent={bountyTarget} onClose={() => setBountyTarget(null)} />}
     </div>
   )
 }
 
-function TargetCard({ opp, rivalXp = 0, revenge = false, disabled, onFight, onShowDetail }) {
+function TargetCard({ opp, rivalXp = 0, revenge = false, disabled, onFight, onHitList, onShowDetail }) {
   const me = usePlayerCombat()
   // Preview the matchup: do you out-hit them per turn? (same model as the fight)
   const youDealt = dmg(me.atk, opp.def)
@@ -293,23 +305,101 @@ function TargetCard({ opp, rivalXp = 0, revenge = false, disabled, onFight, onSh
         </div>
       </div>
 
-      <button
-        onClick={(e) => { e.stopPropagation(); onFight() }}
-        disabled={disabled}
-        style={{
-          background: disabled ? '#1e1e2a' : GOLD,
-          color: disabled ? '#555' : '#0a0a0f',
-          border: 'none', borderRadius: 8,
-          padding: '10px 14px',
-          fontSize: 12, fontWeight: 700, letterSpacing: 1,
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          flexShrink: 0,
-          display: 'flex', alignItems: 'center', gap: 4,
-        }}
-      >
-        <i className="ti ti-sword" style={{ fontSize: 13 }} />
-        FIGHT
-      </button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); onFight() }}
+          disabled={disabled}
+          style={{
+            background: disabled ? '#1e1e2a' : GOLD,
+            color: disabled ? '#555' : '#0a0a0f',
+            border: 'none', borderRadius: 8,
+            padding: '9px 14px',
+            fontSize: 12, fontWeight: 700, letterSpacing: 1,
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+          }}
+        >
+          <i className="ti ti-sword" style={{ fontSize: 13 }} />
+          FIGHT
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onHitList && onHitList() }}
+          title="Put a Hustle bounty on this player"
+          style={{
+            background: 'transparent', color: '#888',
+            border: '0.5px solid #2a2a3a', borderRadius: 8,
+            padding: '7px 14px', fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+          }}
+        >
+          <i className="ti ti-crosshair" style={{ fontSize: 12 }} />
+          HIT LIST
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// =====================================================================
+// Hit List — bountied targets (paid in Hustle)
+// =====================================================================
+
+function HitListScreen() {
+  const list = useHitList()
+  const [bountyTarget, setBountyTarget] = useState(null)
+  const targets = Object.values(list.targets).sort((a, b) => b.bounty - a.bounty)
+  const total = targets.reduce((s, t) => s + t.bounty, 0)
+
+  return (
+    <div className="scroll-area animate-in">
+      <div style={{ margin: '14px 16px 0', background: 'linear-gradient(135deg, #1a1012 0%, #13131f 100%)', border: `1px solid ${RED}44`, borderRadius: 16, padding: 14 }}>
+        <div style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>
+          <i className="ti ti-crosshair" style={{ color: RED, marginRight: 6 }} />Hit List
+        </div>
+        <div style={{ color: '#888', fontSize: 11, marginTop: 3, lineHeight: 1.4 }}>
+          Put a Hustle bounty on a rival. Anyone can stack more on the pot — and move on the target to collect it.
+        </div>
+        {targets.length > 0 && (
+          <div style={{ color: GOLD, fontSize: 12, marginTop: 8, fontWeight: 700 }}>
+            <i className="ti ti-coin" style={{ fontSize: 12, marginRight: 4 }} />{formatHustle(total)} Hustle on {targets.length} target{targets.length === 1 ? '' : 's'}
+          </div>
+        )}
+      </div>
+
+      <div className="section" style={{ marginTop: 14 }}>
+        {targets.length === 0 ? (
+          <div className="card card-pad" style={{ textAlign: 'center', color: DIM, fontSize: 12, lineHeight: 1.6, padding: 24 }}>
+            <i className="ti ti-crosshair" style={{ fontSize: 30, color: '#2a2a3a', display: 'block', marginBottom: 8 }} />
+            No bounties yet. Tap <b style={{ color: '#888' }}>HIT LIST</b> on any player to put a price on their head.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {targets.map(t => (
+              <div key={t.id} className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 12, borderColor: `${RED}33` }}>
+                <Avatar src={t.avatar} emoji={t.emoji} size={48} radius={12} style={{ background: '#1e1e2a' }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: '#fff', fontSize: 14, fontWeight: 500 }}>{t.name}</div>
+                  <div style={{ color: '#888', fontSize: 11, marginTop: 1 }}>Lv {t.level}</div>
+                  <div style={{ color: GOLD, fontSize: 13, fontWeight: 700, marginTop: 3 }}>
+                    <i className="ti ti-coin" style={{ fontSize: 12, marginRight: 3 }} />{formatHustle(t.bounty)} bounty
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => setBountyTarget(t)} style={{ background: '#13131f', color: GOLD, border: `0.5px solid ${GOLD}55`, borderRadius: 8, padding: '8px 12px', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer' }}>
+                    <i className="ti ti-plus" style={{ fontSize: 12, marginRight: 3 }} />ADD BOUNTY
+                  </button>
+                  <button title="Coming soon" disabled style={{ background: `${RED}66`, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 11, fontWeight: 800, letterSpacing: 0.5, cursor: 'not-allowed', position: 'relative' }}>
+                    <i className="ti ti-target-arrow" style={{ fontSize: 12, marginRight: 3 }} />MOVE ON TARGET
+                    <span style={{ position: 'absolute', top: -6, right: -4, background: '#2a2a3a', color: '#aaa', fontSize: 7, fontWeight: 700, padding: '1px 4px', borderRadius: 4 }}>SOON</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {bountyTarget && <BountyModal opponent={bountyTarget} onClose={() => setBountyTarget(null)} />}
     </div>
   )
 }
