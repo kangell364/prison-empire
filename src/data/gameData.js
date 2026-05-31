@@ -1,5 +1,29 @@
 // Game Data — Prison Empire
 
+import { playerCombatStats } from './traitMath'
+
+// Give a named NPC (ranked players, leaderboard rivals) combat stats on the
+// CURRENT build's scale, derived from their level via the same yardstick the
+// bosses + fightable rivals use — so the leaderboard, the character-detail card,
+// and an actual fight all agree. Variance is deterministic per id/name (stable
+// across renders/sessions) and mirrors pvpLadder.generateOpponent's spread, so a
+// tougher-looking veteran really is tougher. Overwrites any legacy `power`.
+function npcRng(seed) {
+  let h = 2166136261
+  const s = String(seed)
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) }
+  h >>>= 0
+  return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h >>>= 0; return h / 4294967296 }
+}
+function withCombat(p) {
+  const base = playerCombatStats(p.level || 1)
+  const rng = npcRng(p.id || p.name || 'x')
+  const atk = Math.round(base.atk * (0.85 + rng() * 0.35))   // 0.85..1.20
+  const def = Math.round(base.def * (0.85 + rng() * 0.35))
+  const hp  = Math.round(base.hp  * (0.90 + rng() * 0.25))   // 0.90..1.15
+  return { ...p, atk, def, hp, power: atk + def }
+}
+
 export const PLAYER = {
   name: 'SlickRico',
   level: 42,
@@ -115,13 +139,16 @@ export const CREW = [
   { id: 8, name: 'Locked',     emoji: '',   power: 0,  rarity: 'locked',   locked: true,  unlockLevel: 80  },
 ]
 
+// Home-screen leaderboard preview. Levels mirror the matching RANKED_PLAYERS so
+// withCombat puts everyone on the current build's scale (no more legacy ~200-900
+// powers sitting next to multi-thousand fight stats).
 export const LEADERBOARD = [
-  { rank: 1, name: 'IronMike_TX',   emoji: '👑', facility: 'Supermax',     state: 'Texas', power: 892, isYou: false },
-  { rank: 2, name: 'YardBoss99',    emoji: '🔥', facility: 'Federal Penn', state: 'Texas', power: 541, isYou: false },
-  { rank: 3, name: 'TexasCartel',   emoji: '💎', facility: 'Federal Penn', state: 'Texas', power: 398, isYou: false },
-  { rank: 4, name: 'SlickRico',     emoji: '🤵', avatar: '/slickrico.jpg', facility: 'Federal Penn', state: 'Texas', power: 284, isYou: true  },
-  { rank: 5, name: 'HoustonKing',   emoji: '🏙️', facility: 'State Prison', state: 'Texas', power: 201, isYou: false },
-]
+  { rank: 1, name: 'IronMike_TX',   emoji: '👑', facility: 'Supermax',     state: 'Texas', level: 88, isYou: false },
+  { rank: 2, name: 'YardBoss99',    emoji: '🔥', facility: 'Federal Penn', state: 'Texas', level: 67, isYou: false },
+  { rank: 3, name: 'TexasCartel',   emoji: '💎', facility: 'Federal Penn', state: 'Texas', level: 61, isYou: false },
+  { rank: 4, name: 'SlickRico',     emoji: '🤵', avatar: '/slickrico.jpg', facility: 'Federal Penn', state: 'Texas', level: 42, isYou: true  },
+  { rank: 5, name: 'HoustonKing',   emoji: '🏙️', facility: 'State Prison', state: 'Texas', level: 47, isYou: false },
+].map(withCombat)
 
 export const CARDS_COLLECTION = [
   { id: 1,  name: 'Slick Rico',      emoji: '🤵', avatar: '/slickrico.jpg', rarity: 'epic',      hustle: 15, muscle: 6,  smarts: 14, cred: 12, special: 'Con Artist',
@@ -552,7 +579,7 @@ export const RANKED_PLAYERS = [
     bio: 'Channels ancient martial wisdom. Mostly just gets hit. The goatee is doing a lot of work.' },
   { id: 'p19', name: 'FreshFishFred',    emoji: '😰',  facility: 'County Jail',  state: 'IN', level: 4,  power: 14,  wins: 0,   losses: 47,  kos: 0,  defeats: 12, jobs: 8,
     bio: 'Brand new. Confused. Scared. 0 wins, 47 losses. Send help, send commissary, send anything.' },
-]
+].map(withCombat)
 
 export function streetRep(p) {
   return ((p.kos - p.defeats * 10) * 100) + ((p.wins - p.losses * 5) * 5) + p.jobs

@@ -287,7 +287,7 @@ export function CharacterDetailModal({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
               <StatTile icon="ti-sword"   label="Attack"  value={attackOf(c)}  color={RED}   small />
               <StatTile icon="ti-shield"  label="Defense" value={defenseOf(c)} color={BLUE}  small />
-              <StatTile icon="ti-bolt"    label="Power"   value={(c.power ?? 0).toLocaleString()} color={GOLD} small />
+              <StatTile icon="ti-heart"   label="Life"    value={(c.hp ?? 0).toLocaleString()} color="#2ecc71" small />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
               <StatTile icon="ti-trophy" label="Wins"   value={c.wins.toLocaleString()}   color={GOLD}     small />
@@ -447,11 +447,13 @@ function UpgradeRow({ label, color, stat, level, perLevel, maxLevel, cost, hustl
 // sees once a fight starts. Falls back to muscle/cred when available
 // (e.g. the player's own card).
 function attackOf(c) {
+  if (c.atk != null) return c.atk.toLocaleString()   // explicit, current-build scale
   if (c.muscle != null) return (c.muscle * 5 + 15).toLocaleString()
   if (c.power  != null) return (Math.floor(c.power * 0.55) + 10).toLocaleString()
   return '—'
 }
 function defenseOf(c) {
+  if (c.def != null) return c.def.toLocaleString()
   if (c.cred  != null) return (c.cred * 5 + 10).toLocaleString()
   if (c.power != null) return (Math.floor(c.power * 0.45) + 15).toLocaleString()
   return '—'
