@@ -103,6 +103,15 @@ export function yourBlocks() {
   })
 }
 
+// Reactive read of your held blocks — re-renders the host whenever ownership
+// changes (recruit / poach / AI poach / KO landing). Used by the map's
+// "blocks by state/county" lists so they stay live.
+export function useYourBlocks() {
+  const [blocks, setBlocks] = useState(yourBlocks)
+  useEffect(() => subscribeBlocks(() => setBlocks(yourBlocks())), [])
+  return blocks
+}
+
 // AI crew takes one of YOUR blocks. You (a real displaced owner) get the payout
 // — stake back + a cut of the premium — so a loss is a payday, not a wipeout.
 // Returns { payout, crew, npc }.

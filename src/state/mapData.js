@@ -121,6 +121,38 @@ export function buildCityCountyMap(mapData, cities) {
   return out
 }
 
+// Counties grouped by their 2-digit state FIPS, cached per mapData. Lets a
+// point lookup scan just one state's counties instead of all ~3,231.
+const countiesByStateCache = new WeakMap()
+function countiesByState(mapData) {
+  if (countiesByStateCache.has(mapData)) return countiesByStateCache.get(mapData)
+  const byStateFips = {}
+  mapData.counties.features.forEach(f => {
+    const fips = String(f.id).padStart(5, '0')
+    ;(byStateFips[fips.slice(0, 2)] ||= []).push(f)
+  })
+  countiesByStateCache.set(mapData, byStateFips)
+  return byStateFips
+}
+
+// County FIPS (5-digit string) containing geographic point [lng, lat], or null.
+// Finds the state by point-in-polygon first (~50 checks), then the county within
+// that state — far cheaper than scanning every county. Falls back to a full
+// county scan if the point misses every state (coastal/precision edge cases).
+export function countyForPoint(mapData, lng, lat) {
+  if (!mapData || typeof lng !== 'number' || typeof lat !== 'number') return null
+  const point = [lng, lat]
+  let stateFips = null
+  for (const sf of mapData.states.features) {
+    if (geoContains(sf, point)) { stateFips = String(sf.id).padStart(2, '0'); break }
+  }
+  const candidates = stateFips ? (countiesByState(mapData)[stateFips] || []) : mapData.counties.features
+  for (const f of candidates) {
+    if (geoContains(f, point)) return String(f.id).padStart(5, '0')
+  }
+  return null
+}
+
 // Lightweight centroid for a single GeoJSON feature — averages the first
 // ring's coordinates. Good enough for the fallback-nearest tie-breaker.
 function pathCentroid(feature) {

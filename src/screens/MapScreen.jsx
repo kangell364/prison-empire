@@ -6,8 +6,8 @@ import { USStateMap } from '../components/USStateMap'
 import { ScoutScreen } from '../components/ScoutScreen'
 import { TurfMap } from '../components/TurfMap'
 import { BlockSheet } from '../components/BlockSheet'
-import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock } from '../state/blocksStore'
-import { useMapData, buildCityCountyMap, STATE_CODE_TO_FIPS } from '../state/mapData'
+import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks } from '../state/blocksStore'
+import { useMapData, buildCityCountyMap, STATE_CODE_TO_FIPS, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
 import { useDisplayName } from '../state/profileStore'
 import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
 import { useWorld, moveHouse, arriveHouse, getHouse, applyHomeRaid, attackHouse } from '../state/worldStore'
@@ -372,6 +372,47 @@ export default function MapScreen() {
     return m
   }, [mapData])
 
+  // Your held NPC blocks, geocoded to state + county. byState/byCounty drive the
+  // "Your Blocks by State" (country view) and "Your Blocks by County" (state
+  // view) lists. Each block is point-in-polygon'd to its county; the first two
+  // FIPS digits give the state. Stays live via useYourBlocks.
+  const myBlocks = useYourBlocks()
+  const blockGeo = useMemo(() => {
+    const byState = {}, byCounty = {}
+    if (!mapData) return { byState, byCounty }
+    for (const b of myBlocks) {
+      const [lat, lng] = cellCenter(b.gx, b.gy)
+      const fips = countyForPoint(mapData, lng, lat)
+      if (!fips) continue
+      const sf = fips.slice(0, 2)
+      const st = byState[sf] || (byState[sf] = { fips: sf, code: STATE_FIPS_TO_CODE[sf] || sf, name: stateNameByFips[sf] || sf, count: 0 })
+      st.count++
+      const ct = byCounty[fips] || (byCounty[fips] = { fips, stateFips: sf, name: countyNameByFips[fips] || 'Unknown', count: 0, blocks: [] })
+      ct.count++
+      ct.blocks.push([lat, lng])
+    }
+    return { byState, byCounty }
+  }, [myBlocks, mapData, stateNameByFips, countyNameByFips])
+
+  const statesWithBlocks = useMemo(
+    () => Object.values(blockGeo.byState).sort((a, b) => b.count - a.count),
+    [blockGeo],
+  )
+  const countiesWithBlocks = useMemo(
+    () => stateView
+      ? Object.values(blockGeo.byCounty).filter(c => c.stateFips === stateView.fips).sort((a, b) => b.count - a.count)
+      : [],
+    [blockGeo, stateView],
+  )
+
+  // Open the Turf Map centered on the average of your owned blocks in a county,
+  // so it lands right on your turf there.
+  const openCountyTurf = (c) => {
+    const n = c.blocks.length
+    const [sumLat, sumLng] = c.blocks.reduce((a, [lat, lng]) => [a[0] + lat, a[1] + lng], [0, 0])
+    setTurfView({ center: n ? [sumLat / n, sumLng / n] : null, label: `${c.name} County` })
+  }
+
   // Current county of a movable house: explicit county_fips, else via its city.
   const houseCounty = (h) => h?.county_fips || (h?.cityId != null ? cityCounty[h.cityId] : null)
   // Geographic coords [lng,lat] of a house. A KO scatter pins it to an exact
@@ -635,39 +676,71 @@ export default function MapScreen() {
         </div>
         {!stateView && (
           <div style={{ color: DIM, fontSize: 11, textAlign: 'center', marginTop: 8 }}>
-            Tap a state to see its facilities, then tap a facility to scout it.
+            Tap a state to drill into the counties where you hold turf.
           </div>
         )}
       </div>
 
-      {/* Facility list for the focused state */}
-      {stateView && (
+      {/* Country view: the states where you hold NPC blocks, with counts. Tap a
+          state to drill into its counties. */}
+      {!stateView && (
         <div className="section">
-          <div className="section-label">{stateView.name} Facilities</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {FACILITIES.filter(f => cityById.get(f.cityId)?.state === stateView.code).map(f => {
-              const o = territories[f.id]?.owner ?? null
-              const color = o === 'you' ? GOLD : o ? RED : '#2ecc71'
-              return (
-                <div key={f.id} className="card card-pad" onClick={() => setSelectedFacility(f)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', cursor: 'pointer', borderColor: `${color}44` }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: `${color}18`, color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <i className="ti ti-building-fortress" />
+          <div className="section-label">Your Blocks by State</div>
+          {statesWithBlocks.length === 0 ? (
+            <div style={{ background: '#13131f', border: '0.5px solid #1e1e2a', borderRadius: 12, padding: 18, textAlign: 'center', color: DIM, fontSize: 12, lineHeight: 1.5 }}>
+              You don't own any blocks yet. Tap a state, then a county, to claim turf.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {statesWithBlocks.map(s => (
+                <div key={s.fips} className="card card-pad"
+                  onClick={() => { sfx.tap(); setStateView({ fips: s.fips, code: s.code, name: s.name }) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', cursor: 'pointer', borderColor: `${GOLD}44` }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: `${GOLD}18`, color: GOLD, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <i className="ti ti-map-pin" />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: '#fff', fontSize: 14, fontWeight: 500 }}>{f.name}</div>
-                    <div style={{ color: '#666', fontSize: 11, marginTop: 2 }}>{FACILITY_TIERS[f.tier].label} · {o === 'you' ? 'Yours' : o || 'Unclaimed'}</div>
+                    <div style={{ color: '#fff', fontSize: 14, fontWeight: 500 }}>{s.name}</div>
+                    <div style={{ color: '#666', fontSize: 11, marginTop: 2 }}>{s.count} block{s.count === 1 ? '' : 's'} owned</div>
                   </div>
-                  {o !== 'you' && <i className="ti ti-sword" style={{ color: DIM, fontSize: 16 }} />}
+                  <div style={{ color: GOLD, fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{s.count}</div>
+                  <i className="ti ti-chevron-right" style={{ color: DIM, fontSize: 18 }} />
                 </div>
-              )
-            })}
-            {FACILITIES.filter(f => cityById.get(f.cityId)?.state === stateView.code).length === 0 && (
-              <div style={{ background: '#13131f', border: '0.5px solid #1e1e2a', borderRadius: 12, padding: 18, textAlign: 'center', color: DIM, fontSize: 12 }}>
-                No facilities in {stateView.name} yet.
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* State view: the counties where you hold NPC blocks, with counts.
+          Replaces the old facilities-owned list. Tap a county to open its Turf
+          Map, centered on your blocks there. */}
+      {stateView && (
+        <div className="section">
+          <div className="section-label">{stateView.name} — Your Blocks by County</div>
+          {countiesWithBlocks.length === 0 ? (
+            <div style={{ background: '#13131f', border: '0.5px solid #1e1e2a', borderRadius: 12, padding: 18, textAlign: 'center', color: DIM, fontSize: 12, lineHeight: 1.5 }}>
+              You don't own any blocks in {stateView.name} yet. Tap a county on the map to claim turf.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {countiesWithBlocks.map(c => (
+                <div key={c.fips} className="card card-pad"
+                  onClick={() => { sfx.tap(); openCountyTurf(c) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', cursor: 'pointer', borderColor: `${GOLD}44` }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: `${GOLD}18`, color: GOLD, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <i className="ti ti-map-pin" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: '#fff', fontSize: 14, fontWeight: 500 }}>{c.name} County</div>
+                    <div style={{ color: '#666', fontSize: 11, marginTop: 2 }}>{c.count} block{c.count === 1 ? '' : 's'} owned</div>
+                  </div>
+                  <div style={{ color: GOLD, fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{c.count}</div>
+                  <i className="ti ti-chevron-right" style={{ color: DIM, fontSize: 18 }} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
