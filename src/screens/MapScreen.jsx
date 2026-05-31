@@ -9,6 +9,7 @@ import { BlockSheet } from '../components/BlockSheet'
 import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks } from '../state/blocksStore'
 import { useMapData, buildCityCountyMap, STATE_CODE_TO_FIPS, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
 import { knockOut } from '../state/vitalsStore'
+import { getBounty } from '../state/bountyStore'
 import { useDisplayName } from '../state/profileStore'
 import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
 import { useWorld, moveHouse, arriveHouse, getHouse, applyHomeRaid, attackHouse } from '../state/worldStore'
@@ -177,12 +178,19 @@ function useRaids(territories, homeId, liveFips, fipsCoords) {
     return () => clearInterval(iv)
   }, [raids, liveFips, fipsCoords])
 
-  // Spawn loop — periodically pick one of your facilities to threaten.
+  // Spawn loop — periodically pick one of your facilities to threaten. Heat
+  // scales with the price on your head: a bigger bounty means raids spawn on
+  // more ticks AND more can be in flight at once (rivals smell the payday).
   useEffect(() => {
     const iv = setInterval(() => {
       const owned = FACILITIES.filter(f => getTerritory(f.id)?.owner === 'you')
       if (owned.length < MIN_HOLD_TO_RAID) return
+      const heat = Math.min(1, getBounty() / 500_000)              // 0..1, caps at a 500k bounty
+      const spawnChance  = 0.35 + heat * 0.6                       // ~38% at the floor → ~95% when hot
+      const maxConcurrent = Math.min(4, 1 + Math.floor(getBounty() / 150_000))  // +1 raid slot per 150k
       setRaids(cur => {
+        if (cur.length >= maxConcurrent) return cur                // already at your heat's raid cap
+        if (Math.random() > spawnChance) return cur                // quiet tick at low bounty
         const underRaid = new Set(cur.map(r => r.facilityId))
         // Eligible targets: your business facilities + your personal home house
         // (unless it's mid-relocation). Weighted by tier — richer = more heat.
