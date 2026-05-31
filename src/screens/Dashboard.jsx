@@ -332,7 +332,7 @@ function VitalsHud() {
       <VitalTimer
         icon="ti-heart" color="#e74c3c"
         label="Health" cur={vitals.health} max={vitals.healthMax}
-        nextMs={msToNextHealth()}
+        nextMs={msToNextHealth()} ko={vitals.ko}
       />
       <VitalTimer
         icon="ti-bolt" color="#f0d080"
@@ -343,7 +343,7 @@ function VitalsHud() {
   )
 }
 
-function VitalTimer({ icon, color, label, cur, max, nextMs }) {
+function VitalTimer({ icon, color, label, cur, max, nextMs, ko = false }) {
   const full = cur >= max
   return (
     <div style={{
@@ -361,8 +361,8 @@ function VitalTimer({ icon, color, label, cur, max, nextMs }) {
             {cur.toLocaleString()}/{max.toLocaleString()}
           </span>
         </div>
-        <div style={{ color: full ? '#555' : '#fff', fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>
-          {full ? 'FULL' : fmtCountdown(nextMs)}
+        <div style={{ color: ko ? '#e74c3c' : full ? '#555' : '#fff', fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>
+          {ko ? 'KO’d' : full ? 'FULL' : fmtCountdown(nextMs)}
         </div>
       </div>
     </div>
