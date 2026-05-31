@@ -339,6 +339,7 @@ function VitalsHud() {
         icon="ti-bolt" color="#f0d080"
         label="Stamina" cur={vitals.stamina} max={vitals.staminaMax}
         nextMs={msToNextStamina()}
+        onClick={() => { sfx.tap(); openNurse() }}
       />
     </div>
   )

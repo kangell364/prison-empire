@@ -141,7 +141,14 @@ export function addStamina(amount) {
 
 // ---- KO / Nurse ----------------------------------------------------
 
-export const KO_HUSTLE_PER_LEVEL = 5000   // Nurse "pay to heal" = 5,000 × level
+export const KO_HUSTLE_PER_LEVEL = 5000        // Nurse "pay to heal" = 5,000 × level
+export const STAMINA_HUSTLE_PER_LEVEL = 2000   // Nurse "refuel stamina" baseline × level
+
+// Top stamina back to full (the Nurse's watch-ads / pay-Hustle refuel options).
+export function refillStamina() {
+  const s = settleAll(state)
+  commit({ ...s, stamina: staminaMax(), staminaAt: Date.now() })
+}
 
 // Knock the player out: health to 0, start the 24h recovery clock. No-op if
 // already KO'd (so a second loss doesn't refresh/extend the timer). Going down
