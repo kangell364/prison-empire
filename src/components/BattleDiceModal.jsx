@@ -428,8 +428,8 @@ function FighterBlock({ name, emoji, avatar, level, attack, defense, hp, maxHp, 
   return (
     <div style={{ flex: 1, minWidth: 0, textAlign: 'center', opacity: dead ? 0.45 : 1, transition: 'opacity 0.4s', animation: outerAnim, borderRadius: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
-        <div key={hit ? hit.key : 'avatar'} style={{ filter: dead ? 'grayscale(1)' : 'none', animation: hit && hit.key > 0 ? 'hitShake 0.32s ease' : 'none' }}>
-          <Avatar src={avatar} emoji={emoji} size={56} radius={10} />
+        <div key={hit ? hit.key : 'avatar'} style={{ animation: hit && hit.key > 0 ? 'hitShake 0.32s ease' : 'none' }}>
+          <Avatar src={avatar} emoji={emoji} size={56} radius={10} ko={dead} />
         </div>
         {hit && hit.key > 0 && (
           <span key={`dmg-${hit.key}`} style={{ position: 'absolute', top: -2, left: '50%', color, fontSize: 16, fontWeight: 800, textShadow: '0 0 6px #0a0a0f, 0 1px 2px #0a0a0f', pointerEvents: 'none', animation: 'damageFloat 0.9s ease-out forwards' }}>-{hit.amount}</span>
