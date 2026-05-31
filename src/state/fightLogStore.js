@@ -9,11 +9,14 @@ import { useEffect, useState } from 'react'
 const KEY = 'pe_fightlog_v1'
 const MAX_LOGS = 60
 
+// Declared before readInitial() runs at module load — readInitial spreads it,
+// and a `const` is in the temporal dead zone until its own line executes, so
+// state init below MUST come after this. (Reordering these = blank-screen crash.)
+const EMPTY_RECORD = { wins: 0, losses: 0, kos: 0, defeats: 0, jobs: 0 }
+
 let seq = 0
 let state = readInitial()
 const listeners = new Set()
-
-const EMPTY_RECORD = { wins: 0, losses: 0, kos: 0, defeats: 0, jobs: 0 }
 
 function readInitial() {
   try {
