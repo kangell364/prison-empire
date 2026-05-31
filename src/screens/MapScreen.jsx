@@ -160,8 +160,9 @@ function useRaids(territories, homeId, liveFips, fipsCoords) {
             const dest = liveFips && liveFips.length ? liveFips[Math.floor(Math.random() * liveFips.length)] : null
             const coords = dest && fipsCoords ? fipsCoords(dest) : null   // [lng,lat] centroid → land on an open block
             const res = applyHomeRaid(r.facilityId, r.gang, dest, coords)
-            // Overrun at home = knocked out → 24h recovery, see the nurse.
-            if (res.ko) knockOut()
+            // Overrun at home = knocked out → 24h recovery, see the nurse. The
+            // raiding gang collects the price on your head.
+            if (res.ko) knockOut(r.gang)
             return { ...r, ...res }
           }
           return { ...r, ...applyRaid(r.facilityId, r.gang) }

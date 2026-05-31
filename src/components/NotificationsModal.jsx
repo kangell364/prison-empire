@@ -71,13 +71,15 @@ function FightLogs({ log, onRevenge }) {
           ? { c: RED,   icon: 'ti-skull',  text: <><b style={{ color: '#fff' }}>{e.oppName}</b> KO'd you</> }
           : e.kind === 'revenge'
             ? { c: GOLD,  icon: 'ti-swords', text: <>Revenge! You KO'd <b style={{ color: '#fff' }}>{e.oppName}</b> <span style={{ color: GOLD }}>+50 XP</span></> }
-            : { c: GREEN, icon: 'ti-trophy', text: <>You KO'd <b style={{ color: '#fff' }}>{e.oppName}</b></> }
+            : e.kind === 'bounty'
+              ? { c: GOLD,  icon: 'ti-coin',   text: <><b style={{ color: '#fff' }}>{e.collector}</b> collected the <span style={{ color: GOLD }}>{e.amount.toLocaleString()}</span> bounty on your head</> }
+              : { c: GREEN, icon: 'ti-trophy', text: <>You KO'd <b style={{ color: '#fff' }}>{e.oppName}</b></> }
         return (
           <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#13131f', border: `0.5px solid ${meta.c}33`, borderRadius: 12, padding: '10px 12px' }}>
             <i className={`ti ${meta.icon}`} style={{ color: meta.c, fontSize: 18, flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: '#ccc', fontSize: 12.5, lineHeight: 1.3 }}>{meta.text}</div>
-              <div style={{ color: DIM, fontSize: 10, marginTop: 2 }}>Lv {e.oppLevel} · {timeAgo(e.ts)}</div>
+              <div style={{ color: DIM, fontSize: 10, marginTop: 2 }}>{e.oppLevel != null ? `Lv ${e.oppLevel} · ` : ''}{timeAgo(e.ts)}</div>
             </div>
             {pending && (
               <button onClick={onRevenge} style={{ flexShrink: 0, background: RED, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 12px', fontSize: 11, fontWeight: 800, letterSpacing: 0.5, cursor: 'pointer' }}>

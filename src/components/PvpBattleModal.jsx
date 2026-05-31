@@ -7,6 +7,7 @@ import { addXp, creditRival, reclaimRival, getRivalXp } from '../state/progressi
 import { recordKoBy, recordKo, isRevengeTarget, recordJob } from '../state/fightLogStore'
 import { addHustle } from '../state/profileStore'
 import { removeTarget } from '../state/hitListStore'
+import { bumpForKo } from '../state/bountyStore'
 
 // PvP scoring constants (shared so the Players list previews match the fight).
 export const XP_WIN      = 5
@@ -36,6 +37,7 @@ export function PvpBattleModal({ opponent, bounty = 0, onKO, onClose }) {
     const { avenged } = recordKo(opp)
     if (avenged) addXp(REVENGE_XP)
     if (bounty) { addHustle(bounty); removeTarget(opp.id); recordJob() }   // bounty fulfilled = a job done
+    bumpForKo()   // a fresh KO raises the price on YOUR head
     if (onKO) onKO(opp)
   }
 

@@ -6,6 +6,7 @@ import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { PvpBattleModal, XP_WIN, XP_LOSE, RECLAIM_MULT } from '../components/PvpBattleModal'
 import { useVitals } from '../state/vitalsStore'
 import { usePlayerCard } from '../state/profileStore'
+import { useBounty } from '../state/bountyStore'
 import { useProgress } from '../state/progressionStore'
 import { usePlayerCombat } from '../state/statsStore'
 import { useFightLog } from '../state/fightLogStore'
@@ -318,8 +319,9 @@ function HitListScreen() {
   const [bountyTarget, setBountyTarget] = useState(null)
   const [moveTarget, setMoveTarget] = useState(null)   // { opp, bounty }
   const targets = Object.values(list.targets).sort((a, b) => b.bounty - a.bounty)
-  // There's a price on YOUR head too — notoriety scales with your level.
-  const youBounty = Math.max(25_000, prog.level * 25_000)
+  // The LIVE price on your head — grows when you KO rivals / clear bosses, and a
+  // rival collects (resets) it when you get knocked out.
+  const youBounty = useBounty()
 
   const moveOn = (t) => {
     if (stamina < PVP_FIGHT_COST) return

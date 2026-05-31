@@ -13,6 +13,8 @@
 
 import { useEffect, useState } from 'react'
 import { getHealthMax, getStaminaMax } from './statsStore'
+import { collectBounty } from './bountyStore'
+import { recordBountyCollected } from './fightLogStore'
 
 const KEY = 'pe_vitals_v1'
 
@@ -142,11 +144,15 @@ export function addStamina(amount) {
 export const KO_HUSTLE_PER_LEVEL = 5000   // Nurse "pay to heal" = 5,000 × level
 
 // Knock the player out: health to 0, start the 24h recovery clock. No-op if
-// already KO'd (so a second loss doesn't refresh/extend the timer).
-export function knockOut() {
+// already KO'd (so a second loss doesn't refresh/extend the timer). Going down
+// also lets a rival CLAIM the price on your head — the bounty resets and a
+// notification posts. `collector` names who cashed in (opponent / raiding gang).
+export function knockOut(collector) {
   const s = settleAll(state)
   if (s.koUntil != null) return
   commit({ ...s, health: 0, healthAt: Date.now(), koUntil: Date.now() + KO_DURATION_MS })
+  const collected = collectBounty()
+  if (collected > 0) recordBountyCollected(collected, collector)
 }
 
 // Come back to full health now (the Nurse's watch-ads / pay-Hustle options, and

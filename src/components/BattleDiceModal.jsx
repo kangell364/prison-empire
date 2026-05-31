@@ -254,7 +254,7 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
     // Out of health in any fight = knocked out → the 24h recovery clock starts
     // and the player must see the nurse. Covers PvP loss/mutual-KO and the boss
     // "worn out" state alike. Idempotent (no-op if already KO'd).
-    if (result === 'lose' || result === 'draw' || result === 'wornout') knockOut()
+    if (result === 'lose' || result === 'draw' || result === 'wornout') knockOut(opponent.name)
 
     // Duel reports damage so the caller can spend shared health on resolve.
     if (!attrition && result && onResult) onResult({ result, damageTaken: maxPlayerHp - newPlayerHp, maxHp: maxPlayerHp })

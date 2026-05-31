@@ -99,6 +99,14 @@ export function recordJob(n = 1) {
   commit({ ...state, record: { ...state.record, jobs: state.record.jobs + add } })
 }
 
+// A rival collected the price on your head (fired when you get knocked out and
+// your bounty resets). Posts a notification to the bell.
+export function recordBountyCollected(amount, collector) {
+  const amt = Math.max(0, Math.round(amount || 0))
+  if (!amt) return
+  commit({ ...state, logs: pushLog({ kind: 'bounty', amount: amt, collector: collector || 'A rival' }) })
+}
+
 // Mark every log seen (clears the bell badge).
 export function markRead() {
   commit({ ...state, lastReadTs: Date.now() })
