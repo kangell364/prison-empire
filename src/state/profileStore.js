@@ -94,9 +94,16 @@ export function spendSteel(cost) {
   return true
 }
 
+export const NAME_MAX_LEN = 20
+
 export function setDisplayName(name) {
-  if (typeof name !== 'string' || !name.trim()) return
-  commit({ display_name: name.trim() })
+  if (typeof name !== 'string') return
+  // Hard cap at 20 characters — spaces count (slice is by code unit, so every
+  // typed character including spaces counts toward the limit). Enforced here so
+  // every entry point obeys it, not just the rename input's maxLength.
+  const capped = name.slice(0, NAME_MAX_LEN)
+  if (!capped.trim()) return                 // reject blank / whitespace-only
+  commit({ display_name: capped.trim() })
 }
 
 export function getPlayerLookId()  { return state.player_look_id }

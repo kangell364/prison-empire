@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { PLAYER_LOOKS, RARITY_COLORS } from '../data/gameData'
 import {
   usePlayerLook, setPlayerLook,
-  useDisplayName, setDisplayName,
+  useDisplayName, setDisplayName, NAME_MAX_LEN,
 } from '../state/profileStore'
 import { CharacterDetailModal } from './CharacterDetailModal'
 import { sfx } from '../sounds'
@@ -89,12 +89,16 @@ export function SwapLookModal({ onClose }) {
             <div style={{ color: '#fff', fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Change Name</div>
             <input
               value={nameDraft}
-              onChange={e => setNameDraft(e.target.value)}
-              maxLength={20}
+              onChange={e => setNameDraft(e.target.value.slice(0, NAME_MAX_LEN))}
+              maxLength={NAME_MAX_LEN}
               autoFocus
               onKeyDown={e => { if (e.key === 'Enter') saveName() }}
-              style={{ width: '100%', boxSizing: 'border-box', background: '#0a0a0f', border: '0.5px solid #2a2a3a', borderRadius: 10, padding: '12px 14px', color: '#fff', fontSize: 15, marginBottom: 14 }}
+              style={{ width: '100%', boxSizing: 'border-box', background: '#0a0a0f', border: '0.5px solid #2a2a3a', borderRadius: 10, padding: '12px 14px', color: '#fff', fontSize: 15, marginBottom: 6 }}
             />
+            {/* Live counter — counts every character including spaces. */}
+            <div style={{ textAlign: 'right', color: nameDraft.length >= NAME_MAX_LEN ? '#e74c3c' : '#555', fontSize: 11, marginBottom: 14 }}>
+              {nameDraft.length}/{NAME_MAX_LEN}
+            </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-dark" style={{ flex: 1, padding: 12 }} onClick={() => setEditingName(false)}>Cancel</button>
               <button className="btn btn-primary" style={{ flex: 1, padding: 12 }} onClick={saveName} disabled={!nameDraft.trim()}>Save</button>
