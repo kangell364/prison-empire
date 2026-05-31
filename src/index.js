@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 // Pin layout width to the actual visual viewport, regardless of how Chrome
 // interprets the meta-viewport tag (Desktop-site mode, browser zoom, etc.
@@ -16,4 +17,10 @@ window.addEventListener('resize', syncViewportVars)
 window.addEventListener('orientationchange', syncViewportVars)
 
 const root = ReactDOM.createRoot(document.getElementById('root'))
-root.render(<React.StrictMode><App /></React.StrictMode>)
+root.render(
+  <React.StrictMode>
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  </React.StrictMode>
+)
