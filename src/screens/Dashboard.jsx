@@ -4,7 +4,7 @@ import { useHustle, useSteel, useDisplayName, usePlayerLook } from '../state/pro
 import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, useNextPayoutCountdown, subscribePayout, blockCap, resetTurf } from '../state/blocksStore'
 import { useCrew, atkOf, defOf, baseAtk, baseDef } from '../state/crewStore'
 import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
-import { useVitals, msToNextStamina, msToNextHealth } from '../state/vitalsStore'
+import { useVitals, msToNextStamina, msToNextHealth, openNurse } from '../state/vitalsStore'
 import { useProgress } from '../state/progressionStore'
 import { usePlayerStats } from '../state/statsStore'
 import { xpForLevel } from '../data/bossLadder'
@@ -333,6 +333,7 @@ function VitalsHud() {
         icon="ti-heart" color="#e74c3c"
         label="Health" cur={vitals.health} max={vitals.healthMax}
         nextMs={msToNextHealth()} ko={vitals.ko}
+        onClick={() => { sfx.tap(); openNurse() }}
       />
       <VitalTimer
         icon="ti-bolt" color="#f0d080"
@@ -343,26 +344,29 @@ function VitalsHud() {
   )
 }
 
-function VitalTimer({ icon, color, label, cur, max, nextMs, ko = false }) {
+function VitalTimer({ icon, color, label, cur, max, nextMs, ko = false, onClick }) {
   const full = cur >= max
   return (
-    <div style={{
+    <div onClick={onClick} style={{
       background: '#13131f',
-      border: '0.5px solid #2a2a3a',
+      border: `0.5px solid ${ko ? '#e74c3c66' : '#2a2a3a'}`,
       borderRadius: 12,
       padding: '8px 12px',
       display: 'flex', alignItems: 'center', gap: 10,
+      cursor: onClick ? 'pointer' : 'default',
     }}>
       <i className={`ti ${icon}`} style={{ color, fontSize: 18 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ color: '#888', fontSize: 10, letterSpacing: 0.5 }}>{label}</span>
+          <span style={{ color: '#888', fontSize: 10, letterSpacing: 0.5 }}>
+            {label}{onClick && <i className="ti ti-chevron-right" style={{ fontSize: 9, marginLeft: 3, color: '#666' }} />}
+          </span>
           <span style={{ color, fontSize: 11, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
             {cur.toLocaleString()}/{max.toLocaleString()}
           </span>
         </div>
         <div style={{ color: ko ? '#e74c3c' : full ? '#555' : '#fff', fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>
-          {ko ? 'KO’d' : full ? 'FULL' : fmtCountdown(nextMs)}
+          {ko ? 'KO’d — see nurse' : full ? 'FULL' : fmtCountdown(nextMs)}
         </div>
       </div>
     </div>

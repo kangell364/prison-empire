@@ -37,10 +37,20 @@ export default function Nurse({ onBack }) {
     return () => { clearInterval(iv); if (adTimer.current) clearTimeout(adTimer.current) }
   }, [])
 
-  const ko       = vitals.ko
+  const ko        = vitals.ko
+  const max       = vitals.healthMax
+  const health    = vitals.health
+  const hurt      = health < max          // KO or just low — either way there's something to mend
+  const missing   = Math.max(0, max - health)
   const remaining = vitals.koMsRemaining
-  const cost      = KO_HUSTLE_PER_LEVEL * Math.max(1, level)
+  const healthPct = Math.max(0, Math.min(100, Math.round((health / Math.max(1, max)) * 100)))
+  // Pay-to-heal: full price (5k × level) at a KO; otherwise proportional to the
+  // damage taken, with a small floor. (KO health is 0, so the same formula lands
+  // on the full price.)
+  const fullCost  = KO_HUSTLE_PER_LEVEL * Math.max(1, level)
+  const cost      = Math.max(500, Math.round(fullCost * missing / Math.max(1, max)))
   const canAfford = hustle >= cost
+  const accent    = ko ? RED : hurt ? GOLD : GREEN
 
   const watchAds = () => {
     if (adPlaying) return
@@ -74,44 +84,47 @@ export default function Nurse({ onBack }) {
           <img src={`${process.env.PUBLIC_URL || ''}/nurse.jpg`} alt="The prison nurse"
             style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
           <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 110, background: 'linear-gradient(180deg, transparent 0%, rgba(10,10,15,0.6) 50%, #0a0a0f 100%)', pointerEvents: 'none' }} />
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: ko ? RED : GREEN }} />
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: accent }} />
           <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '0 16px 12px' }}>
             <div style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>Infirmary</div>
             <div style={{ color: '#cfcfd6', fontSize: 12, fontStyle: 'italic', marginTop: 2 }}>
               {ko ? '“You got laid out. Hold still — let’s get you back on your feet.”'
+                  : hurt ? '“You’re banged up. Want me to patch you up?”'
                   : '“You’re patched up. Stay out of trouble.”'}
             </div>
           </div>
         </div>
       </div>
 
-      {ko ? (
+      {hurt ? (
         <>
-          {/* Status: KO + recovery countdown */}
+          {/* Status — KO (24h clock) vs just banged up. */}
           <div style={{ padding: '14px 16px 0' }}>
-            <div style={{ background: `linear-gradient(135deg, #2a0a0a, #130a0f)`, border: `1px solid ${RED}55`, borderRadius: 16, padding: 16, textAlign: 'center' }}>
-              <div style={{ color: RED, fontSize: 12, fontWeight: 800, letterSpacing: 2 }}>
-                <i className="ti ti-skull" style={{ marginRight: 6 }} />DEFEATED
-              </div>
-              <div style={{ color: '#fff', fontSize: 34, fontWeight: 800, marginTop: 10, fontVariantNumeric: 'tabular-nums', letterSpacing: 1 }}>
-                {fmt(remaining)}
-              </div>
-              <div style={{ color: '#888', fontSize: 11, marginTop: 4, letterSpacing: 0.5 }}>UNTIL YOU’RE BACK ON YOUR FEET</div>
-              <div style={{ marginTop: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                  <span style={{ color: '#888', fontSize: 10 }}>Health</span>
-                  <span style={{ color: RED, fontSize: 10, fontVariantNumeric: 'tabular-nums' }}>0 / {vitals.healthMax.toLocaleString()}</span>
+            {ko ? (
+              <div style={{ background: `linear-gradient(135deg, #2a0a0a, #130a0f)`, border: `1px solid ${RED}55`, borderRadius: 16, padding: 16, textAlign: 'center' }}>
+                <div style={{ color: RED, fontSize: 12, fontWeight: 800, letterSpacing: 2 }}>
+                  <i className="ti ti-skull" style={{ marginRight: 6 }} />DEFEATED
                 </div>
-                <div style={{ height: 5, background: '#1e1e2a', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: '0%', background: RED }} />
+                <div style={{ color: '#fff', fontSize: 34, fontWeight: 800, marginTop: 10, fontVariantNumeric: 'tabular-nums', letterSpacing: 1 }}>
+                  {fmt(remaining)}
                 </div>
+                <div style={{ color: '#888', fontSize: 11, marginTop: 4, letterSpacing: 0.5 }}>UNTIL YOU’RE BACK ON YOUR FEET</div>
+                <HealthBar health={health} max={max} pct={healthPct} />
               </div>
-            </div>
+            ) : (
+              <div style={{ background: '#13131f', border: `1px solid ${GOLD}44`, borderRadius: 16, padding: 16 }}>
+                <div style={{ color: GOLD, fontSize: 12, fontWeight: 800, letterSpacing: 2 }}>
+                  <i className="ti ti-bandage" style={{ marginRight: 6 }} />BANGED UP
+                </div>
+                <HealthBar health={health} max={max} pct={healthPct} />
+                <div style={{ color: '#888', fontSize: 11, marginTop: 8, lineHeight: 1.4 }}>Heal up now, or rest — your health refills on its own over time.</div>
+              </div>
+            )}
           </div>
 
-          {/* Recovery options */}
+          {/* Heal options */}
           <div className="section" style={{ marginTop: 16 }}>
-            <div className="section-label">Get back in the fight</div>
+            <div className="section-label">{ko ? 'Get back in the fight' : 'Patch up'}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
               {/* Watch ads → full health */}
@@ -125,45 +138,60 @@ export default function Nurse({ onBack }) {
                 <span style={pill(GREEN)}>FULL HEAL</span>
               </button>
 
-              {/* Pay Hustle → full health (5,000 × level) */}
+              {/* Pay Hustle → full health */}
               <button onClick={payHustle} disabled={!canAfford || adPlaying}
                 style={optionBtn(GOLD, !canAfford || adPlaying)}>
                 <div style={iconBox(GOLD)}><i className="ti ti-coin" style={{ fontSize: 20 }} /></div>
                 <div style={{ flex: 1, textAlign: 'left' }}>
                   <div style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>Pay the Nurse</div>
                   <div style={{ color: canAfford ? '#888' : RED, fontSize: 11, marginTop: 1 }}>
-                    {canAfford ? `You have ${hustle.toLocaleString()} Hustle` : `Need ${cost.toLocaleString()} — you have ${hustle.toLocaleString()}`}
+                    {canAfford ? `Heal to full · you have ${hustle.toLocaleString()} Hustle` : `Need ${cost.toLocaleString()} — you have ${hustle.toLocaleString()}`}
                   </div>
                 </div>
                 <span style={pill(GOLD)}>{cost.toLocaleString()}</span>
               </button>
 
-              {/* Wait it out */}
+              {/* Wait / rest */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#13131f', border: '0.5px solid #2a2a3a', borderRadius: 14, padding: '12px 14px' }}>
                 <div style={iconBox(BLUE)}><i className="ti ti-clock" style={{ fontSize: 20 }} /></div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>Wait it out</div>
-                  <div style={{ color: '#888', fontSize: 11, marginTop: 1 }}>Auto-heal in {fmt(remaining)} — free</div>
+                  <div style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>{ko ? 'Wait it out' : 'Rest it off'}</div>
+                  <div style={{ color: '#888', fontSize: 11, marginTop: 1 }}>{ko ? `Auto-heal in ${fmt(remaining)} — free` : 'Refills on its own over time — free'}</div>
                 </div>
               </div>
 
             </div>
             <div style={{ color: DIM, fontSize: 11, textAlign: 'center', marginTop: 12, lineHeight: 1.5 }}>
-              The cost to patch up is 5,000 Hustle per level. Costs more the bigger you get.
+              {ko ? 'A full revive costs 5,000 Hustle per level.' : 'Patch-up cost scales with the damage (up to 5,000 Hustle per level).'}
             </div>
           </div>
         </>
       ) : (
-        // Healthy — nothing to fix.
+        // Full health — nothing to fix.
         <div className="section" style={{ marginTop: 16 }}>
           <div style={{ background: '#13131f', border: `0.5px solid ${GREEN}44`, borderRadius: 16, padding: 22, textAlign: 'center' }}>
             <i className="ti ti-heart" style={{ color: GREEN, fontSize: 34 }} />
             <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, marginTop: 8 }}>You’re in good shape</div>
-            <div style={{ color: '#888', fontSize: 12, marginTop: 4 }}>Full health, {vitals.health.toLocaleString()} / {vitals.healthMax.toLocaleString()}. Get back out there.</div>
+            <div style={{ color: '#888', fontSize: 12, marginTop: 4 }}>Full health, {health.toLocaleString()} / {max.toLocaleString()}. Get back out there.</div>
             <button onClick={onBack} className="btn btn-gold" style={{ marginTop: 16, padding: '12px 20px' }}>Back to the yard</button>
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function HealthBar({ health, max, pct }) {
+  const color = pct > 60 ? GREEN : pct > 25 ? '#f39c12' : RED
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+        <span style={{ color: '#888', fontSize: 10 }}>Health</span>
+        <span style={{ color, fontSize: 10, fontVariantNumeric: 'tabular-nums' }}>{health.toLocaleString()} / {max.toLocaleString()}</span>
+      </div>
+      <div style={{ height: 5, background: '#1e1e2a', borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: color, transition: 'width 0.4s' }} />
+      </div>
     </div>
   )
 }
