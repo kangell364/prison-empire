@@ -37,7 +37,11 @@ function hash(str) {
   for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) }
   return h >>> 0
 }
-const pick = (arr, n) => arr[n % arr.length]
+// Negative-safe index: callers pass `h >> k`, and a signed right shift on a
+// hash >= 2^31 goes negative — `negative % len` stays negative in JS, so the
+// raw `arr[n % len]` returned undefined ~half the time (names like
+// "Bigundefinedundefined", plus broken emoji/facility/state). Normalize first.
+const pick = (arr, n) => arr[((n % arr.length) + arr.length) % arr.length]
 
 // One AI rival, stable for a given (level, index) — the same rival always looks
 // and fights the same, so the list is consistent as you re-enter / level up.
