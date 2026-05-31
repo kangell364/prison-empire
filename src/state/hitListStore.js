@@ -6,8 +6,32 @@
 
 import { useEffect, useState } from 'react'
 import { spendHustle } from './profileStore'
+import { generateOpponent } from '../data/pvpLadder'
 
-const KEY = 'pe_hitlist_v1'
+const KEY = 'pe_hitlist_v2'
+
+// Starter bounties so the list isn't empty — real AI players (from pvpLadder, so
+// the current card look), 4 at Level 1 plus a couple of higher-level marks.
+const SEED = [
+  { level: 1, index: 0, bounty: 18_000 },
+  { level: 1, index: 1, bounty: 120_000 },
+  { level: 1, index: 2, bounty: 45_000 },
+  { level: 1, index: 3, bounty: 72_000 },
+  { level: 4, index: 0, bounty: 260_000 },
+  { level: 8, index: 1, bounty: 540_000 },
+]
+
+function seedTargets() {
+  const targets = {}
+  for (const s of SEED) {
+    const o = generateOpponent(s.level, s.index)
+    targets[o.id] = {
+      id: o.id, name: o.name, level: o.level, emoji: o.emoji, avatar: o.avatar,
+      facility: o.facility, state: o.state, bounty: s.bounty, addedTs: Date.now(),
+    }
+  }
+  return targets
+}
 
 let state = readInitial()
 const listeners = new Set()
@@ -17,7 +41,7 @@ function readInitial() {
     const raw = localStorage.getItem(KEY)
     if (raw) { const p = JSON.parse(raw); return { targets: p.targets || {} } }
   } catch {}
-  return { targets: {} }
+  return { targets: seedTargets() }
 }
 
 function persist() { try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }
@@ -41,7 +65,7 @@ export function placeBounty(opp, amount) {
   const cur = state.targets[opp.id]
   const target = cur
     ? { ...cur, bounty: cur.bounty + amount }
-    : { id: opp.id, name: opp.name, level: opp.level, emoji: opp.emoji, avatar: opp.avatar, bounty: amount, addedTs: Date.now() }
+    : { id: opp.id, name: opp.name, level: opp.level, emoji: opp.emoji, avatar: opp.avatar, facility: opp.facility, state: opp.state, bounty: amount, addedTs: Date.now() }
   commit({ targets: { ...state.targets, [opp.id]: target } })
   return true
 }
