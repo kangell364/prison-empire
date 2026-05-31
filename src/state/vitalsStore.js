@@ -12,15 +12,22 @@
 // player vitals in a later phase.
 
 import { useEffect, useState } from 'react'
+import { getHealthMax, getStaminaMax } from './statsStore'
 
 const KEY = 'pe_vitals_v1'
 
-export const STAMINA_MAX = 100
-export const HEALTH_MAX   = 1875   // toughness(75) × 25; trait-driven once Supabase lands
+// Pool maxes are now TRAIT-DRIVEN (Toughness → Health, Hustle → Stamina) and
+// can change as the player allocates points, so they're read live from
+// statsStore rather than baked as constants. Components get the current values
+// from useVitals().healthMax / .staminaMax.
+function staminaMax() { return getStaminaMax() }
+function healthMax()  { return getHealthMax() }
 
-// Regen rates as milliseconds-per-point.
-const STAMINA_MS_PER_POINT = 5 * 60 * 1000                       // +1 every 5 min (full in ~8.3h)
-const HEALTH_MS_PER_POINT  = Math.round((60 * 60 * 1000) / HEALTH_MAX)  // full heal in ~1h
+// Regen rates. Stamina is a flat +1 every 5 min regardless of pool size (a
+// bigger pool just takes longer to top off). Health keeps "full heal in ~1h"
+// semantics, so its ms-per-point scales with the (dynamic) max.
+const STAMINA_MS_PER_POINT = 5 * 60 * 1000
+function healthMsPerPoint() { return Math.max(1, Math.round((60 * 60 * 1000) / Math.max(1, healthMax()))) }
 
 let state = readInitial()
 const listeners = new Set()
@@ -36,9 +43,9 @@ function readInitial() {
     if (raw) saved = JSON.parse(raw)
   } catch {}
   const seed = {
-    stamina:   saved?.stamina   ?? STAMINA_MAX,
+    stamina:   saved?.stamina   ?? staminaMax(),
     staminaAt: saved?.staminaAt ?? now,
-    health:    saved?.health    ?? HEALTH_MAX,
+    health:    saved?.health    ?? healthMax(),
     healthAt:  saved?.healthAt  ?? now,
   }
   return settleAll(seed, now)
@@ -59,8 +66,8 @@ function settlePool(value, at, max, msPerPoint, now) {
 }
 
 function settleAll(s, now = Date.now()) {
-  const st = settlePool(s.stamina, s.staminaAt, STAMINA_MAX, STAMINA_MS_PER_POINT, now)
-  const hp = settlePool(s.health,  s.healthAt,  HEALTH_MAX,  HEALTH_MS_PER_POINT,  now)
+  const st = settlePool(s.stamina, s.staminaAt, staminaMax(), STAMINA_MS_PER_POINT, now)
+  const hp = settlePool(s.health,  s.healthAt,  healthMax(),  healthMsPerPoint(),   now)
   return { stamina: st.value, staminaAt: st.at, health: hp.value, healthAt: hp.at }
 }
 
@@ -104,19 +111,20 @@ export function spendHealth(amount) {
 
 export function addStamina(amount) {
   const s = settleAll(state)
-  commit({ ...s, stamina: Math.min(STAMINA_MAX, s.stamina + amount) })
+  commit({ ...s, stamina: Math.min(staminaMax(), s.stamina + amount) })
 }
 
 // ms until the next +1 regen tick for a pool (0 when full). For countdowns.
 export function msToNextStamina() {
   const s = settleAll(state)
-  if (s.stamina >= STAMINA_MAX) return 0
+  if (s.stamina >= staminaMax()) return 0
   return STAMINA_MS_PER_POINT - ((Date.now() - s.staminaAt) % STAMINA_MS_PER_POINT)
 }
 export function msToNextHealth() {
   const s = settleAll(state)
-  if (s.health >= HEALTH_MAX) return 0
-  return HEALTH_MS_PER_POINT - ((Date.now() - s.healthAt) % HEALTH_MS_PER_POINT)
+  if (s.health >= healthMax()) return 0
+  const per = healthMsPerPoint()
+  return per - ((Date.now() - s.healthAt) % per)
 }
 
 // Subscribe-with-ticker hook. While any component is mounted, a 1s interval
@@ -131,5 +139,7 @@ export function useVitals() {
       if (listeners.size === 0 && ticker) { clearInterval(ticker); ticker = null }
     }
   }, [])
-  return s
+  // Maxes are computed fresh each render so a trait allocation reflects
+  // immediately (the screen that allocates re-renders, recomputing these).
+  return { ...s, healthMax: healthMax(), staminaMax: staminaMax() }
 }

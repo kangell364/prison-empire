@@ -4,8 +4,9 @@ import { generateOpponents, generateOpponent, opponentFromId } from '../data/pvp
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { PvpBattleModal, XP_WIN, XP_LOSE, RECLAIM_MULT } from '../components/PvpBattleModal'
-import { useVitals, STAMINA_MAX } from '../state/vitalsStore'
-import { useProgress, usePlayerCombat } from '../state/progressionStore'
+import { useVitals } from '../state/vitalsStore'
+import { useProgress } from '../state/progressionStore'
+import { usePlayerCombat } from '../state/statsStore'
 import { useFightLog } from '../state/fightLogStore'
 import { useHitList } from '../state/hitListStore'
 import { BountyModal, formatHustle } from '../components/BountyModal'
@@ -76,7 +77,9 @@ function PlayersScreen() {
   const prog = useProgress()
   const fightLog = useFightLog()
   const playerLevel = prog.level
-  const stamina = useVitals().stamina
+  const vitals = useVitals()
+  const stamina = vitals.stamina
+  const STAMINA_MAX = vitals.staminaMax
   const [target, setTarget]         = useState(null)
   const [detailPlayer, setDetailPlayer] = useState(null)
   const [bountyTarget, setBountyTarget] = useState(null)

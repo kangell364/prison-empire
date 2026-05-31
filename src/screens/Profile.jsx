@@ -2,10 +2,11 @@ import React, { useState, useMemo } from 'react'
 import { PLAYER, PLAYER_LOOKS, CARDS_COLLECTION, TRAITS, RARITY_COLORS, SKILLS } from '../data/gameData'
 import { sfx } from '../sounds'
 import { useHustle, usePlayerLook, useDisplayName } from '../state/profileStore'
-import { useVitals, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
-import { baseAtk, baseDef, useCrew, atkOf, defOf } from '../state/crewStore'
+import { useVitals } from '../state/vitalsStore'
+import { useCrew, atkOf, defOf } from '../state/crewStore'
 import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
 import { useProgress } from '../state/progressionStore'
+import { useTraits, useAvailablePoints, usePlayerStats, allocate } from '../state/statsStore'
 import { xpForLevel } from '../data/bossLadder'
 
 const GOLD  = '#c9a84c'
@@ -16,30 +17,20 @@ const DIM   = '#555'
 
 export default function Profile({ onBack }) {
   const [tab, setTab] = useState('upgrades')
-  // Local interactive state — clicking Upgrade actually spends a point and
-  // bumps the trait. Resets on refresh until Supabase lands.
-  const [traits, setTraits] = useState(PLAYER.traits)
-  const [points, setPoints] = useState(PLAYER.traitPoints)
+  // Traits + points are now the PERSISTED single source of truth (statsStore):
+  // upgrading spends a real point, bumps the trait, updates live combat/pool
+  // stats everywhere, and survives a refresh.
+  const traits = useTraits()
+  const points = useAvailablePoints()
 
   const upgrade = (traitId) => {
-    if (points <= 0) { sfx.deny(); return }
-    setTraits(t => ({ ...t, [traitId]: t[traitId] + 1 }))
-    setPoints(p => p - 1)
-    sfx.buy()
+    if (allocate(traitId, 1) > 0) sfx.buy()
+    else sfx.deny()
   }
-
-  // Derived pool max from trait values.
-  const poolMax = useMemo(() => {
-    const m = { health: 0, stamina: 0, knowledge: 0 }
-    TRAITS.forEach(t => {
-      if (t.poolMax) m[t.poolMax] = traits[t.id] * t.perPoint
-    })
-    return m
-  }, [traits])
 
   return (
     <div className="scroll-area animate-in">
-      <StatusBar poolMax={poolMax} onBack={onBack} />
+      <StatusBar onBack={onBack} />
 
       {/* Sub-tabs */}
       <div style={{ padding: '14px 16px 0', display: 'flex', gap: 5, flexWrap: 'wrap' }}>
@@ -63,9 +54,10 @@ export default function Profile({ onBack }) {
 // Status bar (top of profile)
 // ---------------------------------------------------------------------
 
-function StatusBar({ poolMax, onBack }) {
+function StatusBar({ onBack }) {
   const hustle = useHustle()
   const vitals = useVitals()
+  const stats = usePlayerStats()   // live ATK/DEF + pool maxes from real traits
   // Live cosmetic look + name — synced with the home screen (SWAP / rename).
   const lookId = usePlayerLook()
   const look = PLAYER_LOOKS.find(l => l.id === lookId) || PLAYER_LOOKS[0]
@@ -145,11 +137,11 @@ function StatusBar({ poolMax, onBack }) {
               formula the cards use). Distinct from the Crew ATK/DEF totals. */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
             <div style={{ background: '#1e1e2a', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
-              <div style={{ color: RED, fontSize: 16, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{baseAtk(PLAYER).toLocaleString()}</div>
+              <div style={{ color: RED, fontSize: 16, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{stats.atk.toLocaleString()}</div>
               <div style={{ color: '#888', fontSize: 9, fontWeight: 500, letterSpacing: 0.5, marginTop: 4, textTransform: 'uppercase' }}>Attack</div>
             </div>
             <div style={{ background: '#1e1e2a', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
-              <div style={{ color: BLUE, fontSize: 16, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{baseDef(PLAYER).toLocaleString()}</div>
+              <div style={{ color: BLUE, fontSize: 16, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{stats.def.toLocaleString()}</div>
               <div style={{ color: '#888', fontSize: 9, fontWeight: 500, letterSpacing: 0.5, marginTop: 4, textTransform: 'uppercase' }}>Defense</div>
             </div>
           </div>
@@ -161,13 +153,13 @@ function StatusBar({ poolMax, onBack }) {
             <span><span style={{ color: BLUE, fontWeight: 700 }}>+{crewDef.toLocaleString()}</span> Crew DEF</span>
           </div>
 
-        {/* Pool bars. Health + stamina come from the regenerating vitals
-            store (single source of truth across Profile/Fight/Battle);
-            knowledge is still the static trait-derived pool. */}
+        {/* Pool bars. All three are now trait-driven (Toughness→Health,
+            Hustle→Stamina, Smarts→Knowledge). Health + stamina are the live
+            regenerating pools (max from vitals); knowledge shows its capacity. */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 12 }}>
-          <PoolBar icon="ti-heart"  color={RED}  label="Health"    cur={vitals.health}          max={HEALTH_MAX} />
-          <PoolBar icon="ti-bolt"   color={GOLD} label="Stamina"   cur={vitals.stamina}         max={STAMINA_MAX} />
-          <PoolBar icon="ti-brain"  color={BLUE} label="Knowledge" cur={PLAYER.pools.knowledge} max={poolMax.knowledge} />
+          <PoolBar icon="ti-heart"  color={RED}  label="Health"    cur={vitals.health}        max={vitals.healthMax} />
+          <PoolBar icon="ti-bolt"   color={GOLD} label="Stamina"   cur={vitals.stamina}       max={vitals.staminaMax} />
+          <PoolBar icon="ti-brain"  color={BLUE} label="Knowledge" cur={stats.knowledgeMax}   max={stats.knowledgeMax} />
         </div>
 
         {/* Currency */}
@@ -276,7 +268,7 @@ function UpgradesTab({ traits, points, onUpgrade }) {
         </div>
       </div>
 
-      {/* Footer — primary trait note */}
+      {/* Footer — how points work now */}
       <div style={{ padding: '0 16px 0' }}>
         <div style={{
           background: '#0d0d15',
@@ -287,19 +279,14 @@ function UpgradesTab({ traits, points, onUpgrade }) {
         }}>
           <div style={{ color: BLUE, fontSize: 16, lineHeight: 1 }}>★</div>
           <div style={{ color: BLUE, fontSize: 11, lineHeight: 1.5, flex: 1 }}>
-            <span style={{ fontWeight: 600 }}>{primaryLabel()} </span>
-            is your Primary Trait. With each new level it auto-increases by 1 point.
-            Different archetypes have different primary traits.
+            Every level grants trait points — and the grant <span style={{ fontWeight: 600 }}>grows as you level up</span>,
+            so a level's points stay meaningful all the way up. Spend them however you like:
+            your build is how you fight.
           </div>
         </div>
       </div>
     </>
   )
-}
-
-function primaryLabel() {
-  const t = TRAITS.find(x => x.id === PLAYER.primaryTrait)
-  return t ? t.label : ''
 }
 
 function TraitCard({ trait, value, isPrimary, canUpgrade, onUpgrade }) {

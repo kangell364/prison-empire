@@ -4,7 +4,7 @@ import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { BattleDiceModal } from '../components/BattleDiceModal'
 import { useProgress, recordHit, resetProgression } from '../state/progressionStore'
-import { useVitals, spendStamina, spendHealth, STAMINA_MAX } from '../state/vitalsStore'
+import { useVitals, spendStamina, spendHealth } from '../state/vitalsStore'
 
 const STAMINA_COST = 5
 const GOLD = '#c9a84c'
@@ -13,7 +13,9 @@ const PURPLE = '#a855f7'
 
 export default function Battle() {
   const prog   = useProgress()
-  const stamina = useVitals().stamina
+  const vitals = useVitals()
+  const stamina = vitals.stamina
+  const STAMINA_MAX = vitals.staminaMax
   const [area, setArea] = useState('guards')
   const [selected, setSelected] = useState(null)  // boss in dice fight
   const [detail, setDetail]     = useState(null)  // boss in detail card

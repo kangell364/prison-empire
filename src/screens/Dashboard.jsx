@@ -4,7 +4,7 @@ import { useHustle, useSteel, useDisplayName, usePlayerLook } from '../state/pro
 import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, useNextPayoutCountdown, subscribePayout, blockCap, resetTurf } from '../state/blocksStore'
 import { useCrew, atkOf, defOf, baseAtk, baseDef } from '../state/crewStore'
 import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
-import { useVitals, msToNextStamina, msToNextHealth, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
+import { useVitals, msToNextStamina, msToNextHealth } from '../state/vitalsStore'
 import { useProgress } from '../state/progressionStore'
 import { xpForLevel } from '../data/bossLadder'
 import { Avatar } from '../components/Avatar'
@@ -319,12 +319,12 @@ function VitalsHud() {
     }}>
       <VitalTimer
         icon="ti-heart" color="#e74c3c"
-        label="Health" cur={vitals.health} max={HEALTH_MAX}
+        label="Health" cur={vitals.health} max={vitals.healthMax}
         nextMs={msToNextHealth()}
       />
       <VitalTimer
         icon="ti-bolt" color="#f0d080"
-        label="Stamina" cur={vitals.stamina} max={STAMINA_MAX}
+        label="Stamina" cur={vitals.stamina} max={vitals.staminaMax}
         nextMs={msToNextStamina()}
       />
     </div>

@@ -3,8 +3,8 @@ import { PLAYER, SKILLS } from '../data/gameData'
 import { sfx } from '../sounds'
 import { Avatar } from './Avatar'
 import { usePlayerCard } from '../state/profileStore'
-import { useVitals, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
-import { usePlayerCombat } from '../state/progressionStore'
+import { useVitals } from '../state/vitalsStore'
+import { usePlayerCombat } from '../state/statsStore'
 
 const GOLD   = '#c9a84c'
 const BLUE   = '#4a9eff'
@@ -66,8 +66,9 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
   const me = usePlayerCard()
   const vitals = useVitals()
   const stamina = vitals.stamina
-  const combat = usePlayerCombat()          // live player atk/def/level from progression
-  const healthMax = HEALTH_MAX
+  const combat = usePlayerCombat()          // live player atk/def/hp/level from real traits
+  const healthMax = vitals.healthMax        // Toughness-driven; == combat.hp (same source)
+  const STAMINA_MAX = vitals.staminaMax     // Hustle-driven max for the stamina bar
   const attrition = mode === 'attrition'
 
   const [phase, setPhase]     = useState('idle')    // idle | rolling | resolved

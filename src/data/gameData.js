@@ -61,9 +61,9 @@ export const TRAITS = [
     description: 'Each Hustle point increases max Stamina by 2.',
     detail: 'More stamina lets you push more missions and brawls before resting.' },
   { id: 'toughness', label: 'Toughness', icon: 'ti-heart',    color: '#e74c3c',
-    perPoint: 25, poolMax: 'health',
-    description: 'Each Toughness point increases max Health by 25.',
-    detail: 'Higher toughness means you absorb beatings without going down.' },
+    perPoint: 40, poolMax: 'health',
+    description: 'Each Toughness point increases max Health by 40.',
+    detail: 'Higher toughness means you absorb beatings without going down. Your Health pool is what you fight on.' },
   { id: 'smarts',    label: 'Smarts',    icon: 'ti-brain',    color: '#4a9eff',
     perPoint: 5,  poolMax: 'knowledge',
     description: 'Each Smarts point increases max Knowledge by 5.',
@@ -73,8 +73,8 @@ export const TRAITS = [
     description: 'Each Muscle point increases attack damage by 10.',
     detail: 'Muscle cuts through enemy defense — harder than gear-based bonuses.' },
   { id: 'cred',      label: 'Cred',      icon: 'ti-star',     color: '#a855f7',
-    perPoint: 10, poolMax: null,
-    description: 'Each Cred point increases defense by 10.',
+    perPoint: 8, poolMax: null,
+    description: 'Each Cred point increases defense by 8.',
     detail: 'Street credibility makes enemies think twice — soaks defense-piercing hits.' },
 ]
 

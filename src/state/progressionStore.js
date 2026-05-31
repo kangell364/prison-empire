@@ -15,7 +15,7 @@
 
 import { useEffect, useState } from 'react'
 import {
-  SLOTS_PER_WAVE, playerCombatStats, xpForLevel, generateWave,
+  SLOTS_PER_WAVE, xpForLevel, generateWave,
 } from '../data/bossLadder'
 import { addHustle } from './profileStore'
 
@@ -70,9 +70,8 @@ export function useProgress() {
   return s
 }
 
-// Player combat stats derived from current level (atk/def/hp + level).
-export function getPlayerCombat() { return { level: state.level, ...playerCombatStats(state.level) } }
-export function usePlayerCombat() { const s = useProgress(); return { level: s.level, ...playerCombatStats(s.level) } }
+// Player combat stats now live in statsStore (derived from the player's real
+// trait spend, not a level curve). Import { usePlayerCombat } from statsStore.
 
 export function xpForNext()      { return xpForLevel(state.level) }
 export function useXpForNext()   { const s = useProgress(); return xpForLevel(s.level) }

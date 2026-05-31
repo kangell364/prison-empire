@@ -12,24 +12,17 @@
 // BattleDiceModal, so fights always resolve and small stat gaps don't flip a
 // fight between unwinnable and trivial.
 //
-// All stat/XP constants live here so the ladder is tuned in one place.
+// XP/scaling constants live here; the player power curve now comes from the
+// trait economy (traitMath) so the ladder tracks however points are tuned.
+
+import { playerCombatStats } from './traitMath'
 
 export const SLOTS_PER_WAVE = 10
 
-// ---- player power curve (the yardstick bosses scale against) --------
-// Kept here (pure, no React) so the generator and the store share one source.
-const P_ATK_BASE = 20, P_ATK_PER = 10
-const P_DEF_BASE = 15, P_DEF_PER = 8
-const P_HP_BASE  = 200, P_HP_PER = 40
-
-export function playerCombatStats(level) {
-  const L = Math.max(1, level)
-  return {
-    atk: P_ATK_BASE + P_ATK_PER * (L - 1),
-    def: P_DEF_BASE + P_DEF_PER * (L - 1),
-    hp:  P_HP_BASE  + P_HP_PER  * (L - 1),
-  }
-}
+// Re-export so existing importers of bossLadder keep working. The yardstick is
+// the "balanced at-level player" — atk/def/hp of someone who spent every earned
+// trait point in an even spread (see traitMath.playerCombatStats).
+export { playerCombatStats }
 
 // ---- boss scaling (relative to an at-level player) ------------------
 // Slot 1 is a warm-up; slot 10 is the wave's wall. Tuned so an at-level player
