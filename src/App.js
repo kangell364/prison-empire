@@ -13,6 +13,8 @@ import { ensureCardsLoaded } from './state/cardsStore'
 import { ensureUpgradesLoaded } from './state/upgradesStore'
 import { useBlockPayoutTicker } from './state/blocksStore'
 import { usePlayerCard } from './state/profileStore'
+import { useUnreadCount } from './state/fightLogStore'
+import { NotificationsModal } from './components/NotificationsModal'
 
 // Profile lives on the header avatar (top-right) so the bottom nav stays at 6.
 const NAV_ITEMS = [
@@ -27,6 +29,8 @@ const NAV_ITEMS = [
 export default function App() {
   const [screen, setScreen] = useState('home')
   const [muted, setMutedState] = useState(isMuted())
+  const [showNotifs, setShowNotifs] = useState(false)
+  const unread = useUnreadCount()
 
   // Global hourly block-income payout — runs app-wide regardless of screen.
   useBlockPayoutTicker()
@@ -82,9 +86,9 @@ export default function App() {
           <button className="icon-btn" aria-label={muted ? 'Unmute sound' : 'Mute sound'} onClick={toggleMute}>
             <i className={`ti ${muted ? 'ti-volume-off' : 'ti-volume'}`} aria-hidden="true" />
           </button>
-          <button className="icon-btn" aria-label="Notifications">
+          <button className="icon-btn" aria-label="Notifications" onClick={() => { sfx.tap(); setShowNotifs(true) }}>
             <i className="ti ti-bell" aria-hidden="true" />
-            <div className="notif-dot" />
+            {unread > 0 && <div className="notif-dot" />}
           </button>
           <div className="user-avatar" onClick={() => handleNav('profile')} style={{ overflow: 'hidden', padding: 0 }}>
             {playerCard.avatar
@@ -96,6 +100,10 @@ export default function App() {
 
       {/* Screen Content */}
       {renderScreen()}
+
+      {showNotifs && (
+        <NotificationsModal onClose={() => setShowNotifs(false)} onNavigate={setScreen} />
+      )}
 
       {/* Bottom Navigation */}
       <div className="bottom-nav">

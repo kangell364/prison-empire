@@ -5,6 +5,8 @@ import { useHustle, usePlayerLook, useDisplayName } from '../state/profileStore'
 import { useVitals, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
 import { baseAtk, baseDef, useCrew, atkOf, defOf } from '../state/crewStore'
 import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
+import { useProgress } from '../state/progressionStore'
+import { xpForLevel } from '../data/bossLadder'
 
 const GOLD  = '#c9a84c'
 const RED   = '#e74c3c'
@@ -68,7 +70,9 @@ function StatusBar({ poolMax, onBack }) {
   const lookId = usePlayerLook()
   const look = PLAYER_LOOKS.find(l => l.id === lookId) || PLAYER_LOOKS[0]
   const name = useDisplayName()
-  const xpPct = Math.round((PLAYER.xp / PLAYER.xpNext) * 100)
+  const prog = useProgress()
+  const xpNeed = xpForLevel(prog.level)
+  const xpPct = Math.round((prog.xp / xpNeed) * 100)
   const cardColor = RARITY_COLORS[look.rarity] || GOLD
   // Crew combat bonus — the player's 12-card roster totals (with upgrades), the
   // muscle they roll with. Shown as a "Bonus" on top of the player's own ATK/DEF.
@@ -113,7 +117,7 @@ function StatusBar({ poolMax, onBack }) {
           ><i className="ti ti-x" /></button>
           {/* Identity overlaid bottom-left */}
           <div style={{ position: 'absolute', left: 16, right: 16, bottom: 12 }}>
-            <div style={{ color: cardColor, fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase' }}>Lv {PLAYER.level}</div>
+            <div style={{ color: cardColor, fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase' }}>Lv {prog.level}</div>
             <div style={{ color: '#fff', fontSize: 26, fontWeight: 700, lineHeight: 1.1 }}>{name}</div>
             <div style={{ color: '#aaa', fontSize: 12, marginTop: 2 }}>{PLAYER.facility} — {PLAYER.state}</div>
           </div>
@@ -123,9 +127,9 @@ function StatusBar({ poolMax, onBack }) {
           {/* XP bar */}
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-              <span style={{ color: '#555', fontSize: 9 }}>XP to Lv {PLAYER.level + 1}</span>
+              <span style={{ color: '#555', fontSize: 9 }}>XP to Lv {prog.level + 1}</span>
               <span style={{ color: '#888', fontSize: 9 }}>
-                {PLAYER.xp.toLocaleString()} / {PLAYER.xpNext.toLocaleString()}
+                {prog.xp.toLocaleString()} / {xpNeed.toLocaleString()}
               </span>
             </div>
             <div style={{ height: 4, background: '#1e1e2a', borderRadius: 2, overflow: 'hidden' }}>
@@ -372,19 +376,20 @@ function TraitCard({ trait, value, isPrimary, canUpgrade, onUpgrade }) {
 
 function TrainingTab() {
   // Local state because PLAYER is static — same pattern as Property.
+  const playerLevel = useProgress().level   // live campaign level
   const [learned, setLearned] = useState(PLAYER.learnedSkills)
   const [lastUpgradeLevel, setLastUpgradeLevel] = useState(PLAYER.lastSkillUpgradeLevel)
   const [feedback, setFeedback] = useState(null) // { skillId, kind: 'learn'|'upgrade', at }
 
-  const canUpgradeThisLevel = lastUpgradeLevel < PLAYER.level
+  const canUpgradeThisLevel = lastUpgradeLevel < playerLevel
 
   // Next unlock teaser — first skill tier you don't yet qualify for
   const nextUnlock = useMemo(() => {
-    const unmet = SKILLS.find(s => s.minLevel > PLAYER.level)
+    const unmet = SKILLS.find(s => s.minLevel > playerLevel)
     if (unmet) return unmet.minLevel
     // No future skill data yet → first unlock is at the next 10-level mark
-    return Math.ceil((PLAYER.level + 1) / 10) * 10
-  }, [])
+    return Math.ceil((playerLevel + 1) / 10) * 10
+  }, [playerLevel])
 
   const learn = (skill) => {
     const at = Date.now()
@@ -401,13 +406,13 @@ function TrainingTab() {
       const cur = l[skill.id] || { level: 0 }
       return { ...l, [skill.id]: { level: cur.level + 1 } }
     })
-    setLastUpgradeLevel(PLAYER.level)
+    setLastUpgradeLevel(playerLevel)
     setFeedback({ skillId: skill.id, kind: 'upgrade', at })
     sfx.buy()
     setTimeout(() => setFeedback(f => (f && f.at === at) ? null : f), 3500)
   }
 
-  const availableSkills = SKILLS.filter(s => s.minLevel <= PLAYER.level)
+  const availableSkills = SKILLS.filter(s => s.minLevel <= playerLevel)
 
   return (
     <>
@@ -471,7 +476,7 @@ function TrainingTab() {
           fontSize: 11, lineHeight: 1.5,
         }}>
           {canUpgradeThisLevel
-            ? `✓ You can upgrade one skill at Level ${PLAYER.level}.`
+            ? `✓ You can upgrade one skill at Level ${playerLevel}.`
             : `Skill upgrade used at Level ${lastUpgradeLevel}. Next upgrade unlocks at Level ${lastUpgradeLevel + 1}.`}
         </div>
       </div>

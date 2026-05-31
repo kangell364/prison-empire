@@ -1,14 +1,24 @@
 import React, { useState, useMemo } from 'react'
-import { PLAYER, RANKED_PLAYERS, PVP_LEVEL_RANGE, PVP_FIGHT_COST, pvpRewardMultiplier } from '../data/gameData'
+import { PLAYER, PVP_LEVEL_RANGE, PVP_FIGHT_COST } from '../data/gameData'
+import { generateOpponents, generateOpponent } from '../data/pvpLadder'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { BattleDiceModal } from '../components/BattleDiceModal'
 import { useVitals, spendStamina, spendHealth, STAMINA_MAX } from '../state/vitalsStore'
+import { useProgress, usePlayerCombat, addXp, creditRival, reclaimRival } from '../state/progressionStore'
+import { useFightLog, recordKoBy, recordKo } from '../state/fightLogStore'
 import Battle from './Battle'
+
+// PvP per-turn XP: whoever deals more damage that roll wins the turn.
+const XP_WIN  = 5
+const XP_LOSE = 3            // a lost turn stings — and feeds the rival's bounty
+const RECLAIM_MULT = 3      // KO a rival → take back 3× what they banked off you
+const REVENGE_XP = 50       // KO a rival who KO'd you → revenge bounty
+// Ratio damage model — mirrors BattleDiceModal, used to preview matchups.
+const dmg = (a, d) => Math.max(1, Math.round((a * a) / (a + d)))
 
 const GOLD   = '#c9a84c'
 const BLUE   = '#4a9eff'
-const ORANGE = '#f39c12'
 const RED    = '#e74c3c'
 const GREEN  = '#2ecc71'
 const DIM    = '#555'
@@ -62,29 +72,54 @@ function SubTab({ active, onClick, children }) {
 
 function PlayersScreen() {
   const [dailyKills, setDailyKills] = useState(PLAYER.dailyKills)
+  const prog = useProgress()
+  const fightLog = useFightLog()
+  const playerLevel = prog.level
   const stamina = useVitals().stamina
   const [target, setTarget]         = useState(null)
   const [detailPlayer, setDetailPlayer] = useState(null)
-  // Track last fight reward to display on the list
-  const [lastReward, setLastReward] = useState(null)
 
-  const targets = useMemo(() => (
-    RANKED_PLAYERS
-      .filter(p => !p.isYou && p.level >= PLAYER.level && p.level <= PLAYER.level + PVP_LEVEL_RANGE)
-      .sort((a, b) => a.level - b.level)
-  ), [])
+  // Revenge targets (rivals who KO'd you) — regenerated from their stable ids so
+  // they're always fightable and pinned to the top, even if they've since
+  // dropped below your level and wouldn't otherwise appear.
+  const revengeTargets = useMemo(() => (
+    Object.keys(fightLog.revenge).map(id => {
+      const m = /^ai-(\d+)-(\d+)$/.exec(id)
+      return m ? generateOpponent(Number(m[1]), Number(m[2])) : null
+    }).filter(Boolean)
+  ), [fightLog.revenge])
+
+  const targets = useMemo(() => {
+    const base = generateOpponents(playerLevel)
+    const ids = new Set(revengeTargets.map(t => t.id))
+    return [...revengeTargets, ...base.filter(t => !ids.has(t.id))]
+  }, [playerLevel, revengeTargets])
 
   const onFightOpened = (opp) => {
     if (stamina < PVP_FIGHT_COST) return
     setTarget(opp)
   }
 
-  const onWin = (opp) => {
-    const mult = pvpRewardMultiplier(PLAYER.level, opp.level)
-    const reward = { xp: 50 * mult, hustle: 100 * mult, knowledge: 1 * mult, mult }
-    setDailyKills(k => k + 1)
-    setLastReward({ opp: opp.name, ...reward })
+  // Each roll is an attack: win the turn → +XP. Lose it → −XP, and that XP is
+  // handed to the rival (they bank it persistently).
+  const onAttack = ({ won, tie }) => {
+    if (tie) return
+    if (won) { addXp(XP_WIN) }
+    else { addXp(-XP_LOSE); if (target) creditRival(target.id, XP_LOSE) }
   }
+
+  // KO a rival → reclaim 3× the XP they banked, plus a 50 XP bounty if they were
+  // a revenge target (they'd KO'd you before). Logs the KO either way.
+  const onKO = (opp) => {
+    setDailyKills(k => k + 1)
+    const banked = reclaimRival(opp.id)
+    if (banked) addXp(banked * RECLAIM_MULT)
+    const { avenged } = recordKo(opp)
+    if (avenged) addXp(REVENGE_XP)
+  }
+
+  // You went down — log who KO'd you (flags them for revenge).
+  const onPlayerDown = (opp) => { recordKoBy(opp) }
 
   const onDiceRoll = () => {
     spendStamina(PVP_FIGHT_COST)
@@ -103,7 +138,7 @@ function PlayersScreen() {
             <div>
               <div style={{ color: '#fff', fontSize: 16, fontWeight: 600 }}>Player vs Player</div>
               <div style={{ color: '#888', fontSize: 11, marginTop: 2, lineHeight: 1.4 }}>
-                See inmates from your level up to +{PVP_LEVEL_RANGE} above.
+                Pick your fights — rivals from your level up to +{PVP_LEVEL_RANGE} above.
               </div>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -139,28 +174,12 @@ function PlayersScreen() {
           borderRadius: 12, padding: 12,
           color: '#888', fontSize: 11, lineHeight: 1.5,
         }}>
-          <div style={{ color: BLUE, fontSize: 10, fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>HOW REWARDS WORK</div>
-          Each kill pays out scaled to the level gap.{' '}
-          <span style={{ color: '#fff' }}>Same level = 1×.</span>{' '}
-          <span style={{ color: GOLD }}>+2 levels above = 2×.</span>{' '}
-          <span style={{ color: ORANGE }}>+4 levels above = 4×.</span>{' '}
-          Every defeated player also drops one skill-unlock token.
+          <div style={{ color: BLUE, fontSize: 10, fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>HOW IT WORKS</div>
+          Every roll is one attack. <span style={{ color: '#fff' }}>Whoever deals more damage wins the turn.</span>{' '}
+          Win a turn <span style={{ color: GREEN }}>+{XP_WIN} XP</span>, lose it <span style={{ color: RED }}>−{XP_LOSE} XP</span>.{' '}
+          So pick someone you out-hit — fighting up bleeds XP.
         </div>
       </div>
-
-      {/* Last reward flash */}
-      {lastReward && (
-        <div style={{ padding: '12px 16px 0' }}>
-          <div style={{
-            background: '#0e1a0e',
-            border: `0.5px solid ${GREEN}55`,
-            borderRadius: 12, padding: 10,
-            color: GREEN, fontSize: 11, lineHeight: 1.5,
-          }}>
-            ✓ Defeated {lastReward.opp} ({lastReward.mult}× reward) — +{lastReward.xp} XP · +{lastReward.hustle.toLocaleString()} Hustle · +{lastReward.knowledge} skill token
-          </div>
-        </div>
-      )}
 
       {/* Player list */}
       <div className="section" style={{ marginTop: 14 }}>
@@ -175,6 +194,8 @@ function PlayersScreen() {
               <TargetCard
                 key={opp.id}
                 opp={opp}
+                rivalXp={prog.rivalXp[opp.id] || 0}
+                revenge={!!fightLog.revenge[opp.id]}
                 disabled={stamina < PVP_FIGHT_COST}
                 onFight={() => onFightOpened(opp)}
                 onShowDetail={() => setDetailPlayer(opp)}
@@ -184,26 +205,23 @@ function PlayersScreen() {
         )}
       </div>
 
-      {/* Battle Dice modal */}
-      {target && (() => {
-        const mult = pvpRewardMultiplier(PLAYER.level, target.level)
-        return (
-          <BattleDiceModal
-            opponent={target}
-            cost={PVP_FIGHT_COST}
-            rewards={{
-              xp:          50 * mult,
-              hustle:      100 * mult,
-              skillTokens: mult,
-              multText:    `${mult}× REWARD`,
-            }}
-            onClose={() => setTarget(null)}
-            onRoll={onDiceRoll}
-            onWin={onWin}
-            onResult={(r) => spendHealth(r.damageTaken)}
-          />
-        )
-      })()}
+      {/* Battle Dice modal — PvP per-turn XP */}
+      {target && (
+        <BattleDiceModal
+          opponent={target}
+          cost={PVP_FIGHT_COST}
+          attackXp={{ win: XP_WIN, lose: XP_LOSE }}
+          rewards={{
+            reclaim: (prog.rivalXp[target.id] || 0) * RECLAIM_MULT,
+            revenge: fightLog.revenge[target.id] ? REVENGE_XP : 0,
+          }}
+          onClose={() => setTarget(null)}
+          onRoll={onDiceRoll}
+          onAttack={onAttack}
+          onWin={onKO}
+          onResult={(r) => { spendHealth(r.damageTaken); if (r.result === 'lose') onPlayerDown(target) }}
+        />
+      )}
 
       {/* Player detail preview */}
       {detailPlayer && (
@@ -221,41 +239,57 @@ function PlayersScreen() {
   )
 }
 
-function TargetCard({ opp, disabled, onFight, onShowDetail }) {
-  const mult     = pvpRewardMultiplier(PLAYER.level, opp.level)
-  const levelGap = opp.level - PLAYER.level
-  const multColor = mult >= 4 ? ORANGE : mult >= 2 ? GOLD : '#888'
+function TargetCard({ opp, rivalXp = 0, revenge = false, disabled, onFight, onShowDetail }) {
+  const me = usePlayerCombat()
+  // Preview the matchup: do you out-hit them per turn? (same model as the fight)
+  const youDealt = dmg(me.atk, opp.def)
+  const oppDealt = dmg(opp.atk, me.def)
+  const favorable = youDealt > oppDealt
+  const even = youDealt === oppDealt
+  const tag = even ? { c: GOLD, t: 'COIN FLIP' } : favorable ? { c: GREEN, t: `FAVORABLE +${XP_WIN}/turn` } : { c: RED, t: `TOUGH −${XP_LOSE}/turn` }
 
   return (
     <div className="card card-pad"
       onClick={onShowDetail}
       style={{
         padding: 14, display: 'flex', alignItems: 'center', gap: 12,
-        borderColor: '#2a2a3a',
+        borderColor: revenge ? `${RED}88` : '#2a2a3a',
+        background: revenge ? '#1a1012' : undefined,
         cursor: 'pointer',
       }}>
       <Avatar src={opp.avatar} emoji={opp.emoji} size={52} radius={12}
         style={{ background: '#1e1e2a' }} />
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: '#fff', fontSize: 14, fontWeight: 500 }}>{opp.name}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ color: '#fff', fontSize: 14, fontWeight: 500 }}>{opp.name}</span>
+          {revenge && <span style={{ background: RED, color: '#fff', fontSize: 8, fontWeight: 800, letterSpacing: 0.5, padding: '2px 5px', borderRadius: 4 }}>REVENGE</span>}
+        </div>
         <div style={{ color: '#888', fontSize: 11, marginTop: 1 }}>
-          Lv {opp.level} · {opp.facility} · {opp.state}
+          Lv {opp.level} · ATK {opp.atk} · DEF {opp.def}
         </div>
         <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{
-            background: `${multColor}18`,
-            border: `0.5px solid ${multColor}66`,
-            color: multColor,
+            background: `${tag.c}18`,
+            border: `0.5px solid ${tag.c}66`,
+            color: tag.c,
             fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
             padding: '2px 6px',
             borderRadius: 6,
           }}>
-            {mult}× REWARD
+            {tag.t}
           </span>
           <span style={{ color: DIM, fontSize: 10 }}>
-            {levelGap > 0 ? `+${levelGap} levels above` : 'same level'}
+            you {youDealt} vs {oppDealt}
           </span>
+          {rivalXp > 0 && (
+            <span style={{
+              background: `${GOLD}18`, border: `0.5px solid ${GOLD}66`, color: GOLD,
+              fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 6,
+            }} title={`Took ${rivalXp} XP off you — KO them to reclaim ${rivalXp * RECLAIM_MULT}`}>
+              <i className="ti ti-target" style={{ fontSize: 10, marginRight: 2 }} />KO bounty +{rivalXp * RECLAIM_MULT} XP
+            </span>
+          )}
         </div>
       </div>
 

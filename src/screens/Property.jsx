@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react'
-import { PROPERTIES, PROPERTY_COST_GROWTH, PLAYER } from '../data/gameData'
+import { PROPERTIES, PROPERTY_COST_GROWTH } from '../data/gameData'
 import { useHustle, spendHustle } from '../state/playerStore'
+import { useProgress } from '../state/progressionStore'
 import { sfx } from '../sounds'
 
 const GOLD = '#c9a84c'
@@ -32,7 +33,7 @@ function bulkCost(baseCost, owned, qty) {
 const QTY_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 export default function Property() {
-  const playerLevel = PLAYER.level
+  const playerLevel = useProgress().level
   const hustle      = useHustle()
   // Owned counts per property id — local until Phase 5 (own_property table).
   const [owned, setOwned] = useState({})
