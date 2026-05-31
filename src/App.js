@@ -7,7 +7,9 @@ import MapScreen from './screens/MapScreen'
 import Yard from './screens/Yard'
 import Profile from './screens/Profile'
 import Property from './screens/Property'
+import Nurse from './screens/Nurse'
 import { isMuted, setMuted, subscribeMuted, sfx } from './sounds'
+import { useVitals, onOpenNurse } from './state/vitalsStore'
 import { ensureAuth } from './state/profileStore'
 import { ensureCardsLoaded } from './state/cardsStore'
 import { ensureUpgradesLoaded } from './state/upgradesStore'
@@ -37,11 +39,17 @@ export default function App() {
   // Live player card (look + name) for the header avatar — stays in sync with SWAP.
   const playerCard = usePlayerCard()
   const initials = (playerCard.name || 'SR').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
+  // Live KO state — drives the global "DEFEATED — SEE NURSE" banner shown on
+  // every screen while the player is knocked out.
+  const vitals = useVitals()
 
   useEffect(() => subscribeMuted(setMutedState), [])
   useEffect(() => {
     ensureAuth().then(() => { ensureCardsLoaded(); ensureUpgradesLoaded() })
   }, [])
+  // Any component can call openNurse() (e.g. the fight's "DEFEATED — SEE NURSE"
+  // button) to jump straight to the Nurse view.
+  useEffect(() => onOpenNurse(() => setScreen('nurse')), [])
 
   const toggleMute = () => {
     const next = !muted
@@ -63,6 +71,7 @@ export default function App() {
       case 'cards':   return <Cards />
       case 'yard':     return <Yard />
       case 'property': return <Property />
+      case 'nurse':    return <Nurse onBack={() => setScreen('home')} />
       case 'profile':  return <Profile onBack={() => setScreen('home')} />
       default:         return <Dashboard onNavigate={setScreen} />
     }
@@ -97,6 +106,17 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Global KO banner — shown on every screen while knocked out. Tap to see
+          the nurse and heal up (watch ads / pay Hustle / wait out the 24h). */}
+      {vitals.ko && screen !== 'nurse' && (
+        <div onClick={() => { sfx.tap(); setScreen('nurse') }}
+          style={{ margin: '10px 16px 0', background: 'linear-gradient(135deg, #2a0a0a, #130a0f)', border: '1px solid #e74c3c88', borderRadius: 12, padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+          <i className="ti ti-skull" style={{ color: '#e74c3c', fontSize: 18 }} />
+          <div style={{ flex: 1, color: '#fff', fontSize: 13, fontWeight: 800, letterSpacing: 0.5 }}>DEFEATED — SEE NURSE</div>
+          <i className="ti ti-chevron-right" style={{ color: '#e74c3c', fontSize: 18 }} />
+        </div>
+      )}
 
       {/* Screen Content */}
       {renderScreen()}

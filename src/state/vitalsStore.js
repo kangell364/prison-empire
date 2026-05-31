@@ -16,6 +16,14 @@ import { getHealthMax, getStaminaMax } from './statsStore'
 
 const KEY = 'pe_vitals_v1'
 
+// KO recovery: a knocked-out player is frozen at 0 health (no regen) until a
+// 24-hour timer elapses, then auto-revives to full. `?test=1` shortens it to
+// 60s so the flow can be exercised quickly. The Nurse view also lets the player
+// short-circuit the wait (watch ads / pay Hustle → reviveNow()).
+const IS_TEST = typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('test') === '1'
+const KO_DURATION_MS = IS_TEST ? 60 * 1000 : 24 * 60 * 60 * 1000
+
 // Pool maxes are now TRAIT-DRIVEN (Toughness → Health, Hustle → Stamina) and
 // can change as the player allocates points, so they're read live from
 // statsStore rather than baked as constants. Components get the current values
@@ -47,6 +55,7 @@ function readInitial() {
     staminaAt: saved?.staminaAt ?? now,
     health:    saved?.health    ?? healthMax(),
     healthAt:  saved?.healthAt  ?? now,
+    koUntil:   saved?.koUntil   ?? null,   // timestamp the KO clears, or null
   }
   return settleAll(seed, now)
 }
@@ -67,8 +76,22 @@ function settlePool(value, at, max, msPerPoint, now) {
 
 function settleAll(s, now = Date.now()) {
   const st = settlePool(s.stamina, s.staminaAt, staminaMax(), STAMINA_MS_PER_POINT, now)
-  const hp = settlePool(s.health,  s.healthAt,  healthMax(),  healthMsPerPoint(),   now)
-  return { stamina: st.value, staminaAt: st.at, health: hp.value, healthAt: hp.at }
+  let koUntil = s.koUntil ?? null
+  let health = s.health, healthAt = s.healthAt
+  if (koUntil != null) {
+    if (now >= koUntil) {
+      // Recovery timer elapsed → back to full health, KO cleared. (This also
+      // fires on app load after being away the full 24h.)
+      koUntil = null; health = healthMax(); healthAt = now
+    } else {
+      // Knocked out: health is frozen at 0 — no regen while you're down.
+      health = 0; healthAt = now
+    }
+  } else {
+    const hp = settlePool(s.health, s.healthAt, healthMax(), healthMsPerPoint(), now)
+    health = hp.value; healthAt = hp.at
+  }
+  return { stamina: st.value, staminaAt: st.at, health, healthAt, koUntil }
 }
 
 function persist() {
@@ -84,7 +107,7 @@ function commit(next) {
 // Settle regen against the wall clock and notify if anything changed.
 function tick() {
   const next = settleAll(state)
-  if (next.stamina !== state.stamina || next.health !== state.health) {
+  if (next.stamina !== state.stamina || next.health !== state.health || next.koUntil !== state.koUntil) {
     commit(next)
   }
 }
@@ -114,6 +137,40 @@ export function addStamina(amount) {
   commit({ ...s, stamina: Math.min(staminaMax(), s.stamina + amount) })
 }
 
+// ---- KO / Nurse ----------------------------------------------------
+
+export const KO_HUSTLE_PER_LEVEL = 5000   // Nurse "pay to heal" = 5,000 × level
+
+// Knock the player out: health to 0, start the 24h recovery clock. No-op if
+// already KO'd (so a second loss doesn't refresh/extend the timer).
+export function knockOut() {
+  const s = settleAll(state)
+  if (s.koUntil != null) return
+  commit({ ...s, health: 0, healthAt: Date.now(), koUntil: Date.now() + KO_DURATION_MS })
+}
+
+// Come back to full health now (the Nurse's watch-ads / pay-Hustle options, and
+// the auto-revive path). Clears the KO and restarts regen from full.
+export function reviveNow() {
+  const s = settleAll(state)
+  commit({ ...s, health: healthMax(), healthAt: Date.now(), koUntil: null })
+}
+
+export function isKO()        { return settleAll(state).koUntil != null }
+export function getKoUntil()  { return settleAll(state).koUntil }
+// ms left on the recovery timer (0 when not KO'd / already elapsed).
+export function koMsRemaining() {
+  const until = settleAll(state).koUntil
+  return until != null ? Math.max(0, until - Date.now()) : 0
+}
+
+// Nurse-navigation event bus. Any component (e.g. the fight modal's "DEFEATED —
+// SEE NURSE" button) calls openNurse(); App subscribes and switches to the
+// Nurse screen. Avoids threading a nav callback through every screen.
+const nurseListeners = new Set()
+export function openNurse() { nurseListeners.forEach(fn => fn()) }
+export function onOpenNurse(fn) { nurseListeners.add(fn); return () => nurseListeners.delete(fn) }
+
 // ms until the next +1 regen tick for a pool (0 when full). For countdowns.
 export function msToNextStamina() {
   const s = settleAll(state)
@@ -141,5 +198,11 @@ export function useVitals() {
   }, [])
   // Maxes are computed fresh each render so a trait allocation reflects
   // immediately (the screen that allocates re-renders, recomputing these).
-  return { ...s, healthMax: healthMax(), staminaMax: staminaMax() }
+  return {
+    ...s,
+    healthMax: healthMax(),
+    staminaMax: staminaMax(),
+    ko: s.koUntil != null,
+    koMsRemaining: s.koUntil != null ? Math.max(0, s.koUntil - Date.now()) : 0,
+  }
 }

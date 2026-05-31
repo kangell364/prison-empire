@@ -2,7 +2,7 @@ import React from 'react'
 import { BattleDiceModal } from './BattleDiceModal'
 import { formatHustle } from './BountyModal'
 import { PVP_FIGHT_COST } from '../data/gameData'
-import { spendStamina, spendHealth } from '../state/vitalsStore'
+import { spendStamina, spendHealth, knockOut } from '../state/vitalsStore'
 import { addXp, creditRival, reclaimRival, getRivalXp } from '../state/progressionStore'
 import { recordKoBy, recordKo, isRevengeTarget, recordJob } from '../state/fightLogStore'
 import { addHustle } from '../state/profileStore'
@@ -47,6 +47,9 @@ export function PvpBattleModal({ opponent, bounty = 0, onKO, onClose }) {
 
   const handleResult = (r) => {
     if (r.result === 'lose') recordKoBy(opponent)
+    // Out of health in a duel (you lost, or a mutual KO) = knocked out → the 24h
+    // recovery clock starts and the player must see the nurse.
+    if (r.result === 'lose' || r.result === 'draw') knockOut()
   }
 
   return (

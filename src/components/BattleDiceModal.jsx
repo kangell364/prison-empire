@@ -3,7 +3,7 @@ import { PLAYER, SKILLS } from '../data/gameData'
 import { sfx } from '../sounds'
 import { Avatar } from './Avatar'
 import { usePlayerCard } from '../state/profileStore'
-import { useVitals } from '../state/vitalsStore'
+import { useVitals, openNurse } from '../state/vitalsStore'
 import { usePlayerCombat } from '../state/statsStore'
 
 const GOLD   = '#c9a84c'
@@ -321,17 +321,19 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
             player KO = red DEFEATED, mutual KO = DRAW. Tapping it banks and closes.
             Bosses (attrition) keep their bottom-of-modal RETREAT/DONE layout. */}
         {!attrition && fightOver && (
-          <button onClick={onClose} style={{
-            marginTop: 14, width: '100%',
-            background: outcome === 'win' ? GREEN : outcome === 'lose' ? RED : '#2a2a3a',
-            color: outcome === 'win' ? '#0a0a0f' : '#fff',
-            border: 'none', borderRadius: 10, padding: 14,
-            fontSize: 14, fontWeight: 800, letterSpacing: 1.5, cursor: 'pointer',
-            boxShadow: outcome === 'win' ? `0 0 20px ${GREEN}55` : outcome === 'lose' ? `0 0 20px ${RED}55` : 'none',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          }}>
+          <button
+            onClick={outcome === 'win' ? onClose : () => { onClose(); openNurse() }}
+            style={{
+              marginTop: 14, width: '100%',
+              background: outcome === 'win' ? GREEN : outcome === 'lose' ? RED : '#2a2a3a',
+              color: outcome === 'win' ? '#0a0a0f' : '#fff',
+              border: 'none', borderRadius: 10, padding: 14,
+              fontSize: 14, fontWeight: 800, letterSpacing: 1.5, cursor: 'pointer',
+              boxShadow: outcome === 'win' ? `0 0 20px ${GREEN}55` : outcome === 'lose' ? `0 0 20px ${RED}55` : 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}>
             <i className={`ti ${outcome === 'win' ? 'ti-trophy' : outcome === 'lose' ? 'ti-skull' : 'ti-minus'}`} style={{ fontSize: 15 }} />
-            {outcome === 'win' ? 'VICTORY' : outcome === 'lose' ? 'DEFEATED' : 'DRAW'}
+            {outcome === 'win' ? 'VICTORY' : outcome === 'lose' ? 'DEFEATED — SEE NURSE' : 'DRAW — SEE NURSE'}
           </button>
         )}
 
