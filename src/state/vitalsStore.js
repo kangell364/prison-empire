@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react'
 import { getHealthMax, getStaminaMax } from './statsStore'
 import { collectBounty } from './bountyStore'
 import { recordBountyCollected } from './fightLogStore'
+import { getHustle, spendHustle } from './profileStore'
 
 const KEY = 'pe_vitals_v1'
 
@@ -158,8 +159,12 @@ export function knockOut(collector) {
   const s = settleAll(state)
   if (s.koUntil != null) return
   commit({ ...s, health: 0, healthAt: Date.now(), koUntil: Date.now() + KO_DURATION_MS })
+  // A rival collects the price on your head AND banks it — taken out of your
+  // Hustle, capped at whatever you're holding (they can't rob what you don't
+  // have). The bounty pot resets either way.
   const collected = collectBounty()
-  if (collected > 0) recordBountyCollected(collected, collector)
+  const taken = Math.min(collected, getHustle())
+  if (taken > 0) { spendHustle(taken); recordBountyCollected(taken, collector) }
 }
 
 // Come back to full health now (the Nurse's watch-ads / pay-Hustle options, and
