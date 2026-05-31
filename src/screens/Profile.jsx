@@ -3,6 +3,7 @@ import { PLAYER, PLAYER_LOOKS, CARDS_COLLECTION, TRAITS, RARITY_COLORS, SKILLS }
 import { sfx } from '../sounds'
 import { useHustle, usePlayerLook, useDisplayName } from '../state/profileStore'
 import { useVitals } from '../state/vitalsStore'
+import { KoOverlay, KO_FILTER } from '../components/Avatar'
 import { useCrew, atkOf, defOf } from '../state/crewStore'
 import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
 import { useProgress } from '../state/progressionStore'
@@ -88,10 +89,11 @@ function StatusBar({ onBack }) {
         <div style={{ position: 'relative', width: '100%', height: 280, overflow: 'hidden' }}>
           {look.avatar ? (
             <img src={look.avatar} alt={name}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
+              style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block', filter: vitals.ko ? KO_FILTER : 'none' }} />
           ) : (
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 140, background: 'radial-gradient(circle at center, #1a1a2e 0%, #0a0a0f 100%)' }}>{look.emoji}</div>
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 140, background: 'radial-gradient(circle at center, #1a1a2e 0%, #0a0a0f 100%)', filter: vitals.ko ? KO_FILTER : 'none' }}>{look.emoji}</div>
           )}
+          {vitals.ko && <KoOverlay fontSize={34} />}
           {/* Top accent stripe */}
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: cardColor }} />
           {/* Bottom gradient so text reads on any art */}

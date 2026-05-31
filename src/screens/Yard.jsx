@@ -3,6 +3,7 @@ import { RANKED_PLAYERS, streetRep } from '../data/gameData'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { usePlayerCard } from '../state/profileStore'
+import { useVitals } from '../state/vitalsStore'
 import { useProgress } from '../state/progressionStore'
 import { usePlayerStats } from '../state/statsStore'
 import { useRecord } from '../state/fightLogStore'
@@ -190,6 +191,7 @@ function HitCard({ target: t, onAddBounty, onMove }) {
 
 function YardKingsView({ openDetail }) {
   const me = usePlayerCard()   // live player card (look + name), synced with SWAP/rename
+  const playerKo = useVitals().ko
   const prog = useProgress()
   const stats = usePlayerStats()   // real ATK/DEF/HP from traits
   const record = useRecord()       // live career record → Street Rep
@@ -235,7 +237,7 @@ function YardKingsView({ openDetail }) {
           cursor: 'pointer',
         }} onClick={() => openDetail({ character: liveYou })}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Avatar src={me.avatar} emoji={me.emoji} size={28} radius={6} />
+            <Avatar src={me.avatar} emoji={me.emoji} size={28} radius={6} ko={playerKo} />
             <div>
               <div style={{ color: GOLD, fontSize: 12, fontWeight: 500 }}>You — {me.name}</div>
               <div style={{ color: DIM, fontSize: 10 }}>Street Rep: {streetRep(liveYou).toLocaleString()}</div>
@@ -291,6 +293,7 @@ function Podium({ top3, openDetail }) {
 
 function PodiumColumn({ p, place, height, color, isWinner, openDetail }) {
   const me = usePlayerCard()
+  const playerKo = useVitals().ko
   // Live name/avatar for the player's own podium slot.
   const pc = p.isYou ? { ...p, name: me.name, avatar: me.avatar, emoji: me.emoji } : p
   return (
@@ -301,7 +304,7 @@ function PodiumColumn({ p, place, height, color, isWinner, openDetail }) {
         minWidth: 0, maxWidth: 110, cursor: 'pointer',
       }}>
       {/* Avatar */}
-      <Avatar src={pc.avatar} emoji={pc.emoji}
+      <Avatar src={pc.avatar} emoji={pc.emoji} ko={p.isYou && playerKo}
         size={isWinner ? 60 : 48}
         radius={12}
         style={{
@@ -340,6 +343,7 @@ function PodiumColumn({ p, place, height, color, isWinner, openDetail }) {
 
 function CategoryLeaderboard({ label, subtitle, metricLabel, metric, icon, players, openDetail }) {
   const me = usePlayerCard()
+  const playerKo = useVitals().ko
   const liveName = (p) => p.isYou ? me.name : p.name
   const liveAvatar = (p) => p.isYou ? me.avatar : p.avatar
   const liveEmoji = (p) => p.isYou ? me.emoji : p.emoji
@@ -387,7 +391,7 @@ function CategoryLeaderboard({ label, subtitle, metricLabel, metric, icon, playe
               fontSize: 12, fontWeight: 600, width: 18, textAlign: 'right',
               fontVariantNumeric: 'tabular-nums',
             }}>{i + 1}</div>
-            <Avatar src={liveAvatar(p)} emoji={liveEmoji(p)} size={28} radius={6} />
+            <Avatar src={liveAvatar(p)} emoji={liveEmoji(p)} size={28} radius={6} ko={p.isYou && playerKo} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
                 color: p.isYou ? GOLD : '#fff',

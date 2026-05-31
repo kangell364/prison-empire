@@ -1,6 +1,7 @@
 import React from 'react'
 import { RARITY_COLORS } from '../data/gameData'
-import { Avatar } from './Avatar'
+import { Avatar, KoOverlay, KO_FILTER } from './Avatar'
+import { useVitals } from '../state/vitalsStore'
 
 const GOLD = '#c9a84c'
 const RED  = '#e74c3c'
@@ -36,7 +37,11 @@ export function CharacterDetailModal({
   canMerge = false,
   onMerge,
 }) {
+  // KO the player's own portrait when knocked out (this modal opens for the
+  // player from Home / leaderboards, and for opponents — only `isYou` greys out).
+  const playerKo = useVitals().ko
   if (!c) return null
+  const koHero = !!c.isYou && playerKo
 
   const accent =
     c.rarity ? (RARITY_COLORS[c.rarity] || GOLD)
@@ -94,7 +99,7 @@ export function CharacterDetailModal({
               style={{
                 width: '100%', height: '100%',
                 objectFit: 'cover', objectPosition: 'center top',
-                display: 'block',
+                display: 'block', filter: koHero ? KO_FILTER : 'none',
               }}
             />
           ) : (
@@ -102,9 +107,10 @@ export function CharacterDetailModal({
               width: '100%', height: '100%',
               background: 'radial-gradient(circle at center, #1a1a2e 0%, #0a0a0f 100%)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 140,
+              fontSize: 140, filter: koHero ? KO_FILTER : 'none',
             }}>{c.emoji}</div>
           )}
+          {koHero && <KoOverlay fontSize={40} />}
           {/* Dark gradient at the bottom so name/meta read against any image */}
           <div style={{
             position: 'absolute', left: 0, right: 0, bottom: 0,

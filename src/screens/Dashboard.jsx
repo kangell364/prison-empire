@@ -8,7 +8,7 @@ import { useVitals, msToNextStamina, msToNextHealth } from '../state/vitalsStore
 import { useProgress } from '../state/progressionStore'
 import { usePlayerStats } from '../state/statsStore'
 import { xpForLevel } from '../data/bossLadder'
-import { Avatar } from '../components/Avatar'
+import { Avatar, KoOverlay, KO_FILTER } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { SwapLookModal } from '../components/SwapLookModal'
 import { sfx } from '../sounds'
@@ -49,6 +49,7 @@ export default function Dashboard({ onNavigate }) {
     return acc
   }, { atk: 0, def: 0 })
   const playerName = useDisplayName()
+  const playerKo = useVitals().ko                    // KO treatment on the player's own portrait
   const liveStats = usePlayerStats()                 // real ATK/DEF/HP from traits
   const livePower = liveStats.atk + liveStats.def    // leaderboard "power" = ATK+DEF
   const lookId = usePlayerLook()
@@ -82,10 +83,11 @@ export default function Dashboard({ onNavigate }) {
           }}>
             {look.avatar ? (
               <img src={look.avatar} alt={look.name}
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', filter: playerKo ? KO_FILTER : 'none' }} />
             ) : (
-              <div style={{ fontSize: 30, marginBottom: 4 }}>{look.emoji}</div>
+              <div style={{ fontSize: 30, marginBottom: 4, filter: playerKo ? KO_FILTER : 'none' }}>{look.emoji}</div>
             )}
+            {playerKo && <KoOverlay fontSize={16} />}
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: lookColor }} />
             <div style={{
               position: 'relative', zIndex: 1, width: '100%',
@@ -293,7 +295,7 @@ export default function Dashboard({ onNavigate }) {
               }
             }}>
               <div style={{ color: p.rank === 1 ? '#c9a84c' : p.rank === 2 ? '#888' : p.rank === 3 ? '#8b6914' : '#555', fontSize: 14, fontWeight: 500, width: 20 }}>{p.rank}</div>
-              <Avatar src={p.avatar} emoji={p.emoji} size={36} radius={10}
+              <Avatar src={p.avatar} emoji={p.emoji} size={36} radius={10} ko={p.isYou && playerKo}
                 style={{ background: '#1e1e2a' }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: p.isYou ? '#c9a84c' : '#fff', fontSize: 13, fontWeight: 500 }}>{p.isYou ? playerName : p.name}{p.isYou ? ' (You)' : ''}</div>

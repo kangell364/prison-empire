@@ -10,6 +10,7 @@ import Property from './screens/Property'
 import Nurse from './screens/Nurse'
 import { isMuted, setMuted, subscribeMuted, sfx } from './sounds'
 import { useVitals, onOpenNurse } from './state/vitalsStore'
+import { KoOverlay, KO_FILTER } from './components/Avatar'
 import { ensureAuth } from './state/profileStore'
 import { ensureCardsLoaded } from './state/cardsStore'
 import { ensureUpgradesLoaded } from './state/upgradesStore'
@@ -99,10 +100,11 @@ export default function App() {
             <i className="ti ti-bell" aria-hidden="true" />
             {unread > 0 && <div className="notif-dot" />}
           </button>
-          <div className="user-avatar" onClick={() => handleNav('profile')} style={{ overflow: 'hidden', padding: 0 }}>
+          <div className="user-avatar" onClick={() => handleNav('profile')} style={{ overflow: 'hidden', padding: 0, position: 'relative' }}>
             {playerCard.avatar
-              ? <img src={playerCard.avatar} alt={playerCard.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
+              ? <img src={playerCard.avatar} alt={playerCard.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', filter: vitals.ko ? KO_FILTER : 'none' }} />
               : initials}
+            {vitals.ko && <KoOverlay fontSize={11} />}
           </div>
         </div>
       </div>
