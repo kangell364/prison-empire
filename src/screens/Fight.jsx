@@ -5,6 +5,7 @@ import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { PvpBattleModal, XP_WIN, XP_LOSE, RECLAIM_MULT } from '../components/PvpBattleModal'
 import { useVitals } from '../state/vitalsStore'
+import { usePlayerCard } from '../state/profileStore'
 import { useProgress } from '../state/progressionStore'
 import { usePlayerCombat } from '../state/statsStore'
 import { useFightLog } from '../state/fightLogStore'
@@ -310,10 +311,15 @@ function TargetCard({ opp, rivalXp = 0, revenge = false, disabled, onFight, onHi
 
 function HitListScreen() {
   const list = useHitList()
-  const stamina = useVitals().stamina
+  const vitals = useVitals()
+  const stamina = vitals.stamina
+  const me = usePlayerCard()
+  const prog = useProgress()
   const [bountyTarget, setBountyTarget] = useState(null)
   const [moveTarget, setMoveTarget] = useState(null)   // { opp, bounty }
   const targets = Object.values(list.targets).sort((a, b) => b.bounty - a.bounty)
+  // There's a price on YOUR head too — notoriety scales with your level.
+  const youBounty = Math.max(25_000, prog.level * 25_000)
 
   const moveOn = (t) => {
     if (stamina < PVP_FIGHT_COST) return
@@ -339,6 +345,22 @@ function HitListScreen() {
       </div>
 
       <div className="section" style={{ marginTop: 14 }}>
+        {/* Your own player — pinned on top. There's a price on your head too. */}
+        <div className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 12, borderColor: `${GOLD}66`, background: 'linear-gradient(135deg, #15110a, #13131f)', marginBottom: 10 }}>
+          <Avatar src={me.avatar} emoji={me.emoji} size={48} radius={12} ko={vitals.ko} style={{ background: '#1e1e2a' }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: '#fff', fontSize: 14, fontWeight: 600, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{me.name}</span>
+              <span style={{ background: GOLD, color: '#0a0a0f', fontSize: 8, fontWeight: 800, letterSpacing: 0.5, padding: '2px 5px', borderRadius: 4, flexShrink: 0 }}>YOU</span>
+            </div>
+            <div style={{ color: '#888', fontSize: 11, marginTop: 1 }}>Lv {prog.level} · price on your head</div>
+            <div style={{ color: GOLD, fontSize: 13, fontWeight: 700, marginTop: 3 }}>
+              <i className="ti ti-coin" style={{ fontSize: 12, marginRight: 3 }} />{formatHustle(youBounty)} bounty
+            </div>
+          </div>
+          <div style={{ color: DIM, fontSize: 9, textAlign: 'right', flexShrink: 0, maxWidth: 80, lineHeight: 1.4 }}>Rivals can collect this</div>
+        </div>
+
         {targets.length === 0 ? (
           <div className="card card-pad" style={{ textAlign: 'center', color: DIM, fontSize: 12, lineHeight: 1.6, padding: 24 }}>
             <i className="ti ti-crosshair" style={{ fontSize: 30, color: '#2a2a3a', display: 'block', marginBottom: 8 }} />
