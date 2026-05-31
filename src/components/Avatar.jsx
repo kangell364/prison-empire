@@ -40,22 +40,22 @@ export function Avatar({ src, emoji, size = 40, radius = 8, style = {}, ko = fal
 // The greyscale wash applied to a knocked-out portrait.
 export const KO_FILTER = 'grayscale(1) brightness(0.55)'
 
-// A red "KO" stamp centered over a portrait. Drop it inside any
+// The comic "K.O." burst stamp centered over a portrait. Drop it inside any
 // position:relative container (Avatar does this automatically; raw-<img> hero
-// portraits pass their own fontSize). Purely decorative — never intercepts taps.
-export function KoOverlay({ fontSize = 16 }) {
+// portraits include it too). Purely decorative — never intercepts taps.
+// `fontSize` is kept for call-site compatibility but the burst scales to its
+// container.
+export function KoOverlay() {
   return (
     <div style={{
       position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(10,10,15,0.4)', pointerEvents: 'none',
+      background: 'rgba(10,10,15,0.35)', pointerEvents: 'none',
     }}>
-      <span style={{
-        color: '#fff', fontWeight: 900, fontSize, letterSpacing: 1, lineHeight: 1,
-        border: `${Math.max(1, Math.round(fontSize / 8))}px solid #e74c3c`,
-        background: 'rgba(150,20,20,0.55)', borderRadius: Math.max(3, Math.round(fontSize / 4)),
-        padding: `${Math.round(fontSize / 6)}px ${Math.round(fontSize / 2.5)}px`,
-        textShadow: '0 1px 4px #000',
-      }}>KO</span>
+      <img
+        src={`${process.env.PUBLIC_URL || ''}/ko-stamp.png`}
+        alt="KO"
+        style={{ width: '94%', height: '82%', objectFit: 'contain', filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.7))' }}
+      />
     </div>
   )
 }
