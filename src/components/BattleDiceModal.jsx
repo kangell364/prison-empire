@@ -336,7 +336,16 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
           </div>
         )}
 
-        {fightOver && (
+        {/* Win — a single green VICTORY button. No "roll again" after a win:
+            the opponent is KO'd, so the only move is to bank it and head back. */}
+        {fightOver && outcome === 'win' && (
+          <button onClick={onClose} style={{ marginTop: 14, width: '100%', background: GREEN, color: '#0a0a0f', border: 'none', borderRadius: 10, padding: 14, fontSize: 14, fontWeight: 800, letterSpacing: 1.5, cursor: 'pointer', boxShadow: `0 0 20px ${GREEN}55` }}>
+            <i className="ti ti-trophy" style={{ fontSize: 15, marginRight: 6 }} />VICTORY
+          </button>
+        )}
+        {/* Attrition loss/boss not-yet-down handled by RETREAT; duel loss/draw
+            shows DONE. (Win is handled above for both modes.) */}
+        {fightOver && outcome !== 'win' && (
           <button onClick={onClose} style={{ marginTop: 14, width: '100%', background: GOLD, color: '#0a0a0f', border: 'none', borderRadius: 10, padding: 14, fontSize: 13, fontWeight: 800, letterSpacing: 1, cursor: 'pointer' }}>
             <i className="ti ti-check" style={{ fontSize: 14, marginRight: 4 }} />DONE
           </button>
@@ -349,8 +358,9 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
             RETREAT (progress saved)
           </button>
         )}
-        {/* Duel post-fight: roll again / close */}
-        {!attrition && phase === 'resolved' && (
+        {/* Duel post-fight, NON-win only: let the player re-roll a fresh bout or
+            bail. After a win this is suppressed (see green VICTORY above). */}
+        {!attrition && phase === 'resolved' && outcome !== 'win' && (
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button onClick={roll} disabled={!canRoll}
               style={{ flex: 1, background: canRoll ? GOLD : '#1e1e2a', color: canRoll ? '#0a0a0f' : '#555', border: 'none', borderRadius: 10, padding: 14, fontSize: 12, fontWeight: 800, letterSpacing: 1, cursor: canRoll ? 'pointer' : 'not-allowed' }}>
@@ -360,9 +370,11 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
           </div>
         )}
 
-        {outcome && (
-          <div style={{ marginTop: 10, textAlign: 'center', color: outcome === 'win' ? GREEN : outcome === 'wornout' ? ORANGE : outcome === 'lose' ? RED : '#888', fontSize: 12, fontWeight: 700, letterSpacing: 1.5 }}>
-            {outcome === 'win' ? '★ VICTORY ★' : outcome === 'wornout' ? 'WORN OUT' : outcome === 'lose' ? 'DEFEATED' : 'DRAW'}
+        {/* Status line for non-win outcomes — the green VICTORY button already
+            says it for a win, so don't stack a second "VICTORY" under it. */}
+        {outcome && outcome !== 'win' && (
+          <div style={{ marginTop: 10, textAlign: 'center', color: outcome === 'wornout' ? ORANGE : outcome === 'lose' ? RED : '#888', fontSize: 12, fontWeight: 700, letterSpacing: 1.5 }}>
+            {outcome === 'wornout' ? 'WORN OUT' : outcome === 'lose' ? 'DEFEATED' : 'DRAW'}
           </div>
         )}
       </div>
