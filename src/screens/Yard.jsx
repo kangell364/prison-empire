@@ -1,8 +1,12 @@
 import React, { useState, useMemo } from 'react'
-import { RANKED_PLAYERS, HIT_LIST, streetRep } from '../data/gameData'
+import { RANKED_PLAYERS, streetRep } from '../data/gameData'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { usePlayerCard } from '../state/profileStore'
+import { useHitList } from '../state/hitListStore'
+import { BountyModal } from '../components/BountyModal'
+import { PvpBattleModal } from '../components/PvpBattleModal'
+import { opponentFromId } from '../data/pvpLadder'
 
 const GOLD   = '#c9a84c'
 const SILVER = '#b0b0b0'
@@ -18,18 +22,6 @@ function formatHustle(n) {
   if (n >= 1e3)  return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K'
   return n.toLocaleString()
 }
-
-function timeAgo(days, hours) {
-  if (days > 0)  return `${days}d ${hours}h ago`
-  if (hours > 0) return `${hours}h ago`
-  return 'just now'
-}
-
-const playerById = (() => {
-  const m = {}
-  RANKED_PLAYERS.forEach(p => { m[p.id] = p })
-  return m
-})()
 
 export default function Yard() {
   const [tab, setTab] = useState('hits')
@@ -49,7 +41,7 @@ export default function Yard() {
         </TabButton>
       </div>
 
-      {tab === 'hits'  && <HitListView  openDetail={setDetail} />}
+      {tab === 'hits'  && <HitListView />}
       {tab === 'kings' && <YardKingsView openDetail={setDetail} />}
 
       {detail && (
@@ -84,8 +76,20 @@ function TabButton({ active, onClick, children }) {
 // Hit List
 // ---------------------------------------------------------------------
 
-function HitListView({ openDetail }) {
-  const totalBounty = useMemo(() => HIT_LIST.reduce((sum, h) => sum + h.bountyHustle, 0), [])
+function HitListView() {
+  const list = useHitList()
+  const targets = useMemo(
+    () => Object.values(list.targets).sort((a, b) => b.bounty - a.bounty),
+    [list.targets],
+  )
+  const totalBounty = useMemo(() => targets.reduce((sum, t) => sum + t.bounty, 0), [targets])
+  const [bountyTarget, setBountyTarget] = useState(null)
+  const [moveTarget, setMoveTarget] = useState(null)   // { opp, bounty }
+
+  const moveOn = (t) => {
+    const opp = opponentFromId(t.id)
+    if (opp) setMoveTarget({ opp, bounty: t.bounty })
+  }
 
   return (
     <>
@@ -99,7 +103,7 @@ function HitListView({ openDetail }) {
         }}>
           <div>
             <div style={{ color: '#888', fontSize: 10, letterSpacing: 1.5, fontWeight: 600 }}>ACTIVE HITS</div>
-            <div style={{ color: RED, fontSize: 26, fontWeight: 600, lineHeight: 1, marginTop: 4 }}>{HIT_LIST.length}</div>
+            <div style={{ color: RED, fontSize: 26, fontWeight: 600, lineHeight: 1, marginTop: 4 }}>{targets.length}</div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ color: '#888', fontSize: 10, letterSpacing: 1.5, fontWeight: 600 }}>TOTAL BOUNTY</div>
@@ -120,71 +124,56 @@ function HitListView({ openDetail }) {
       <div className="section" style={{ marginTop: 14 }}>
         <div className="section-label">Active Hits</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {HIT_LIST.length === 0 ? (
+          {targets.length === 0 ? (
             <div className="card card-pad" style={{ textAlign: 'center', color: DIM, fontSize: 12 }}>
-              No hits posted right now. Visit a rival's profile to place one.
+              No hits posted right now. Put a bounty on a rival from the Fight screen.
             </div>
           ) : (
-            HIT_LIST
-              .slice()
-              .sort((a, b) => b.bountyHustle - a.bountyHustle)
-              .map(hit => <HitCard key={hit.id} hit={hit} openDetail={openDetail} />)
+            targets.map(t => <HitCard key={t.id} target={t} onAddBounty={() => setBountyTarget(t)} onMove={() => moveOn(t)} />)
           )}
         </div>
       </div>
+
+      {bountyTarget && <BountyModal opponent={bountyTarget} onClose={() => setBountyTarget(null)} />}
+      {moveTarget && (
+        <PvpBattleModal opponent={moveTarget.opp} bounty={moveTarget.bounty} onClose={() => setMoveTarget(null)} />
+      )}
     </>
   )
 }
 
-function HitCard({ hit, openDetail }) {
-  const t = playerById[hit.targetId]
-  if (!t) return null
-
-  const showDetail = () => openDetail({
-    character: t,
-    actions: [
-      { label: 'Add Bounty',     icon: 'ti-coin',  onClick: () => {}, kind: 'secondary' },
-      { label: 'Move on Target', icon: 'ti-sword', onClick: () => {}, kind: 'danger' },
-    ],
-  })
-
+function HitCard({ target: t, onAddBounty, onMove }) {
   return (
     <div className="card card-pad" style={{
       padding: 14,
       borderColor: `${RED}44`,
       background: 'linear-gradient(135deg, #15090a 0%, #13131f 60%)',
-      cursor: 'pointer',
-    }} onClick={showDetail}>
+    }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        {/* Avatar */}
         <Avatar src={t.avatar} emoji={t.emoji} size={56} radius={14}
           style={{ background: '#1e1e2a', border: `1px solid ${RED}44` }} />
 
-        {/* Target info */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ color: '#fff', fontSize: 15, fontWeight: 500 }}>{t.name}</div>
             <div style={{ color: DIM, fontSize: 10 }}>Lv {t.level}</div>
           </div>
-          <div style={{ color: '#888', fontSize: 11, marginTop: 1 }}>
-            {t.facility} — {t.state}
-          </div>
-          {/* Bounty */}
+          {(t.facility || t.state) && (
+            <div style={{ color: '#888', fontSize: 11, marginTop: 1 }}>
+              {[t.facility, t.state].filter(Boolean).join(' — ')}
+            </div>
+          )}
           <div style={{ color: RED, fontSize: 18, fontWeight: 600, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
-            {formatHustle(hit.bountyHustle)} <span style={{ fontSize: 11, color: '#888', fontWeight: 400 }}>HUSTLE</span>
-          </div>
-          <div style={{ color: DIM, fontSize: 10, marginTop: 2 }}>
-            {hit.contributors} contributor{hit.contributors === 1 ? '' : 's'} · opened {timeAgo(hit.openedDaysAgo, hit.openedHoursAgo)}
+            {formatHustle(t.bounty)} <span style={{ fontSize: 11, color: '#888', fontWeight: 400 }}>HUSTLE</span>
           </div>
         </div>
       </div>
 
-      {/* Actions — stopPropagation so the buttons don't also open the detail */}
-      <div style={{ display: 'flex', gap: 8, marginTop: 12 }} onClick={e => e.stopPropagation()}>
-        <button className="btn btn-dark" style={{ flex: 1, padding: '10px 0', fontSize: 12 }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        <button className="btn btn-dark" style={{ flex: 1, padding: '10px 0', fontSize: 12 }} onClick={onAddBounty}>
           <i className="ti ti-coin" style={{ fontSize: 14 }} /> Add Bounty
         </button>
-        <button className="btn btn-red" style={{ flex: 1, padding: '10px 0', fontSize: 12, fontWeight: 600 }}>
+        <button className="btn btn-red" onClick={onMove} title="KO the target to claim the bounty" style={{ flex: 1, padding: '10px 0', fontSize: 12, fontWeight: 600 }}>
           <i className="ti ti-sword" style={{ fontSize: 14 }} /> Move on Target
         </button>
       </div>

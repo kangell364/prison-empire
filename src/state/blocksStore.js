@@ -19,7 +19,7 @@
 
 import { useEffect, useState } from 'react'
 import { addHustle, spendHustle } from './profileStore'
-import { PLAYER } from '../data/gameData'
+import { getProgress } from './progressionStore'
 
 export const GRID = 0.004              // ~440m block — MUST match the TurfMap grid
 const KEY = 'pe_blocks_v1'
@@ -30,10 +30,9 @@ const DECAY_PER_HR     = 0.02          // loyalty decays 2%/hr toward its base w
 const COOLDOWN_MS      = 60 * 1000     // re-poach lock after a takeover
 // Block cap scales with player level (25 per level) — a soft anti-whale ceiling
 // that doubles as a progression reward: low levels are gently capped, high
-// levels are effectively uncapped. Level is static (PLAYER.level) for now;
-// swap to the level store when it exists.
+// levels are effectively uncapped. Level comes from the live progression store.
 export const BLOCKS_PER_LEVEL = 25
-export function blockCap() { return BLOCKS_PER_LEVEL * Math.max(1, PLAYER.level || 1) }
+export function blockCap() { return BLOCKS_PER_LEVEL * Math.max(1, getProgress().level || 1) }
 const INCOME_CAP_HRS   = 24
 export const HOME_RADIUS_DEG = 0.06    // ~4mi home-turf radius
 const HOME_INCOME_MULT = 1.25

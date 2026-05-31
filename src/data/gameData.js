@@ -710,11 +710,4 @@ export const PROPERTIES = [
 // Per-purchase cost growth (Cat Champions ≈ 2%). Cost(n) = base × COST_GROWTH^n.
 export const PROPERTY_COST_GROWTH = 1.02
 
-// Active Hit List — community-funded bounties. Targets reference RANKED_PLAYERS.id.
-export const HIT_LIST = [
-  { id: 1, targetId: 'p4',  bountyHustle: 2_400_000, contributors: 12, openedDaysAgo: 3, openedHoursAgo: 4  },
-  { id: 2, targetId: 'p13', bountyHustle: 1_850_000, contributors: 9,  openedDaysAgo: 6, openedHoursAgo: 2  },
-  { id: 3, targetId: 'p9',  bountyHustle:   890_000, contributors: 5,  openedDaysAgo: 1, openedHoursAgo: 11 },
-  { id: 4, targetId: 'p8',  bountyHustle:   670_000, contributors: 4,  openedDaysAgo: 2, openedHoursAgo: 0  },
-  { id: 5, targetId: 'p12', bountyHustle:   145_000, contributors: 2,  openedDaysAgo: 0, openedHoursAgo: 8  },
-]
+// (Hit List moved to the live hitListStore — see src/state/hitListStore.js)

@@ -5,6 +5,8 @@ import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingInco
 import { useCrew, atkOf, defOf, baseAtk, baseDef } from '../state/crewStore'
 import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
 import { useVitals, msToNextStamina, msToNextHealth, STAMINA_MAX, HEALTH_MAX } from '../state/vitalsStore'
+import { useProgress } from '../state/progressionStore'
+import { xpForLevel } from '../data/bossLadder'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { SwapLookModal } from '../components/SwapLookModal'
@@ -14,7 +16,9 @@ export default function Dashboard({ onNavigate }) {
   const [detailChar, setDetailChar] = useState(null)
   const [showSwap, setShowSwap] = useState(false)
 
-  const xpPct = Math.round((PLAYER.xp / PLAYER.xpNext) * 100)
+  const prog = useProgress()
+  const xpNeed = xpForLevel(prog.level)
+  const xpPct = Math.round((prog.xp / xpNeed) * 100)
   const hustle = useHustle()
   const steel  = useSteel()
   // Live "Your Turf" block economy — re-renders when blocks change (recruit /
@@ -86,7 +90,7 @@ export default function Dashboard({ onNavigate }) {
               padding: '12px 4px 3px',
             }}>
               <div style={{ color: lookColor, fontSize: 8, fontWeight: 700, letterSpacing: 0.5, textAlign: 'center' }}>{playerName.toUpperCase()}</div>
-              <div style={{ color: '#bbb', fontSize: 8, marginTop: 1, textAlign: 'center' }}>LVL {PLAYER.level}</div>
+              <div style={{ color: '#bbb', fontSize: 8, marginTop: 1, textAlign: 'center' }}>LVL {prog.level}</div>
             </div>
           </div>
 
@@ -101,8 +105,8 @@ export default function Dashboard({ onNavigate }) {
             {/* XP Bar */}
             <div style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ color: '#555', fontSize: 10 }}>XP to Level {PLAYER.level + 1}</span>
-                <span style={{ color: '#888', fontSize: 10 }}>{PLAYER.xp.toLocaleString()} / {PLAYER.xpNext.toLocaleString()}</span>
+                <span style={{ color: '#555', fontSize: 10 }}>XP to Level {prog.level + 1}</span>
+                <span style={{ color: '#888', fontSize: 10 }}>{prog.xp.toLocaleString()} / {xpNeed.toLocaleString()}</span>
               </div>
               <div style={{ height: 4, background: '#1e1e2a', borderRadius: 2, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${xpPct}%`, background: 'linear-gradient(90deg, #c9a84c, #f0d080)', borderRadius: 2 }} />
