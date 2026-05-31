@@ -68,6 +68,13 @@ export function generateOpponent(level, index) {
   }
 }
 
+// Rebuild a fightable opponent from its stable id (`ai-{level}-{index}`) — used
+// to fight revenge / hit-list targets stored only by id.
+export function opponentFromId(id) {
+  const m = /^ai-(\d+)-(\d+)$/.exec(id || '')
+  return m ? generateOpponent(Number(m[1]), Number(m[2])) : null
+}
+
 // The visible rival list for a player at `playerLevel`: same-level fair fights
 // plus a thinning tail of higher-reward targets, all within the PvP range.
 export function generateOpponents(playerLevel) {

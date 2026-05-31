@@ -213,6 +213,7 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
       if (rewards?.hustle)     parts.push(`+${rewards.hustle.toLocaleString()} Hustle`)
       if (rewards?.skillTokens)parts.push(`+${rewards.skillTokens} skill token${rewards.skillTokens === 1 ? '' : 's'}`)
       if (rewards?.revenge)    parts.push(`+${rewards.revenge} REVENGE XP`)
+      if (rewards?.bountyText) parts.push(`+${rewards.bountyText} Hustle BOUNTY`)
       if (rewards?.reclaim)    parts.push(`reclaimed ${rewards.reclaim} XP`)
       if (rewards?.cardDrop)   parts.push(`+1 card drop`)
       roundLog.push({ side: 'result', text: `★ ${opponent.name} is DOWN! ${parts.join(' · ') || 'Victory!'}`, color: GREEN })

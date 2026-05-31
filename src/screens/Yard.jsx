@@ -5,6 +5,8 @@ import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { usePlayerCard } from '../state/profileStore'
 import { useHitList } from '../state/hitListStore'
 import { BountyModal } from '../components/BountyModal'
+import { PvpBattleModal } from '../components/PvpBattleModal'
+import { opponentFromId } from '../data/pvpLadder'
 
 const GOLD   = '#c9a84c'
 const SILVER = '#b0b0b0'
@@ -82,6 +84,12 @@ function HitListView() {
   )
   const totalBounty = useMemo(() => targets.reduce((sum, t) => sum + t.bounty, 0), [targets])
   const [bountyTarget, setBountyTarget] = useState(null)
+  const [moveTarget, setMoveTarget] = useState(null)   // { opp, bounty }
+
+  const moveOn = (t) => {
+    const opp = opponentFromId(t.id)
+    if (opp) setMoveTarget({ opp, bounty: t.bounty })
+  }
 
   return (
     <>
@@ -121,17 +129,20 @@ function HitListView() {
               No hits posted right now. Put a bounty on a rival from the Fight screen.
             </div>
           ) : (
-            targets.map(t => <HitCard key={t.id} target={t} onAddBounty={() => setBountyTarget(t)} />)
+            targets.map(t => <HitCard key={t.id} target={t} onAddBounty={() => setBountyTarget(t)} onMove={() => moveOn(t)} />)
           )}
         </div>
       </div>
 
       {bountyTarget && <BountyModal opponent={bountyTarget} onClose={() => setBountyTarget(null)} />}
+      {moveTarget && (
+        <PvpBattleModal opponent={moveTarget.opp} bounty={moveTarget.bounty} onClose={() => setMoveTarget(null)} />
+      )}
     </>
   )
 }
 
-function HitCard({ target: t, onAddBounty }) {
+function HitCard({ target: t, onAddBounty, onMove }) {
   return (
     <div className="card card-pad" style={{
       padding: 14,
@@ -162,9 +173,8 @@ function HitCard({ target: t, onAddBounty }) {
         <button className="btn btn-dark" style={{ flex: 1, padding: '10px 0', fontSize: 12 }} onClick={onAddBounty}>
           <i className="ti ti-coin" style={{ fontSize: 14 }} /> Add Bounty
         </button>
-        <button className="btn btn-red" disabled title="Coming soon" style={{ flex: 1, padding: '10px 0', fontSize: 12, fontWeight: 600, opacity: 0.5, cursor: 'not-allowed', position: 'relative' }}>
+        <button className="btn btn-red" onClick={onMove} title="KO the target to claim the bounty" style={{ flex: 1, padding: '10px 0', fontSize: 12, fontWeight: 600 }}>
           <i className="ti ti-sword" style={{ fontSize: 14 }} /> Move on Target
-          <span style={{ position: 'absolute', top: -6, right: -2, background: '#2a2a3a', color: '#aaa', fontSize: 7, fontWeight: 700, padding: '1px 4px', borderRadius: 4 }}>SOON</span>
         </button>
       </div>
     </div>

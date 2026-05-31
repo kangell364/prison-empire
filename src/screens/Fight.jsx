@@ -1,21 +1,16 @@
 import React, { useState, useMemo } from 'react'
 import { PLAYER, PVP_LEVEL_RANGE, PVP_FIGHT_COST } from '../data/gameData'
-import { generateOpponents, generateOpponent } from '../data/pvpLadder'
+import { generateOpponents, generateOpponent, opponentFromId } from '../data/pvpLadder'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
-import { BattleDiceModal } from '../components/BattleDiceModal'
-import { useVitals, spendStamina, spendHealth, STAMINA_MAX } from '../state/vitalsStore'
-import { useProgress, usePlayerCombat, addXp, creditRival, reclaimRival } from '../state/progressionStore'
-import { useFightLog, recordKoBy, recordKo } from '../state/fightLogStore'
+import { PvpBattleModal, XP_WIN, XP_LOSE, RECLAIM_MULT } from '../components/PvpBattleModal'
+import { useVitals, STAMINA_MAX } from '../state/vitalsStore'
+import { useProgress, usePlayerCombat } from '../state/progressionStore'
+import { useFightLog } from '../state/fightLogStore'
 import { useHitList } from '../state/hitListStore'
 import { BountyModal, formatHustle } from '../components/BountyModal'
 import Battle from './Battle'
 
-// PvP per-turn XP: whoever deals more damage that roll wins the turn.
-const XP_WIN  = 5
-const XP_LOSE = 3            // a lost turn stings — and feeds the rival's bounty
-const RECLAIM_MULT = 3      // KO a rival → take back 3× what they banked off you
-const REVENGE_XP = 50       // KO a rival who KO'd you → revenge bounty
 // Ratio damage model — mirrors BattleDiceModal, used to preview matchups.
 const dmg = (a, d) => Math.max(1, Math.round((a * a) / (a + d)))
 
@@ -107,31 +102,6 @@ function PlayersScreen() {
     setTarget(opp)
   }
 
-  // Each roll is an attack: win the turn → +XP. Lose it → −XP, and that XP is
-  // handed to the rival (they bank it persistently).
-  const onAttack = ({ won, tie }) => {
-    if (tie) return
-    if (won) { addXp(XP_WIN) }
-    else { addXp(-XP_LOSE); if (target) creditRival(target.id, XP_LOSE) }
-  }
-
-  // KO a rival → reclaim 3× the XP they banked, plus a 50 XP bounty if they were
-  // a revenge target (they'd KO'd you before). Logs the KO either way.
-  const onKO = (opp) => {
-    setDailyKills(k => k + 1)
-    const banked = reclaimRival(opp.id)
-    if (banked) addXp(banked * RECLAIM_MULT)
-    const { avenged } = recordKo(opp)
-    if (avenged) addXp(REVENGE_XP)
-  }
-
-  // You went down — log who KO'd you (flags them for revenge).
-  const onPlayerDown = (opp) => { recordKoBy(opp) }
-
-  const onDiceRoll = () => {
-    spendStamina(PVP_FIGHT_COST)
-  }
-
   return (
     <div className="scroll-area animate-in">
       {/* Header card with daily kills + stamina + reward rule */}
@@ -213,21 +183,12 @@ function PlayersScreen() {
         )}
       </div>
 
-      {/* Battle Dice modal — PvP per-turn XP */}
+      {/* PvP fight — per-turn XP, revenge, reclaim */}
       {target && (
-        <BattleDiceModal
+        <PvpBattleModal
           opponent={target}
-          cost={PVP_FIGHT_COST}
-          attackXp={{ win: XP_WIN, lose: XP_LOSE }}
-          rewards={{
-            reclaim: (prog.rivalXp[target.id] || 0) * RECLAIM_MULT,
-            revenge: fightLog.revenge[target.id] ? REVENGE_XP : 0,
-          }}
+          onKO={() => setDailyKills(k => k + 1)}
           onClose={() => setTarget(null)}
-          onRoll={onDiceRoll}
-          onAttack={onAttack}
-          onWin={onKO}
-          onResult={(r) => { spendHealth(r.damageTaken); if (r.result === 'lose') onPlayerDown(target) }}
         />
       )}
 
@@ -346,8 +307,16 @@ function TargetCard({ opp, rivalXp = 0, revenge = false, disabled, onFight, onHi
 
 function HitListScreen() {
   const list = useHitList()
+  const stamina = useVitals().stamina
   const [bountyTarget, setBountyTarget] = useState(null)
+  const [moveTarget, setMoveTarget] = useState(null)   // { opp, bounty }
   const targets = Object.values(list.targets).sort((a, b) => b.bounty - a.bounty)
+
+  const moveOn = (t) => {
+    if (stamina < PVP_FIGHT_COST) return
+    const opp = opponentFromId(t.id)
+    if (opp) setMoveTarget({ opp, bounty: t.bounty })
+  }
   const total = targets.reduce((s, t) => s + t.bounty, 0)
 
   return (
@@ -388,9 +357,9 @@ function HitListScreen() {
                   <button onClick={() => setBountyTarget(t)} style={{ background: '#13131f', color: GOLD, border: `0.5px solid ${GOLD}55`, borderRadius: 8, padding: '8px 12px', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer' }}>
                     <i className="ti ti-plus" style={{ fontSize: 12, marginRight: 3 }} />ADD BOUNTY
                   </button>
-                  <button title="Coming soon" disabled style={{ background: `${RED}66`, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 11, fontWeight: 800, letterSpacing: 0.5, cursor: 'not-allowed', position: 'relative' }}>
+                  <button onClick={() => moveOn(t)} disabled={stamina < PVP_FIGHT_COST} title="KO the target to claim the bounty"
+                    style={{ background: stamina < PVP_FIGHT_COST ? '#1e1e2a' : RED, color: stamina < PVP_FIGHT_COST ? '#555' : '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 11, fontWeight: 800, letterSpacing: 0.5, cursor: stamina < PVP_FIGHT_COST ? 'not-allowed' : 'pointer' }}>
                     <i className="ti ti-target-arrow" style={{ fontSize: 12, marginRight: 3 }} />MOVE ON TARGET
-                    <span style={{ position: 'absolute', top: -6, right: -4, background: '#2a2a3a', color: '#aaa', fontSize: 7, fontWeight: 700, padding: '1px 4px', borderRadius: 4 }}>SOON</span>
                   </button>
                 </div>
               </div>
@@ -400,6 +369,9 @@ function HitListScreen() {
       </div>
 
       {bountyTarget && <BountyModal opponent={bountyTarget} onClose={() => setBountyTarget(null)} />}
+      {moveTarget && (
+        <PvpBattleModal opponent={moveTarget.opp} bounty={moveTarget.bounty} onClose={() => setMoveTarget(null)} />
+      )}
     </div>
   )
 }
