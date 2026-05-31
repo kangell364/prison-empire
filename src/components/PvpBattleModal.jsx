@@ -4,7 +4,7 @@ import { formatHustle } from './BountyModal'
 import { PVP_FIGHT_COST } from '../data/gameData'
 import { spendStamina, spendHealth } from '../state/vitalsStore'
 import { addXp, creditRival, reclaimRival, getRivalXp } from '../state/progressionStore'
-import { recordKoBy, recordKo, isRevengeTarget } from '../state/fightLogStore'
+import { recordKoBy, recordKo, isRevengeTarget, recordJob } from '../state/fightLogStore'
 import { addHustle } from '../state/profileStore'
 import { removeTarget } from '../state/hitListStore'
 
@@ -35,7 +35,7 @@ export function PvpBattleModal({ opponent, bounty = 0, onKO, onClose }) {
     if (banked) addXp(banked * RECLAIM_MULT)
     const { avenged } = recordKo(opp)
     if (avenged) addXp(REVENGE_XP)
-    if (bounty) { addHustle(bounty); removeTarget(opp.id) }
+    if (bounty) { addHustle(bounty); removeTarget(opp.id); recordJob() }   // bounty fulfilled = a job done
     if (onKO) onKO(opp)
   }
 

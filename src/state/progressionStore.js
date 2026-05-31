@@ -18,6 +18,7 @@ import {
   SLOTS_PER_WAVE, xpForLevel, generateWave,
 } from '../data/bossLadder'
 import { addHustle } from './profileStore'
+import { recordJob } from './fightLogStore'
 
 const KEY = 'pe_progression_v1'
 
@@ -168,6 +169,7 @@ function applyDefeat(boss) {
 
   commit({ xp, level, waves, defeated, bossHp })
   if (boss.hustle) addHustle(boss.hustle)
+  recordJob()   // a boss cleared counts as a job done toward Street Rep
   // TODO: milestone card drop — grant boss.cardDrop into the card inventory once
   // that system exposes a grant API. For now rewards are XP + Hustle (+ level).
 }

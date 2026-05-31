@@ -5,6 +5,7 @@ import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { usePlayerCard } from '../state/profileStore'
 import { useProgress } from '../state/progressionStore'
 import { usePlayerStats } from '../state/statsStore'
+import { useRecord } from '../state/fightLogStore'
 import { useHitList } from '../state/hitListStore'
 import { BountyModal } from '../components/BountyModal'
 import { PvpBattleModal } from '../components/PvpBattleModal'
@@ -191,25 +192,21 @@ function YardKingsView({ openDetail }) {
   const me = usePlayerCard()   // live player card (look + name), synced with SWAP/rename
   const prog = useProgress()
   const stats = usePlayerStats()   // real ATK/DEF/HP from traits
-  // The "you" leaderboard row: live name/avatar AND live combat stats (level,
-  // ATK/DEF/Life/power) over the static seed. Street Rep stays record-based.
-  const youRow = () => {
-    const p = RANKED_PLAYERS.find(x => x.isYou)
-    return { ...p, name: me.name, avatar: me.avatar, emoji: me.emoji,
-      level: prog.level, atk: stats.atk, def: stats.def, hp: stats.hp, power: stats.atk + stats.def }
+  const record = useRecord()       // live career record → Street Rep
+  // The "you" row: live identity + live combat stats + live W/L/KO/defeat/job
+  // record over the static seed. Now Street Rep moves with real results.
+  const liveYou = {
+    ...RANKED_PLAYERS.find(x => x.isYou),
+    name: me.name, avatar: me.avatar, emoji: me.emoji,
+    level: prog.level, atk: stats.atk, def: stats.def, hp: stats.hp, power: stats.atk + stats.def,
+    wins: record.wins, losses: record.losses, kos: record.kos, defeats: record.defeats, jobs: record.jobs,
   }
-  // Top 3 overall by Street Rep
-  const podium = useMemo(() => (
-    RANKED_PLAYERS
-      .slice()
-      .sort((a, b) => streetRep(b) - streetRep(a))
-      .slice(0, 3)
-  ), [])
-
-  const youRank = useMemo(() => {
-    const sorted = RANKED_PLAYERS.slice().sort((a, b) => streetRep(b) - streetRep(a))
-    return sorted.findIndex(p => p.isYou) + 1
-  }, [])
+  // Full board with the live you swapped in for the static seed, so every
+  // podium / rank / category reflects real results.
+  const players = RANKED_PLAYERS.map(p => (p.isYou ? liveYou : p))
+  const sortedByRep = players.slice().sort((a, b) => streetRep(b) - streetRep(a))
+  const podium = sortedByRep.slice(0, 3)
+  const youRank = sortedByRep.findIndex(p => p.isYou) + 1
 
   const categories = [
     { key: 'wins',    label: 'Heavy Hitters', subtitle: 'Most fights won this period',  metricLabel: 'WINS',   metric: p => p.wins,    icon: 'ti-flame' },
@@ -236,12 +233,12 @@ function YardKingsView({ openDetail }) {
           padding: '10px 14px',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           cursor: 'pointer',
-        }} onClick={() => openDetail({ character: youRow() })}>
+        }} onClick={() => openDetail({ character: liveYou })}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Avatar src={me.avatar} emoji={me.emoji} size={28} radius={6} />
             <div>
               <div style={{ color: GOLD, fontSize: 12, fontWeight: 500 }}>You — {me.name}</div>
-              <div style={{ color: DIM, fontSize: 10 }}>Street Rep: {streetRep(RANKED_PLAYERS.find(p => p.isYou)).toLocaleString()}</div>
+              <div style={{ color: DIM, fontSize: 10 }}>Street Rep: {streetRep(liveYou).toLocaleString()}</div>
             </div>
           </div>
           <div style={{ color: GOLD, fontSize: 18, fontWeight: 600 }}>#{youRank}</div>
@@ -250,7 +247,7 @@ function YardKingsView({ openDetail }) {
 
       {/* Category leaderboards */}
       {categories.map(cat => (
-        <CategoryLeaderboard key={cat.key} {...cat} openDetail={openDetail} />
+        <CategoryLeaderboard key={cat.key} {...cat} players={players} openDetail={openDetail} />
       ))}
 
       {/* Footer — formula */}
@@ -341,17 +338,14 @@ function PodiumColumn({ p, place, height, color, isWinner, openDetail }) {
   )
 }
 
-function CategoryLeaderboard({ label, subtitle, metricLabel, metric, icon, openDetail }) {
+function CategoryLeaderboard({ label, subtitle, metricLabel, metric, icon, players, openDetail }) {
   const me = usePlayerCard()
   const liveName = (p) => p.isYou ? me.name : p.name
   const liveAvatar = (p) => p.isYou ? me.avatar : p.avatar
   const liveEmoji = (p) => p.isYou ? me.emoji : p.emoji
-  const ranked = useMemo(() => (
-    RANKED_PLAYERS
-      .slice()
-      .sort((a, b) => metric(b) - metric(a))
-      .slice(0, 10)
-  ), [metric])
+  // Sort the live board (the "you" entry already carries the live record), so a
+  // category like KOs/Jobs ranks the player by their real results.
+  const ranked = players.slice().sort((a, b) => metric(b) - metric(a)).slice(0, 10)
 
   return (
     <div className="section">

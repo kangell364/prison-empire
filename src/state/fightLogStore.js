@@ -13,15 +13,20 @@ let seq = 0
 let state = readInitial()
 const listeners = new Set()
 
+const EMPTY_RECORD = { wins: 0, losses: 0, kos: 0, defeats: 0, jobs: 0 }
+
 function readInitial() {
   try {
     const raw = localStorage.getItem(KEY)
     if (raw) {
       const p = JSON.parse(raw)
-      return { logs: p.logs || [], revenge: p.revenge || {}, lastReadTs: p.lastReadTs || 0 }
+      return {
+        logs: p.logs || [], revenge: p.revenge || {}, lastReadTs: p.lastReadTs || 0,
+        record: { ...EMPTY_RECORD, ...(p.record || {}) },
+      }
     }
   } catch {}
-  return { logs: [], revenge: {}, lastReadTs: 0 }
+  return { logs: [], revenge: {}, lastReadTs: 0, record: { ...EMPTY_RECORD } }
 }
 
 function persist() { try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }
@@ -34,6 +39,12 @@ function newId() { return `${Date.now()}-${seq++}` }
 export function getFightLog()      { return state }
 export function isRevengeTarget(id){ return !!state.revenge[id] }
 export function unreadCount()      { return state.logs.filter(l => l.ts > state.lastReadTs).length }
+
+// Career record — the live source for the player's Street Rep. Driven by real
+// outcomes: PvP wins/KOs, PvP losses/defeats, and jobs (bosses cleared + hit-list
+// bounties fulfilled). Starts at zero for a new player.
+export function getRecord()        { return state.record }
+export function useRecord()        { const s = useFightLog(); return s.record }
 
 export function useFightLog() {
   const [s, setS] = useState(state)
@@ -55,7 +66,9 @@ export function recordKoBy(opp) {
   const already = !!state.revenge[opp.id]
   const revenge = { ...state.revenge, [opp.id]: { name: opp.name, level: opp.level, ts: Date.now() } }
   const logs = already ? state.logs : pushLog({ kind: 'ko_by', oppId: opp.id, oppName: opp.name, oppLevel: opp.level })
-  commit({ ...state, logs, revenge })
+  // A PvP loss: one fight lost + one defeat (you got KO'd) on the career record.
+  const record = { ...state.record, losses: state.record.losses + 1, defeats: state.record.defeats + 1 }
+  commit({ ...state, logs, revenge, record })
 }
 
 // You KO'd a rival. If they were a revenge target, it's an avenged KO (caller
@@ -64,12 +77,23 @@ export function recordKo(opp) {
   const avenged = !!state.revenge[opp.id]
   const revenge = { ...state.revenge }
   if (avenged) delete revenge[opp.id]
+  // A PvP win: one fight won + one KO landed on the career record.
+  const record = { ...state.record, wins: state.record.wins + 1, kos: state.record.kos + 1 }
   commit({
     ...state,
     logs: pushLog({ kind: avenged ? 'revenge' : 'ko', oppId: opp.id, oppName: opp.name, oppLevel: opp.level }),
     revenge,
+    record,
   })
   return { avenged }
+}
+
+// Credit completed "jobs" toward the career record / Street Rep — a boss cleared
+// or a hit-list bounty fulfilled. Defaults to 1.
+export function recordJob(n = 1) {
+  const add = Math.max(0, Math.floor(n || 0))
+  if (!add) return
+  commit({ ...state, record: { ...state.record, jobs: state.record.jobs + add } })
 }
 
 // Mark every log seen (clears the bell badge).
@@ -78,5 +102,5 @@ export function markRead() {
 }
 
 export function clearFightLog() {
-  commit({ logs: [], revenge: {}, lastReadTs: Date.now() })
+  commit({ logs: [], revenge: {}, lastReadTs: Date.now(), record: { ...EMPTY_RECORD } })
 }
