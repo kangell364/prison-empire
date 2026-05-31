@@ -8,6 +8,7 @@ import { TurfMap } from '../components/TurfMap'
 import { BlockSheet } from '../components/BlockSheet'
 import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks } from '../state/blocksStore'
 import { useMapData, buildCityCountyMap, STATE_CODE_TO_FIPS, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
+import { knockOut } from '../state/vitalsStore'
 import { useDisplayName } from '../state/profileStore'
 import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
 import { useWorld, moveHouse, arriveHouse, getHouse, applyHomeRaid, attackHouse } from '../state/worldStore'
@@ -158,7 +159,10 @@ function useRaids(territories, homeId, liveFips, fipsCoords) {
           if (r.kind === 'personal') {
             const dest = liveFips && liveFips.length ? liveFips[Math.floor(Math.random() * liveFips.length)] : null
             const coords = dest && fipsCoords ? fipsCoords(dest) : null   // [lng,lat] centroid → land on an open block
-            return { ...r, ...applyHomeRaid(r.facilityId, r.gang, dest, coords) }
+            const res = applyHomeRaid(r.facilityId, r.gang, dest, coords)
+            // Overrun at home = knocked out → 24h recovery, see the nurse.
+            if (res.ko) knockOut()
+            return { ...r, ...res }
           }
           return { ...r, ...applyRaid(r.facilityId, r.gang) }
         })

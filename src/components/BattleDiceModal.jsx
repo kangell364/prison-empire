@@ -3,7 +3,7 @@ import { PLAYER, SKILLS } from '../data/gameData'
 import { sfx } from '../sounds'
 import { Avatar } from './Avatar'
 import { usePlayerCard } from '../state/profileStore'
-import { useVitals, openNurse } from '../state/vitalsStore'
+import { useVitals, openNurse, knockOut } from '../state/vitalsStore'
 import { usePlayerCombat } from '../state/statsStore'
 
 const GOLD   = '#c9a84c'
@@ -239,7 +239,7 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
       sfx.win()
       if (onWin) onWin(opponent)
     } else if (result === 'wornout') {
-      roundLog.push({ side: 'result', text: `You're worn out — back off and heal. ${opponent.name}'s wounds stay.`, color: ORANGE })
+      roundLog.push({ side: 'result', text: `You're knocked out — see the nurse. ${opponent.name}'s wounds stay.`, color: ORANGE })
       sfx.lose()
     } else if (result === 'lose') {
       roundLog.push({ side: 'result', text: `${opponent.name} defeats you.`, color: RED })
@@ -250,6 +250,11 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
     } else {
       sfx.clash()
     }
+
+    // Out of health in any fight = knocked out → the 24h recovery clock starts
+    // and the player must see the nurse. Covers PvP loss/mutual-KO and the boss
+    // "worn out" state alike. Idempotent (no-op if already KO'd).
+    if (result === 'lose' || result === 'draw' || result === 'wornout') knockOut()
 
     // Duel reports damage so the caller can spend shared health on resolve.
     if (!attrition && result && onResult) onResult({ result, damageTaken: maxPlayerHp - newPlayerHp, maxHp: maxPlayerHp })
@@ -265,7 +270,9 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
     setPhase(result ? 'resolved' : 'idle')
   }
 
-  const fightOver = phase === 'resolved' && (outcome === 'win' || outcome === 'lose' || outcome === 'draw' || (attrition && outcome === 'win'))
+  // Terminal states: someone's down (win/lose/draw) or the player is worn out in
+  // a boss fight (now a KO → see the nurse, no longer a free retreat-and-heal).
+  const fightOver = phase === 'resolved' && (outcome === 'win' || outcome === 'lose' || outcome === 'draw' || outcome === 'wornout')
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#13131f', display: 'flex', alignItems: 'stretch', justifyContent: 'center', zIndex: 220 }}>
@@ -390,11 +397,13 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
             <i className="ti ti-trophy" style={{ fontSize: 15, marginRight: 6 }} />VICTORY
           </button>
         )}
-        {/* Boss not-yet-down handled by RETREAT; a finished attrition fight shows
-            DONE. Duel outcomes are all handled by the result button above. */}
-        {attrition && fightOver && outcome !== 'win' && (
-          <button onClick={onClose} style={{ marginTop: 14, width: '100%', background: GOLD, color: '#0a0a0f', border: 'none', borderRadius: 10, padding: 14, fontSize: 13, fontWeight: 800, letterSpacing: 1, cursor: 'pointer' }}>
-            <i className="ti ti-check" style={{ fontSize: 14, marginRight: 4 }} />DONE
+        {/* Boss worn out = a KO now: health bottomed out → 24h recovery, see the
+            nurse. (Boss not-yet-down, with health to spare, still shows RETREAT
+            below.) Duel outcomes are handled by the result button above. */}
+        {attrition && fightOver && outcome === 'wornout' && (
+          <button onClick={() => { onClose(); openNurse() }}
+            style={{ marginTop: 14, width: '100%', background: RED, color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 14, fontWeight: 800, letterSpacing: 1.5, cursor: 'pointer', boxShadow: `0 0 20px ${RED}55`, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <i className="ti ti-skull" style={{ fontSize: 15 }} />DEFEATED — SEE NURSE
           </button>
         )}
         {/* Bail out between rolls. Attrition keeps the boss's wounds (progress
@@ -406,14 +415,6 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
           </button>
         )}
 
-        {/* Status line for boss (attrition) non-win outcomes (WORN OUT). Duel
-            outcomes are spelled out by the result button under SKILLS, so no
-            redundant status line there. */}
-        {attrition && outcome && outcome !== 'win' && (
-          <div style={{ marginTop: 10, textAlign: 'center', color: outcome === 'wornout' ? ORANGE : outcome === 'lose' ? RED : '#888', fontSize: 12, fontWeight: 700, letterSpacing: 1.5 }}>
-            {outcome === 'wornout' ? 'WORN OUT' : outcome === 'lose' ? 'DEFEATED' : 'DRAW'}
-          </div>
-        )}
       </div>
     </div>
   )
