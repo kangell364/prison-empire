@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { PROPERTIES, PROPERTY_COST_GROWTH } from '../data/gameData'
 import { useHustle, spendHustle } from '../state/playerStore'
 import { useProgress } from '../state/progressionStore'
+import { useOwnedProperties, buyProperty } from '../state/propertyStore'
 import { sfx } from '../sounds'
 
 const GOLD = '#c9a84c'
@@ -35,8 +36,8 @@ const QTY_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 export default function Property() {
   const playerLevel = useProgress().level
   const hustle      = useHustle()
-  // Owned counts per property id — local until Phase 5 (own_property table).
-  const [owned, setOwned] = useState({})
+  // Owned counts per property id — persisted (survives leaving the screen).
+  const owned = useOwnedProperties()
   // Per-card transient feedback ("Bought 3 for 1,540 Hustle, +15/hr")
   const [flash, setFlash] = useState({})
 
@@ -75,7 +76,7 @@ export default function Property() {
       return
     }
     const at = Date.now()
-    setOwned(o => ({ ...o, [p.id]: have + qty }))
+    buyProperty(p.id, qty)
     setFlash(f => ({ ...f, [p.id]: { qty, cost, perHrAdded: qty * p.perHr, at } }))
     sfx.buy()
     // Clear the flash after a few seconds — unless a newer purchase replaced it
