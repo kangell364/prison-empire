@@ -53,11 +53,15 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack }) {
     let layer = null
     const draw = () => {
       if (layer) { try { map.removeLayer(layer) } catch {}; layer = null }
-      if (map.getZoom() < 13) return
       const b = map.getBounds()
       const x0 = Math.floor(b.getWest() / GRID), x1 = Math.ceil(b.getEast() / GRID)
       const y0 = Math.floor(b.getSouth() / GRID), y1 = Math.ceil(b.getNorth() / GRID)
-      if ((x1 - x0) * (y1 - y0) > 700) return   // safety cap
+      // No hard zoom floor — let the count cap decide. Now that blocks are the
+      // ~1.8km merged unit, a viewport holds 16× fewer, so you can pan/zoom way
+      // out and still see colored turf (up to a metro-wide view). Past the cap
+      // it's too zoomed out for blocks to be useful, so we stop drawing.
+      if ((x1 - x0) * (y1 - y0) > 1500) return
+      const showIcons = map.getZoom() >= 13    // NPC icons only up close (perf + clutter)
       layer = L.layerGroup().addTo(map)
       for (let gx = x0; gx < x1; gx++) for (let gy = y0; gy < y1; gy++) {
         const blk = getBlock(gx, gy)
@@ -69,7 +73,7 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack }) {
           fillColor: owner ? color : '#888', fillOpacity: owner ? 0.18 : 0.04, interactive: true,
         }).addTo(layer)
         rect.on('click', () => onBlockTapRef.current && onBlockTapRef.current(gx, gy))
-        if (owner) {
+        if (owner && showIcons) {
           const npc = L.divIcon({ className: '', iconSize: [28, 36], iconAnchor: [14, 30], html: `<div style="text-align:center"><div style="width:24px;height:24px;border-radius:50%;background:${color};border:2px solid #0a0a0f;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,.7);margin:0 auto">🕴️</div></div>` })
           L.marker([s + GRID / 2, w + GRID / 2], { icon: npc })
             .on('click', () => onBlockTapRef.current && onBlockTapRef.current(gx, gy)).addTo(layer)
