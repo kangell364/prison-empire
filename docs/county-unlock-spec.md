@@ -52,6 +52,47 @@ server-side dial — tune from telemetry once the real cap-vs-owned ratio is kno
 - Meanwhile Montana, with 3 players, stays on its single seeded county — alive (NPC turf),
   just not crowded.
 
+## Clustered turf (block structure within a county)
+
+Keep the existing `0.004°` cell grid, but have NPCs own **clusters** of cells, not single
+cells. This makes a fresh county fast to fill (chunky grabs) and lets it deepen as it
+saturates — converging on today's per-cell grid.
+
+- **An NPC controls a cluster of cells.** Taking the NPC flips the whole cluster to you in one
+  move. Cluster grain depends on the county's **local fill %** (see ladder).
+- **Income rides on the node, not the cells.** One NPC = one income node (pays for one
+  block's worth), even though it controls a cluster of cells. So *territory* is grabbed in
+  big chunks (the satisfying fill) while *income* comes from nodes — and subdivision is how
+  income density grows: 1 node / 16 cells (sparse) → many nodes / 16 cells (rich). Avoids the
+  "16× income for one cost" windfall and ties earnings to map maturity + competition.
+- **Subdivision schedule (grain = f(local fill %)).** As a county fills, its remaining NPC
+  territory fractures into smaller, more contested nodes:
+
+  | County fill | NPC cluster | cells/NPC |
+  |---|---|---|
+  | 0–25%   | 4×4 | 16 |
+  | 25–50%  | 3×4 | 12 |
+  | 50–75%  | 3×3 | 9  |
+  | 75–90%  | 2×3 | 6  |
+  | 90–~98% | 2×2 | 4  |
+  | ~98%+   | 1×1 | 1  |
+
+- **Direction matters:** grain tracks **saturation**, NOT unlock rank. So *fresh* counties stay
+  chunky (easy — good for the new players who keep arriving via GPS) and *old, full* cities
+  become fine-grained (the deep veteran endgame). This is emergent — one rule for all 3,231
+  counties, no per-county hand-tuning — and it points the right way (the frontier is the soft
+  start, not the hardest place).
+- **Only NPC clusters subdivide.** Player-owned turf is never carved up.
+- **The player cap** (`25 × level`) counts **cells/nodes**, not clusters, so chunk size doesn't
+  accidentally 16× anyone's holdings.
+
+### Full map open at launch
+
+Because every state's **seed county is fresh (0% filled), it starts at the 4×4 grain** — big,
+visible, takeable NPC turf. Combined with the per-state seed (one county live per state on day
+one), the **entire USA map reads as open and active from launch**, with chunky turf to grab in
+every state, even before many real players arrive (NPC clusters carry the PvE).
+
 ## Supabase schema
 
 ```sql
