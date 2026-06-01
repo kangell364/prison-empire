@@ -51,10 +51,13 @@ function readInitial() {
         stash: p.stash || 0,
         yieldLvl: p.yieldLvl || 0,
         speedLvl: p.speedLvl || 0,
+        // Automated interior model:
+        tables: Array.isArray(p.tables) ? p.tables : Array(TABLE_START).fill(null),
+        bank: p.bank || 0,
       }
     }
   } catch {}
-  return { plots: Array(START_PLOTS).fill(null), stash: 0, yieldLvl: 0, speedLvl: 0 }
+  return { plots: Array(START_PLOTS).fill(null), stash: 0, yieldLvl: 0, speedLvl: 0, tables: Array(TABLE_START).fill(null), bank: 0 }
 }
 
 function persist() { try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }
@@ -167,5 +170,104 @@ export function buyUpgrade(kind, spend) {
   const cost = upgradeCost(kind)
   if (!spend(cost)) return false
   commit({ ...state, [kind === 'yield' ? 'yieldLvl' : 'speedLvl']: lvl + 1 })
+  return true
+}
+
+// =====================================================================
+// AUTOMATED INTERIOR MODEL (the landscape "inside the trap house" view)
+//
+// Tables grow product into a container; one worker hauls full containers down
+// the line and the sale credits the trap house BANK. The bank funds upgrades
+// (buy tables, +plants). Surplus later moves to a stash house (raidable).
+// =====================================================================
+const TABLE_START = 1                 // one free table
+export const TABLE_MAX = 5
+export const PLANTS_PER_LEVEL = 4     // each +plants upgrade adds 4 plant slots
+const CONTAINER_PER_PLANT = 6         // container holds this many units per plant
+const BANK_SELL_PRICE = 5             // bank cash per unit the worker hauls out
+const TABLE_COST_BASE = 400, TABLE_COST_GROWTH = 2.2
+const PLANTS_COST_BASE = 250, PLANTS_COST_GROWTH = 1.8
+
+function tCard(t) { return t && CARDS_COLLECTION.find(c => c.id === t.cardId) }
+function tStrain(t) { return STRAIN[tCard(t)?.rarity] || STRAIN.common }
+export function tablePlants(t) { return (t?.plantLevel || 1) * PLANTS_PER_LEVEL }
+export function tableCapacity(t) { return tablePlants(t) * CONTAINER_PER_PLANT }
+// units/sec a planted table produces (one strain.yield × plantLevel per grow cycle).
+function tableRate(t) { const s = tStrain(t); return (s.yield * (t.plantLevel || 1)) / s.grow }
+
+// Pour elapsed-time production into every table's container (capped).
+function accrue(now) {
+  let changed = false
+  const tables = state.tables.map(t => {
+    if (!t) return t
+    const cap = tableCapacity(t)
+    const dt = Math.max(0, (now - (t.lastTick || now)) / 1000)
+    const container = Math.min(cap, (t.container || 0) + dt * tableRate(t))
+    if (container !== t.container) changed = true
+    return { ...t, container, lastTick: now }
+  })
+  return { tables, changed }
+}
+
+// ---- reads ----
+export function getBank() { return state.bank || 0 }
+export function tableFillPct(t) { return t ? Math.min(100, ((t.container || 0) / tableCapacity(t)) * 100) : 0 }
+export function tableCost() {
+  const bought = state.tables.length - TABLE_START
+  return Math.round(TABLE_COST_BASE * Math.pow(TABLE_COST_GROWTH, Math.max(0, bought)))
+}
+export function plantsCost(t) { return Math.round(PLANTS_COST_BASE * Math.pow(PLANTS_COST_GROWTH, (t.plantLevel || 1) - 1)) }
+
+// ---- ticks + worker ----
+// Call ~1/s while the interior is open to advance the live container fills.
+export function tickProduction() {
+  const now = Date.now()
+  const { tables, changed } = accrue(now)
+  if (changed) commit({ ...state, tables })
+}
+
+// The worker empties the single fullest container → bank. Returns
+// { units, gain, tableIndex } so the UI can animate the haul, or 0 if nothing ready.
+export function workerHaul() {
+  const now = Date.now()
+  const { tables } = accrue(now)
+  let bi = -1, best = 0
+  tables.forEach((t, i) => { if (t && (t.container || 0) > best) { best = t.container; bi = i } })
+  if (bi < 0 || best < 1) { commit({ ...state, tables }); return 0 }
+  const units = Math.floor(tables[bi].container)
+  tables[bi] = { ...tables[bi], container: tables[bi].container - units, lastTick: now }
+  const gain = units * BANK_SELL_PRICE
+  commit({ ...state, tables, bank: (state.bank || 0) + gain })
+  return { units, gain, tableIndex: bi }
+}
+
+// ---- actions ----
+export function plantTable(i, card) {
+  if (i < 0 || i >= state.tables.length) return false
+  const tables = state.tables.slice()
+  tables[i] = { cardId: card.cardId ?? card.id, cardLevel: card.level || card.cardLevel || 1, plantLevel: 1, container: 0, lastTick: Date.now() }
+  commit({ ...state, tables })
+  return true
+}
+export function uprootTable(i) {
+  const tables = state.tables.slice()
+  tables[i] = null
+  commit({ ...state, tables })
+}
+export function buyTable() {
+  if (state.tables.length >= TABLE_MAX) return false
+  const cost = tableCost()
+  if ((state.bank || 0) < cost) return false
+  commit({ ...state, tables: [...state.tables, null], bank: state.bank - cost })
+  return true
+}
+export function upgradePlants(i) {
+  const t = state.tables[i]
+  if (!t) return false
+  const cost = plantsCost(t)
+  if ((state.bank || 0) < cost) return false
+  const tables = state.tables.slice()
+  tables[i] = { ...t, plantLevel: (t.plantLevel || 1) + 1 }
+  commit({ ...state, tables, bank: state.bank - cost })
   return true
 }
