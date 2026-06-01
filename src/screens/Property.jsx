@@ -296,24 +296,29 @@ function QtySelect({ value, onChange }) {
         color: DIM, fontSize: 9, fontWeight: 600, letterSpacing: 1,
         padding: '0 8px 0 10px',
       }}>QTY</span>
-      <select
-        value={value}
-        onChange={e => onChange(Number(e.target.value))}
-        style={{
-          background: 'transparent',
-          color: '#fff', fontSize: 13, fontWeight: 600,
-          border: 'none',
-          padding: '8px 8px',
-          outline: 'none',
-          appearance: 'none',
-          WebkitAppearance: 'none',
-          MozAppearance: 'none',
-          cursor: 'pointer',
-        }}
-      >
-        {QTY_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
-      </select>
-      <i className="ti ti-chevron-down" style={{ color: '#888', fontSize: 12, paddingRight: 8, pointerEvents: 'none' }} />
+      {/* Chevron is overlaid ON the select (pointer-events none) so tapping the
+          arrow opens the dropdown too — the select's right padding makes room. */}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <select
+          value={value}
+          onChange={e => onChange(Number(e.target.value))}
+          style={{
+            background: 'transparent',
+            color: '#fff', fontSize: 13, fontWeight: 600,
+            border: 'none',
+            padding: '8px 26px 8px 8px',
+            outline: 'none',
+            appearance: 'none',
+            WebkitAppearance: 'none',
+            MozAppearance: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          {/* Black dropdown background so the white numbers stay readable. */}
+          {QTY_OPTIONS.map(n => <option key={n} value={n} style={{ background: '#000', color: '#fff' }}>{n}</option>)}
+        </select>
+        <i className="ti ti-chevron-down" style={{ position: 'absolute', right: 8, color: '#888', fontSize: 12, pointerEvents: 'none' }} />
+      </div>
     </div>
   )
 }
