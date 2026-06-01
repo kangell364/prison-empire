@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { PLAYER, PLAYER_LOOKS, RESOURCES, CARDS_COLLECTION, LEADERBOARD, RARITY_COLORS, RANKED_PLAYERS } from '../data/gameData'
-import { useHustle, useSteel, useDisplayName, usePlayerLook } from '../state/profileStore'
+import { useHustle, useDisplayName, usePlayerLook } from '../state/profileStore'
 import { useBlocksVersion, yourBlockCount, yourBlockIncomePerHr, yourPendingIncome, useNextPayoutCountdown, subscribePayout, blockCap, resetTurf } from '../state/blocksStore'
 import { useCrew, atkOf, defOf, baseAtk, baseDef } from '../state/crewStore'
 import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
@@ -11,16 +11,17 @@ import { xpForLevel } from '../data/bossLadder'
 import { Avatar, KoOverlay, KO_FILTER } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { SwapLookModal } from '../components/SwapLookModal'
+import { StoreModal } from '../components/StoreModal'
 import { sfx } from '../sounds'
 
 export default function Dashboard({ onNavigate }) {
   const [detailChar, setDetailChar] = useState(null)
   const [showSwap, setShowSwap] = useState(false)
+  const [showStore, setShowStore] = useState(false)
 
   const prog = useProgress()
   const xpNeed = xpForLevel(prog.level)
   const xpPct = Math.round((prog.xp / xpNeed) * 100)
-  const steel  = useSteel()
   // Live "Your Turf" block economy — re-renders when blocks change (recruit /
   // poach / collect / AI poach).
   useBlocksVersion()
@@ -151,31 +152,15 @@ export default function Dashboard({ onNavigate }) {
       {/* Resources */}
       <div className="section">
         <div className="section-label">Commissary Store</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {Object.entries(RESOURCES).filter(([key]) => key !== 'hustle').map(([key, r]) => {
-            // hustle now lives in the vitals bar at the top; steel comes from the
-            // profile; crew + snitch are still static until their own phases land.
-            const value = key === 'steel' ? steel
-                        : r.value
-            return (
-              <div key={key} className="card card-pad" style={{ padding: 14 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${r.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                  <i className={`ti ${r.icon}`} style={{ color: r.color, fontSize: 18 }} />
-                </div>
-                <div style={{ color: '#fff', fontSize: 22, fontWeight: 500 }}>
-                  {key === 'crew' || key === 'snitch'
-                    ? `${value} / ${r.max}`
-                    : value.toLocaleString()}
-                </div>
-                <div style={{ color: '#555', fontSize: 11, marginTop: 2, textTransform: 'capitalize' }}>
-                  {key === 'snitch' ? 'Snitches' : key.charAt(0).toUpperCase() + key.slice(1)}
-                </div>
-                <div style={{ height: 3, background: '#1e1e2a', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${Math.round((value / r.max) * 100)}%`, background: r.color, borderRadius: 2 }} />
-                </div>
-              </div>
-            )
-          })}
+        {/* STORE entry — tap the art to open the store view. Art is a placeholder
+            for now; another piece may replace it later. */}
+        <div
+          onClick={() => { sfx.tap?.(); setShowStore(true) }}
+          className="card"
+          style={{ overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
+        >
+          <img src="/STORE.png" alt="Commissary Store"
+            style={{ display: 'block', width: '100%', height: 'auto' }} />
         </div>
       </div>
 
@@ -310,6 +295,7 @@ export default function Dashboard({ onNavigate }) {
       )}
 
       {showSwap && <SwapLookModal onClose={() => setShowSwap(false)} />}
+      {showStore && <StoreModal onClose={() => setShowStore(false)} />}
 
     </div>
   )
