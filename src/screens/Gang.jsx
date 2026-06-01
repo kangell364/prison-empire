@@ -34,7 +34,7 @@ const ROLE_META = {
   [ROLES.MEMBER]:  { label: 'Member',  color: DIM,  icon: 'ti-user' },
 }
 
-export default function Gang({ onBack }) {
+export default function Gang({ onBack, onNavigate }) {
   const s = useGang()
   const prog = useProgress()
   const name = useDisplayName()
@@ -53,7 +53,7 @@ export default function Gang({ onBack }) {
         <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, letterSpacing: 0.5 }}>Gang</div>
       </div>
 
-      {s.myGang ? <GangHub gang={s.myGang} player={player} /> : <NotInGang player={player} />}
+      {s.myGang ? <GangHub gang={s.myGang} player={player} onNavigate={onNavigate} /> : <NotInGang player={player} />}
     </div>
   )
 }
@@ -228,7 +228,7 @@ function FoundGangModal({ player, steel, onClose }) {
 // ---------------------------------------------------------------------
 // In a gang — the hub.
 // ---------------------------------------------------------------------
-function GangHub({ gang, player }) {
+function GangHub({ gang, player, onNavigate }) {
   const [showPicker, setShowPicker] = useState(false)
   const boss = gang.members.some(m => m.id === PLAYER_MEMBER_ID && m.role === ROLES.BOSS)
   const openSpots = gang.capacity - gang.members.length
@@ -253,6 +253,22 @@ function GangHub({ gang, player }) {
           </div>
           {/* Gang XP — climbs off member contributions. */}
           <GangXpBar gang={gang} />
+        </div>
+      </div>
+
+      {/* Trap House — the gang's grow-and-sell operation. */}
+      <div className="section">
+        <div
+          onClick={() => { sfx.tap?.(); onNavigate && onNavigate('traphouse') }}
+          className="card card-pad"
+          style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
+        >
+          <div style={{ fontSize: 30, width: 40, textAlign: 'center' }}>🏚️</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>Trap House</div>
+            <div style={{ color: DIM, fontSize: 12, marginTop: 2 }}>Grow & sell — plant your cards, harvest, cash out.</div>
+          </div>
+          <i className="ti ti-chevron-right" style={{ color: '#666', fontSize: 18 }} />
         </div>
       </div>
 

@@ -8,6 +8,7 @@ import Yard from './screens/Yard'
 import Profile from './screens/Profile'
 import Property from './screens/Property'
 import Gang from './screens/Gang'
+import TrapHouse from './screens/TrapHouse'
 import Nurse from './screens/Nurse'
 import { isMuted, setMuted, subscribeMuted, sfx } from './sounds'
 import { useVitals, onOpenNurse } from './state/vitalsStore'
@@ -85,7 +86,8 @@ export default function App() {
       case 'cards':   return <Cards initialTab={cardsTab} />
       case 'yard':     return <Yard />
       case 'property': return <Property />
-      case 'gang':     return <Gang onBack={() => setScreen('home')} />
+      case 'gang':     return <Gang onBack={() => setScreen('home')} onNavigate={navigateTo} />
+      case 'traphouse': return <TrapHouse onBack={() => setScreen('gang')} />
       case 'nurse':    return <Nurse onBack={() => setScreen('home')} />
       case 'profile':  return <Profile onBack={() => setScreen('home')} />
       default:         return <Dashboard onNavigate={navigateTo} />
