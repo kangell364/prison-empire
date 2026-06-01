@@ -17,7 +17,7 @@ Format that works (keep it short, like these):
 2. White man with a brown buzz cut and light stubble, 30s.
 3. White man with slicked-back blonde hair and a goatee, 40s.
 4. White man, bald with a thick full beard, 50s.
-5. White man with messy red hair and freckles, clean-shaven, mid 20s.
+5. Messy red hair and freckles, clean-shaven, mid 20s.
 6. White man with gray balding hair and a heavily wrinkled face, 60s.
 7. White man with a tall red mohawk, a nose ring, and a manic grin.
 8. White man with an eye patch and a scar across the lips, gaunt cheeks, sinister smirk.
@@ -37,7 +37,7 @@ Format that works (keep it short, like these):
 22. White man with a buzz cut, cauliflower ears, and a crooked nose, snarling.
 23. White man with shoulder-length dark hair and a goatee, menacing.
 24. White man with a receding hairline and round glasses, 50s, defeated look.
-25. White man with a shaved head and a deep scar across one eyebrow.
+25. White man with a shavedWhite man with me head and a deep scar across one eyebrow.
 26. White man with sandy blonde hair, clean-shaven, scared wide eyes, early 30s.
 27. White man with a salt-and-pepper beard and short hair, 50s.
 28. White man with a face tattoo across one cheek and a shaved head, cold stare.
@@ -107,7 +107,7 @@ Format that works (keep it short, like these):
 92. Pacific Islander man, bald with a full head tattoo and a missing tooth, with a war-cry scream.
 93. Pacific Islander man with a top-knot and full facial tribal tattoos, fierce.
 94. Mixed-race (Black and white) man with short curly hair and light stubble.
-95. Mixed-race man with a fade and freckles, 20s.
+95. Mixed-race (Black and white) man with short curly hair and light stubble.
 96. White man with a crew cut and a scar through one eyebrow, 30s.
 97. Black man with waves and a thin mustache, 20s, smug.
 98. Latino man with a slicked ponytail and a goatee, 40s.
@@ -160,6 +160,13 @@ Format that works (keep it short, like these):
 145. Black woman with cornrows and gold hoop earrings, smug.
 146. Black woman with a shaved head and face tattoos, cold stare.
 147. Black woman with short natural curls, 30s.
+
+
+
+ABOVE COMPLETED
+
+
+
 148. Black woman with a long straight weave and dark lipstick, 20s.
 149. Black woman, elderly with gray locs and a weathered face.
 150. Black woman with bantu knots and a nose ring, fierce snarl.

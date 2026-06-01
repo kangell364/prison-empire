@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react'
 
 const KEY = 'pe_fightlog_v1'
-const MAX_LOGS = 60
+const MAX_LOGS = 200
 
 // Declared before readInitial() runs at module load — readInitial spreads it,
 // and a `const` is in the temporal dead zone until its own line executes, so
@@ -89,6 +89,17 @@ export function recordKo(opp) {
     record,
   })
   return { avenged }
+}
+
+// You took down a campaign boss (PvE). Logs a blow-by-blow entry so the fight
+// history isn't PvP-only, and counts the clear as a job toward Street Rep.
+export function recordBossKo(boss) {
+  const record = { ...state.record, jobs: state.record.jobs + 1 }
+  commit({
+    ...state,
+    logs: pushLog({ kind: 'boss', oppId: boss.id, oppName: boss.name, oppLevel: boss.level }),
+    record,
+  })
 }
 
 // Credit completed "jobs" toward the career record / Street Rep — a boss cleared

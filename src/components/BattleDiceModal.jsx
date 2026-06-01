@@ -423,7 +423,7 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
 function FighterBlock({ name, emoji, avatar, level, attack, defense, hp, maxHp, color, hit, outcome }) {
   const pct = maxHp > 0 ? Math.max(0, Math.min(100, (hp / maxHp) * 100)) : 0
   const hpColor = pct > 60 ? GREEN : pct > 25 ? ORANGE : RED
-  const dead = hp <= 0
+  const dead = hp <= 0   // out of HP → show the KO stamp, even in a mutual KO
   const outerAnim = outcome === 'winner' ? 'winnerGlow 1.8s ease-in-out infinite' : outcome === 'loser' ? 'loserDim 0.7s ease forwards' : 'none'
   return (
     <div style={{ flex: 1, minWidth: 0, textAlign: 'center', opacity: dead ? 0.45 : 1, transition: 'opacity 0.4s', animation: outerAnim, borderRadius: 12 }}>

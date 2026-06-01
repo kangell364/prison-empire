@@ -74,7 +74,9 @@ function FightLogs({ log, onRevenge }) {
             ? { c: GOLD,  icon: 'ti-swords', text: <>Revenge! You KO'd <b style={{ color: '#fff' }}>{e.oppName}</b> <span style={{ color: GOLD }}>+50 XP</span></> }
             : e.kind === 'bounty'
               ? { c: GOLD,  icon: 'ti-coin',   text: <><b style={{ color: '#fff' }}>{e.collector}</b> collected the bounty on your head — took <span style={{ color: GOLD }}>{e.amount.toLocaleString()}</span> Hustle</> }
-              : { c: GREEN, icon: 'ti-trophy', text: <>You KO'd <b style={{ color: '#fff' }}>{e.oppName}</b></> }
+              : e.kind === 'boss'
+                ? { c: GOLD,  icon: 'ti-trophy', text: <>You took down <b style={{ color: '#fff' }}>{e.oppName}</b></> }
+                : { c: GREEN, icon: 'ti-trophy', text: <>You KO'd <b style={{ color: '#fff' }}>{e.oppName}</b></> }
         return (
           <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#13131f', border: `0.5px solid ${meta.c}33`, borderRadius: 12, padding: '10px 12px' }}>
             <i className={`ti ${meta.icon}`} style={{ color: meta.c, fontSize: 18, flexShrink: 0 }} />
