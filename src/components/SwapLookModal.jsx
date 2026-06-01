@@ -11,8 +11,17 @@ import { sfx } from '../sounds'
 // curated, cosmetic-only player-look cards (no stats) at 2x the home card size,
 // plus a Change Name control. Picking a card swaps the player's look and closes
 // back to the home screen.
-const BLUE = '#4a9eff'
-const PINK = '#ff6fb5'
+const BLUE  = '#4a9eff'
+const PINK  = '#ff6fb5'
+const GREEN = '#2ecc71'
+
+// SWAP card tabs, split by the look's category. MEN = anything without a
+// category tag; WOMEN = sex:'women'; BADDIES = sex:'baddies'.
+const SWAP_TABS = [
+  { id: 'men',     label: 'MEN',     icon: 'ti-gender-male',   color: BLUE },
+  { id: 'women',   label: 'WOMEN',   icon: 'ti-gender-female', color: PINK },
+  { id: 'baddies', label: 'BADDIES', icon: 'ti-fish',          color: GREEN },
+]
 
 export function SwapLookModal({ onClose }) {
   const currentId = usePlayerLook()
@@ -20,11 +29,13 @@ export function SwapLookModal({ onClose }) {
   const [detail, setDetail]           = useState(null)   // a look opened in the big card view
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft]     = useState(name)
-  const [tab, setTab]                 = useState('men')  // 'men' | 'women'
+  const [tab, setTab]                 = useState('men')  // 'men' | 'women' | 'baddies'
 
-  // Cards are split by sex. Everything currently is a MEN card; a card opts into
-  // the WOMEN tab with `sex: 'women'` on its look data (none yet).
-  const looks = PLAYER_LOOKS.filter(l => tab === 'women' ? l.sex === 'women' : l.sex !== 'women')
+  // MEN = no category tag; the others match on `sex`.
+  const looks = PLAYER_LOOKS.filter(l =>
+    tab === 'men' ? (l.sex !== 'women' && l.sex !== 'baddies') : l.sex === tab
+  )
+  const activeMeta = SWAP_TABS.find(t => t.id === tab)
 
   const swapTo = (id) => {
     setPlayerLook(id)
@@ -59,17 +70,19 @@ export function SwapLookModal({ onClose }) {
         Playing as <span style={{ color: '#fff', fontWeight: 600 }}>{name}</span> — pick a new look. This only changes your card, not your level.
       </div>
 
-      {/* MEN / WOMEN tabs — right above the cards. */}
-      <div style={{ display: 'flex', gap: 8, padding: '2px 16px 8px' }}>
-        <SexTab active={tab === 'men'}   color={BLUE} icon="ti-gender-male"   label="MEN"   onClick={() => { sfx.tap?.(); setTab('men') }} />
-        <SexTab active={tab === 'women'} color={PINK} icon="ti-gender-female" label="WOMEN" onClick={() => { sfx.tap?.(); setTab('women') }} />
+      {/* MEN / WOMEN / BADDIES tabs — right above the cards. */}
+      <div style={{ display: 'flex', gap: 6, padding: '2px 16px 8px' }}>
+        {SWAP_TABS.map(t => (
+          <SexTab key={t.id} active={tab === t.id} color={t.color} icon={t.icon} label={t.label}
+            onClick={() => { sfx.tap?.(); setTab(t.id) }} />
+        ))}
       </div>
 
       {/* Look cards at 2x the home card size (home art is 70x92 → 140x184) */}
       {looks.length === 0 ? (
         <div style={{ padding: '24px 16px 110px', textAlign: 'center' }}>
-          <i className="ti ti-gender-female" style={{ color: PINK, fontSize: 34 }} />
-          <div style={{ color: '#fff', fontSize: 14, fontWeight: 600, marginTop: 10 }}>No women cards yet</div>
+          <i className={`ti ${activeMeta.icon}`} style={{ color: activeMeta.color, fontSize: 34 }} />
+          <div style={{ color: '#fff', fontSize: 14, fontWeight: 600, marginTop: 10 }}>No {activeMeta.label.toLowerCase()} cards yet</div>
           <div style={{ color: '#555', fontSize: 12, marginTop: 4 }}>Coming soon.</div>
         </div>
       ) : (
@@ -135,14 +148,14 @@ export function SwapLookModal({ onClose }) {
 function SexTab({ active, color, icon, label, onClick }) {
   return (
     <button onClick={onClick} style={{
-      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
       background: active ? `${color}22` : '#13131f',
       border: `1px solid ${active ? color : '#2a2a3a'}`,
-      borderRadius: 10, padding: '10px 0',
-      color: active ? color : '#888', fontSize: 13, fontWeight: 800, letterSpacing: 1.5,
-      cursor: 'pointer',
+      borderRadius: 10, padding: '10px 2px',
+      color: active ? color : '#888', fontSize: 11.5, fontWeight: 800, letterSpacing: 0.5,
+      whiteSpace: 'nowrap', cursor: 'pointer',
     }}>
-      <i className={`ti ${icon}`} style={{ fontSize: 16 }} />{label}
+      <i className={`ti ${icon}`} style={{ fontSize: 15 }} />{label}
     </button>
   )
 }
