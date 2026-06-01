@@ -42,7 +42,7 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Block grid (street-zoom economic layer). A large uniform ~440m grid laid
+  // Block grid (street-zoom economic layer). A large uniform ~1.8km (4×4 merged) grid laid
   // over the map; blocks held by a crew are colored + have an NPC standing on
   // them, vacant blocks are faint claimable outlines. Only drawn at street zoom.
   // NOTE: owners are deterministic placeholders for now — the real loyalty-market

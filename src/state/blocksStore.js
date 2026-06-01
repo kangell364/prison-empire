@@ -1,6 +1,6 @@
 // blocksStore — the block / loyalty-market economy (v1).
 //
-// The map is an infinite uniform grid of ~440m blocks. We do NOT store every
+// The map is an infinite uniform grid of ~1.8km (4×4 "merged") blocks. We do NOT store every
 // block — that's billions of cells. Instead:
 //   - blockDefault(gx,gy) gives every cell a DETERMINISTIC ambient state
 //     (procedural rival crews hold turf everywhere, with a base value/income).
@@ -21,8 +21,13 @@ import { useEffect, useState } from 'react'
 import { addHustle, spendHustle } from './profileStore'
 import { getProgress } from './progressionStore'
 
-export const GRID = 0.004              // ~440m block — MUST match the TurfMap grid
-const KEY = 'pe_blocks_v1'
+// One block = the "merged 4×4" unit (~1.8km / ~1.1mi across — a neighborhood).
+// Each block has one NPC, one recruit card, one color, one centered icon.
+// (Was 0.004° / ~440m; coarsening 4× makes the map readable + better for GPS.)
+export const GRID = 0.016             // ~1.8km block — MUST match the TurfMap grid
+// Bumped v1→v2 with the grid change: old 0.004° turf coordinates don't map onto
+// the new grid, so we start fresh rather than scatter owned blocks to wrong spots.
+const KEY = 'pe_blocks_v2'
 
 const POACH_MULT       = 1.10          // +10% per takeover
 const PAYOUT_CUT       = 0.5           // displaced owner gets stake + this share of the premium
