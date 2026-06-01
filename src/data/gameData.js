@@ -333,6 +333,7 @@ export const PLAYER_LOOKS = [
   { id: 'look_150', name: 'Player Card 150', avatar: '/player-look-150.jpg', rarity: 'epic', sex: 'women' },
   { id: 'look_151', name: 'Player Card 151', avatar: '/player-look-151.jpg', rarity: 'epic', sex: 'women' },
   { id: 'look_152', name: 'Player Card 152', avatar: '/player-look-152.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_153', name: 'Player Card 153', avatar: '/player-look-153.jpg', rarity: 'epic', sex: 'baddies' },
 ]
 export const DEFAULT_LOOK_ID = 'look_1'
 
