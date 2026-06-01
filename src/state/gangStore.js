@@ -70,6 +70,30 @@ function makeRoster(count, avgLevel) {
 
 function gangPower(members) { return members.reduce((s, m) => s + (m.power || 0), 0) }
 
+// Gang XP comes from member contributions — 1 Hustle donated = 1 gang XP. Each
+// level costs progressively more (linear growth), so the gang climbs as the
+// treasury is fed.
+const GANG_XP_BASE = 5000   // Hustle to go from Lv 1 → 2; ×2 for 2→3, etc.
+export function xpForGangLevel(level) {   // total XP to REACH `level` (Lv 1 = 0)
+  const L = Math.max(1, level)
+  return GANG_XP_BASE * ((L - 1) * L) / 2
+}
+export function gangLevelFromXp(xp) {
+  let level = 1
+  while (xpForGangLevel(level + 1) <= xp) level++
+  return level
+}
+// Progress within the current level — drives the gang XP bar.
+export function gangLevelProgress(gang) {
+  const xp = gang?.xp || 0
+  const level = gangLevelFromXp(xp)
+  const base = xpForGangLevel(level)
+  const next = xpForGangLevel(level + 1)
+  const span = next - base
+  const inLevel = xp - base
+  return { level, xp, inLevel: Math.max(0, inLevel), span, toNext: Math.max(0, next - xp), pct: span > 0 ? Math.min(100, (inLevel / span) * 100) : 0 }
+}
+
 // Eight hand-authored AI gangs, rosters generated at load. Not persisted — this
 // is just the browse list, regenerated each session.
 function buildAiGangs() {
@@ -85,10 +109,12 @@ function buildAiGangs() {
   ]
   return defs.map(d => {
     const members = makeRoster(d.size, d.avgLevel)
+    const level = Math.max(1, Math.round(d.avgLevel))
     return {
       id: d.id, name: d.name, tag: d.tag, crest: d.crest,
       enrollment: d.enrollment, minLevel: d.minLevel,
-      level: Math.max(1, Math.round(d.avgLevel)),
+      level,
+      xp: xpForGangLevel(level),   // seed XP so leveling stays consistent if you join + donate
       capacity: GANG_CAPACITY,
       members,
       power: gangPower(members),
@@ -165,7 +191,10 @@ export function donateToTreasury(amount, memberId = PLAYER_MEMBER_ID) {
   const treasury = (state.myGang.treasury || 0) + amt
   const contributions = { ...(state.myGang.contributions || {}) }
   contributions[memberId] = (contributions[memberId] || 0) + amt
-  commit({ ...state, myGang: { ...state.myGang, treasury, contributions } })
+  // Every Hustle donated is gang XP — the gang levels up off contributions.
+  const xp = (state.myGang.xp || 0) + amt
+  const level = gangLevelFromXp(xp)
+  commit({ ...state, myGang: { ...state.myGang, treasury, contributions, xp, level } })
 }
 
 // Buy the next level of a perk out of the treasury (OG-gated in the UI).
@@ -216,6 +245,7 @@ export function foundGang({ name, tag, crest, enrollment = ENROLLMENT.APPLY, min
     crest: crest || '🏴',
     enrollment, minLevel: Math.max(0, minLevel | 0),
     level: 1,
+    xp: 0,
     capacity: GANG_CAPACITY,
     members,
     power: gangPower(members),

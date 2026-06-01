@@ -10,7 +10,7 @@ import {
   foundGang, joinGang, applyToGang, leaveGang,
   kickMember, promoteMember, demoteMember, addCardMember,
   setEnrollment, setMinLevel, syncPlayerMember,
-  donateToTreasury, buyPerk, getContribution,
+  donateToTreasury, buyPerk, getContribution, gangLevelProgress,
   PERKS, perkCost,
   CREATE_MIN_LEVEL, FOUND_COST_STEEL, ROLES, ENROLLMENT, PLAYER_MEMBER_ID,
 } from '../state/gangStore'
@@ -237,18 +237,22 @@ function GangHub({ gang, player }) {
     <>
       {/* Identity header */}
       <div className="section">
-        <div className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ fontSize: 44, width: 54, textAlign: 'center' }}>{gang.crest}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: '#fff', fontSize: 18, fontWeight: 700 }}>
-              {gang.name} <span style={{ color: DIM, fontSize: 12 }}>[{gang.tag}]</span>
-            </div>
-            <div style={{ display: 'flex', gap: 12, marginTop: 4, color: DIM, fontSize: 12 }}>
-              <span>Lv {gang.level}</span>
-              <span>{gang.members.length}/{gang.capacity} members</span>
-              <span style={{ color: GOLD }}>{gang.power.toLocaleString()} PWR</span>
+        <div className="card card-pad">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ fontSize: 44, width: 54, textAlign: 'center' }}>{gang.crest}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: '#fff', fontSize: 18, fontWeight: 700 }}>
+                {gang.name} <span style={{ color: DIM, fontSize: 12 }}>[{gang.tag}]</span>
+              </div>
+              <div style={{ display: 'flex', gap: 12, marginTop: 4, color: DIM, fontSize: 12 }}>
+                <span>Lv {gang.level}</span>
+                <span>{gang.members.length}/{gang.capacity} members</span>
+                <span style={{ color: GOLD }}>{gang.power.toLocaleString()} PWR</span>
+              </div>
             </div>
           </div>
+          {/* Gang XP — climbs off member contributions. */}
+          <GangXpBar gang={gang} />
         </div>
       </div>
 
@@ -293,6 +297,22 @@ function GangHub({ gang, player }) {
 
       {showPicker && <CardPickerModal gang={gang} onClose={() => setShowPicker(false)} />}
     </>
+  )
+}
+
+function GangXpBar({ gang }) {
+  const p = gangLevelProgress(gang)
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+        <span style={{ color: DIM, fontSize: 10, fontWeight: 700, letterSpacing: 0.5 }}>GANG XP → LV {p.level + 1}</span>
+        <span style={{ color: DIM, fontSize: 10 }}>{p.inLevel.toLocaleString()} / {p.span.toLocaleString()}</span>
+      </div>
+      <div style={{ height: 5, background: '#1e1e2a', borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${p.pct}%`, background: `linear-gradient(90deg, ${GOLD}, #f0d080)`, borderRadius: 3 }} />
+      </div>
+      <div style={{ color: DIM, fontSize: 10, marginTop: 4 }}>Donations to the treasury level the gang up — {p.toNext.toLocaleString()} to go.</div>
+    </div>
   )
 }
 
