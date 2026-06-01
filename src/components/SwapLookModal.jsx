@@ -11,12 +11,20 @@ import { sfx } from '../sounds'
 // curated, cosmetic-only player-look cards (no stats) at 2x the home card size,
 // plus a Change Name control. Picking a card swaps the player's look and closes
 // back to the home screen.
+const BLUE = '#4a9eff'
+const PINK = '#ff6fb5'
+
 export function SwapLookModal({ onClose }) {
   const currentId = usePlayerLook()
   const name      = useDisplayName()
   const [detail, setDetail]           = useState(null)   // a look opened in the big card view
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft]     = useState(name)
+  const [tab, setTab]                 = useState('men')  // 'men' | 'women'
+
+  // Cards are split by sex. Everything currently is a MEN card; a card opts into
+  // the WOMEN tab with `sex: 'women'` on its look data (none yet).
+  const looks = PLAYER_LOOKS.filter(l => tab === 'women' ? l.sex === 'women' : l.sex !== 'women')
 
   const swapTo = (id) => {
     setPlayerLook(id)
@@ -51,18 +59,32 @@ export function SwapLookModal({ onClose }) {
         Playing as <span style={{ color: '#fff', fontWeight: 600 }}>{name}</span> — pick a new look. This only changes your card, not your level.
       </div>
 
-      {/* Look cards at 2x the home card size (home art is 70x92 → 140x184) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: '6px 16px 110px', justifyItems: 'center' }}>
-        {PLAYER_LOOKS.map(look => (
-          <LookCard
-            key={look.id}
-            look={look}
-            equipped={look.id === currentId}
-            onOpen={() => setDetail(look)}
-            onSwap={() => swapTo(look.id)}
-          />
-        ))}
+      {/* MEN / WOMEN tabs — right above the cards. */}
+      <div style={{ display: 'flex', gap: 8, padding: '2px 16px 8px' }}>
+        <SexTab active={tab === 'men'}   color={BLUE} icon="ti-gender-male"   label="MEN"   onClick={() => { sfx.tap?.(); setTab('men') }} />
+        <SexTab active={tab === 'women'} color={PINK} icon="ti-gender-female" label="WOMEN" onClick={() => { sfx.tap?.(); setTab('women') }} />
       </div>
+
+      {/* Look cards at 2x the home card size (home art is 70x92 → 140x184) */}
+      {looks.length === 0 ? (
+        <div style={{ padding: '24px 16px 110px', textAlign: 'center' }}>
+          <i className="ti ti-gender-female" style={{ color: PINK, fontSize: 34 }} />
+          <div style={{ color: '#fff', fontSize: 14, fontWeight: 600, marginTop: 10 }}>No women cards yet</div>
+          <div style={{ color: '#555', fontSize: 12, marginTop: 4 }}>Coming soon.</div>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: '6px 16px 110px', justifyItems: 'center' }}>
+          {looks.map(look => (
+            <LookCard
+              key={look.id}
+              look={look}
+              equipped={look.id === currentId}
+              onOpen={() => setDetail(look)}
+              onSwap={() => swapTo(look.id)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Open a look in the same big card view as any other card. The action
           reflects whether it's the one already equipped. */}
@@ -107,6 +129,21 @@ export function SwapLookModal({ onClose }) {
         </div>
       )}
     </div>
+  )
+}
+
+function SexTab({ active, color, icon, label, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+      background: active ? `${color}22` : '#13131f',
+      border: `1px solid ${active ? color : '#2a2a3a'}`,
+      borderRadius: 10, padding: '10px 0',
+      color: active ? color : '#888', fontSize: 13, fontWeight: 800, letterSpacing: 1.5,
+      cursor: 'pointer',
+    }}>
+      <i className={`ti ${icon}`} style={{ fontSize: 16 }} />{label}
+    </button>
   )
 }
 
