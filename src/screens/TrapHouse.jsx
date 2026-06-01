@@ -14,22 +14,36 @@ const GOLD = '#c9a84c'
 const GREEN = '#2ecc71'
 const DIM = '#666'
 
-const isLandscape = () => (typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : true)
+const isLandscape = () => {
+  if (typeof window === 'undefined') return true
+  try { if (window.matchMedia && window.matchMedia('(orientation: landscape)').matches) return true } catch {}
+  return window.innerWidth > window.innerHeight
+}
 function cardOf(id) { return CARDS_COLLECTION.find(c => c.id === id) }
 
 export default function TrapHouse({ onBack }) {
   const house = useTrapHouse()
   const [land, setLand] = useState(isLandscape())
+  const [forceEnter, setForceEnter] = useState(false)   // escape hatch if rotation can't be detected
   const [picking, setPicking] = useState(null)   // table index being planted
   const [crates, setCrates] = useState([])
   const crateId = useRef(0)
 
-  // Orientation gate — the interior is a landscape "side view".
+  // Orientation gate — the interior is a landscape "side view". Rechecked on
+  // every signal (resize / orientationchange / media query), with a short delay
+  // after orientationchange because mobile dims settle a beat late.
   useEffect(() => {
     const f = () => setLand(isLandscape())
+    const delayed = () => setTimeout(f, 250)
     window.addEventListener('resize', f)
-    window.addEventListener('orientationchange', f)
-    return () => { window.removeEventListener('resize', f); window.removeEventListener('orientationchange', f) }
+    window.addEventListener('orientationchange', delayed)
+    let mq
+    try { mq = window.matchMedia('(orientation: landscape)'); mq.addEventListener ? mq.addEventListener('change', f) : mq.addListener(f) } catch {}
+    return () => {
+      window.removeEventListener('resize', f)
+      window.removeEventListener('orientationchange', delayed)
+      try { mq && (mq.removeEventListener ? mq.removeEventListener('change', f) : mq.removeListener(f)) } catch {}
+    }
   }, [])
 
   // Live container fills.
@@ -50,7 +64,7 @@ export default function TrapHouse({ onBack }) {
     return () => clearInterval(iv)
   }, [land])
 
-  if (!land) return <RotateGate onBack={onBack} />
+  if (!land && !forceEnter) return <RotateGate onBack={onBack} onEnter={() => setForceEnter(true)} />
 
   const tables = house.tables || []
   const planted = tables.filter(Boolean).length
@@ -186,15 +200,18 @@ function TableSlot({ table, index, onPlant }) {
   )
 }
 
-function RotateGate({ onBack }) {
+function RotateGate({ onBack, onEnter }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: '#0a0a0f', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 30 }}>
       <div style={{ fontSize: 56, animation: 'rotateHint 2s ease-in-out infinite' }}>📱</div>
       <div style={{ color: '#fff', fontSize: 18, fontWeight: 700, marginTop: 18 }}>Turn your phone sideways</div>
       <div style={{ color: DIM, fontSize: 13, marginTop: 8, lineHeight: 1.5, maxWidth: 280 }}>
-        Step inside the Trap House. Rotate to landscape to walk the floor.
+        Step inside the Trap House. Rotate to landscape to walk the floor — or just enter below.
       </div>
-      <button className="btn btn-dark" onClick={onBack} style={{ marginTop: 26, padding: '10px 18px' }}>
+      <button className="btn btn-gold" onClick={onEnter} style={{ marginTop: 24, padding: '12px 22px', fontWeight: 800 }}>
+        Enter anyway <i className="ti ti-arrow-right" />
+      </button>
+      <button className="btn btn-dark" onClick={onBack} style={{ marginTop: 12, padding: '10px 18px' }}>
         <i className="ti ti-arrow-left" /> Back
       </button>
       <Keyframes />
