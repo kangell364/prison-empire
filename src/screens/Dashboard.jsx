@@ -72,9 +72,9 @@ export default function Dashboard({ onNavigate }) {
           <div
             onClick={() => { sfx.tap?.(); onNavigate('profile') }}
             style={{
-            width: 70, height: 92,
+            width: 105, height: 138,
             background: '#1a1a2e',
-            borderRadius: 10,
+            borderRadius: 15,
             border: `1px solid ${lookColor}44`,
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'flex-end',
@@ -84,17 +84,17 @@ export default function Dashboard({ onNavigate }) {
               <img src={look.avatar} alt={look.name}
                 style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', filter: playerKo ? KO_FILTER : 'none' }} />
             ) : (
-              <div style={{ fontSize: 30, marginBottom: 4, filter: playerKo ? KO_FILTER : 'none' }}>{look.emoji}</div>
+              <div style={{ fontSize: 45, marginBottom: 6, filter: playerKo ? KO_FILTER : 'none' }}>{look.emoji}</div>
             )}
-            {playerKo && <KoOverlay fontSize={16} />}
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: lookColor }} />
+            {playerKo && <KoOverlay fontSize={24} />}
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: lookColor }} />
             <div style={{
               position: 'relative', zIndex: 1, width: '100%',
               background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.85) 60%)',
-              padding: '12px 4px 3px',
+              padding: '18px 6px 5px',
             }}>
-              <div style={{ color: lookColor, fontSize: 8, fontWeight: 700, letterSpacing: 0.5, textAlign: 'center' }}>{playerName.toUpperCase()}</div>
-              <div style={{ color: '#bbb', fontSize: 8, marginTop: 1, textAlign: 'center' }}>LVL {prog.level}</div>
+              <div style={{ color: lookColor, fontSize: 12, fontWeight: 700, letterSpacing: 0.5, textAlign: 'center' }}>{playerName.toUpperCase()}</div>
+              <div style={{ color: '#bbb', fontSize: 12, marginTop: 2, textAlign: 'center' }}>LVL {prog.level}</div>
             </div>
           </div>
 
