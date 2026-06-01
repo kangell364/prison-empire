@@ -9,6 +9,11 @@ import { useEffect, useState } from 'react'
 
 const KEY = 'pe_properties_v1'
 
+// Every new player starts owning 1 Soup Cup — a guaranteed first property so
+// that even if they fumble their Hustle, they still hold something earning in
+// the Property screen. Only seeded for brand-new saves (no stored holdings yet).
+const STARTER_OWNED = { soup_cup: 1 }
+
 let state = readInitial()   // { owned: { [propertyId]: count } }
 const listeners = new Set()
 
@@ -17,7 +22,7 @@ function readInitial() {
     const raw = localStorage.getItem(KEY)
     if (raw) { const p = JSON.parse(raw); return { owned: p.owned || {} } }
   } catch {}
-  return { owned: {} }
+  return { owned: { ...STARTER_OWNED } }
 }
 
 function persist() { try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }
