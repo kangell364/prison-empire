@@ -151,6 +151,16 @@ export function refillStamina() {
   commit({ ...s, stamina: staminaMax(), staminaAt: Date.now() })
 }
 
+// Restore health UP TO `frac` of max (never lowers it). Used for a boss win so
+// you don't walk away on empty after grinding it down. No-op while KO'd.
+export function restoreHealthTo(frac) {
+  const s = settleAll(state)
+  if (s.koUntil != null) return
+  const target = Math.round(healthMax() * frac)
+  if (s.health >= target) return
+  commit({ ...s, health: target, healthAt: Date.now() })
+}
+
 // Knock the player out: health to 0, start the 24h recovery clock. No-op if
 // already KO'd (so a second loss doesn't refresh/extend the timer). Going down
 // also lets a rival CLAIM the price on your head — the bounty resets and a

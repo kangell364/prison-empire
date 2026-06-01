@@ -4,7 +4,7 @@ import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { BattleDiceModal } from '../components/BattleDiceModal'
 import { useProgress, recordHit, resetProgression } from '../state/progressionStore'
-import { useVitals, spendStamina, spendHealth } from '../state/vitalsStore'
+import { useVitals, spendStamina, spendHealth, restoreHealthTo } from '../state/vitalsStore'
 import { bumpForBoss } from '../state/bountyStore'
 
 const STAMINA_COST = 5
@@ -150,7 +150,7 @@ export default function Battle() {
           rewards={{ xp: selected.xp, hustle: selected.hustle, cardDrop: selected.cardDrop }}
           onRoll={() => spendStamina(STAMINA_COST)}
           onHit={({ dealtToOpp, dealtToPlayer }) => { recordHit(selected, dealtToOpp); spendHealth(dealtToPlayer) }}
-          onWin={() => bumpForBoss()}   // clearing a boss raises the price on your head
+          onWin={() => { bumpForBoss(); restoreHealthTo(0.5) }}   // boss down: bounty up + patch back to half health
           onClose={() => setSelected(null)}
         />
       )}
