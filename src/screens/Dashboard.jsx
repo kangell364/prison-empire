@@ -20,7 +20,6 @@ export default function Dashboard({ onNavigate }) {
   const prog = useProgress()
   const xpNeed = xpForLevel(prog.level)
   const xpPct = Math.round((prog.xp / xpNeed) * 100)
-  const hustle = useHustle()
   const steel  = useSteel()
   // Live "Your Turf" block economy — re-renders when blocks change (recruit /
   // poach / collect / AI poach).
@@ -153,11 +152,10 @@ export default function Dashboard({ onNavigate }) {
       <div className="section">
         <div className="section-label">Commissary Store</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {Object.entries(RESOURCES).map(([key, r]) => {
-            // hustle + steel come from the profile now; crew + snitch are
-            // still static until their own phases land.
-            const value = key === 'hustle' ? hustle
-                        : key === 'steel'  ? steel
+          {Object.entries(RESOURCES).filter(([key]) => key !== 'hustle').map(([key, r]) => {
+            // hustle now lives in the vitals bar at the top; steel comes from the
+            // profile; crew + snitch are still static until their own phases land.
+            const value = key === 'steel' ? steel
                         : r.value
             return (
               <div key={key} className="card card-pad" style={{ padding: 14 }}>
