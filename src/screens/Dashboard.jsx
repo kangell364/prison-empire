@@ -151,7 +151,7 @@ export default function Dashboard({ onNavigate }) {
 
       {/* Resources */}
       <div className="section">
-        <div className="section-label">Resources</div>
+        <div className="section-label">Commissary Store</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {Object.entries(RESOURCES).map(([key, r]) => {
             // hustle + steel come from the profile now; crew + snitch are
@@ -324,23 +324,45 @@ export default function Dashboard({ onNavigate }) {
 // ---------------------------------------------------------------------
 function VitalsHud() {
   const vitals = useVitals()   // re-renders every 1s via the store's ticker
+  const hustle = useHustle()
+  const hustleMax = RESOURCES.hustle?.max || 10000
+  const hustlePct = Math.min(100, (hustle / hustleMax) * 100)
   return (
-    <div style={{
-      margin: '12px 16px 0',
-      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
-    }}>
-      <VitalTimer
-        icon="ti-heart" color="#e74c3c"
-        label="Health" cur={vitals.health} max={vitals.healthMax}
-        nextMs={msToNextHealth()} ko={vitals.ko}
-        onClick={() => { sfx.tap(); openNurse() }}
-      />
-      <VitalTimer
-        icon="ti-bolt" color="#f0d080"
-        label="Stamina" cur={vitals.stamina} max={vitals.staminaMax}
-        nextMs={msToNextStamina()}
-        onClick={() => { sfx.tap(); openNurse() }}
-      />
+    <div style={{ margin: '12px 16px 0' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <VitalTimer
+          icon="ti-heart" color="#e74c3c"
+          label="Health" cur={vitals.health} max={vitals.healthMax}
+          nextMs={msToNextHealth()} ko={vitals.ko}
+          onClick={() => { sfx.tap(); openNurse() }}
+        />
+        <VitalTimer
+          icon="ti-bolt" color="#f0d080"
+          label="Stamina" cur={vitals.stamina} max={vitals.staminaMax}
+          nextMs={msToNextStamina()}
+          onClick={() => { sfx.tap(); openNurse() }}
+        />
+      </div>
+
+      {/* Hustle bar — your spendable cash, right under the vitals. */}
+      <div style={{
+        marginTop: 10,
+        background: '#13131f', border: '0.5px solid #2a2a3a', borderRadius: 12,
+        padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <i className="ti ti-flame" style={{ color: '#c9a84c', fontSize: 18 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+            <span style={{ color: '#888', fontSize: 10, letterSpacing: 0.5 }}>Hustle</span>
+            <span style={{ color: '#c9a84c', fontSize: 11, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+              {hustle.toLocaleString()}
+            </span>
+          </div>
+          <div style={{ height: 4, background: '#1e1e2a', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${hustlePct}%`, background: 'linear-gradient(90deg, #c9a84c, #f0d080)', borderRadius: 2 }} />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
