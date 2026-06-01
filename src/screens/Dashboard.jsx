@@ -231,13 +231,16 @@ export default function Dashboard({ onNavigate }) {
             const rc = c ? (RARITY_COLORS[c.rarity] || '#c9a84c') : '#1e1e2a'
             const power = c ? atkOf(c, flat) + defOf(c, flat) : 0
             return (
-              <div key={i} style={{
+              <div key={i}
+                onClick={() => { sfx.tap?.(); onNavigate('cards', { tab: 'crew' }) }}
+                style={{
                 position: 'relative',
                 background: '#13131f',
                 border: `0.5px solid ${c ? rc + '55' : '#1e1e2a'}`,
                 borderRadius: 14, padding: '10px 8px',
                 textAlign: 'center',
                 opacity: c ? 1 : 0.5,
+                cursor: 'pointer',
               }}>
                 {slot.isLeader && (
                   <div style={{ position: 'absolute', top: -6, right: -4, width: 20, height: 20, borderRadius: '50%', background: '#c9a84c', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,.6)' }}>

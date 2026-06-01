@@ -31,6 +31,9 @@ const NAV_ITEMS = [
 
 export default function App() {
   const [screen, setScreen] = useState('home')
+  // Which tab the Cards screen opens on. Set to 'crew' when jumping straight to
+  // the My Crew view (e.g. tapping a crew slot on the home screen).
+  const [cardsTab, setCardsTab] = useState('collection')
   const [muted, setMutedState] = useState(isMuted())
   const [showNotifs, setShowNotifs] = useState(false)
   const unread = useUnreadCount()
@@ -61,20 +64,29 @@ export default function App() {
 
   const handleNav = (id) => {
     if (id !== screen) sfx.tap()
+    // Bottom-nav Cards always lands on the collection tab.
+    if (id === 'cards') setCardsTab('collection')
+    setScreen(id)
+  }
+
+  // Navigation for in-screen links (e.g. Dashboard). Accepts an optional tab so
+  // a caller can deep-link into the Cards screen's My Crew view.
+  const navigateTo = (id, opts) => {
+    if (id === 'cards') setCardsTab(opts?.tab || 'collection')
     setScreen(id)
   }
 
   const renderScreen = () => {
     switch(screen) {
-      case 'home':    return <Dashboard onNavigate={setScreen} />
+      case 'home':    return <Dashboard onNavigate={navigateTo} />
       case 'map':     return <MapScreen />
       case 'battle':  return <Fight />
-      case 'cards':   return <Cards />
+      case 'cards':   return <Cards initialTab={cardsTab} />
       case 'yard':     return <Yard />
       case 'property': return <Property />
       case 'nurse':    return <Nurse onBack={() => setScreen('home')} />
       case 'profile':  return <Profile onBack={() => setScreen('home')} />
-      default:         return <Dashboard onNavigate={setScreen} />
+      default:         return <Dashboard onNavigate={navigateTo} />
     }
   }
 

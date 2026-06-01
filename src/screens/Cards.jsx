@@ -36,8 +36,8 @@ function sectionLabelFor(filter, ownedCount, totalCount) {
   return filter
 }
 
-export default function Cards() {
-  const [tab, setTab] = useState('collection')   // 'collection' | 'crew'
+export default function Cards({ initialTab = 'collection' }) {
+  const [tab, setTab] = useState(initialTab)   // 'collection' | 'crew'
   const [selectedCard, setSelectedCard]   = useState(null)
   const [mergeReveal, setMergeReveal]     = useState(null)   // { card, toLevel } during merge animation
   // Active filter chip for the collection grid. 'All' / 'Owned' / one of
