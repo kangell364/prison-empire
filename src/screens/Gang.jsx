@@ -285,6 +285,11 @@ function GangHub({ gang, player }) {
         {openSpots > 0 && !boss && (
           <div style={{ color: DIM, fontSize: 11, textAlign: 'center', marginTop: 10 }}>{openSpots} open spot{openSpots > 1 ? 's' : ''}</div>
         )}
+        {openSpots === 0 && gang.capacity < 12 && (
+          <div style={{ color: DIM, fontSize: 11, textAlign: 'center', marginTop: 10 }}>
+            <i className="ti ti-lock" style={{ fontSize: 11, marginRight: 3 }} />Gang full — level up to unlock another spot (+1 per level, max 12).
+          </div>
+        )}
       </div>
 
       {/* Leave */}

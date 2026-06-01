@@ -12,7 +12,7 @@ import { Avatar, KoOverlay, KO_FILTER } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { SwapLookModal } from '../components/SwapLookModal'
 import { StoreModal } from '../components/StoreModal'
-import { useGang, GANG_CAPACITY } from '../state/gangStore'
+import { useGang } from '../state/gangStore'
 import { sfx } from '../sounds'
 
 export default function Dashboard({ onNavigate }) {
@@ -424,7 +424,7 @@ function YourGangCard({ onNavigate }) {
           {myGang.name} <span style={{ color: '#555', fontSize: 11 }}>[{myGang.tag}]</span>
         </div>
         <div style={{ display: 'flex', gap: 12, marginTop: 3, color: '#555', fontSize: 12 }}>
-          <span>{myGang.members.length}/{GANG_CAPACITY} members</span>
+          <span>{myGang.members.length}/{myGang.capacity} members</span>
           <span style={{ color: '#c9a84c' }}>{myGang.power.toLocaleString()} PWR</span>
         </div>
       </div>

@@ -15,7 +15,13 @@ const KEY = 'pe_gang_v1'
 // ---- tuning knobs ---------------------------------------------------
 export const CREATE_MIN_LEVEL = 10     // level required to FOUND a gang
 export const FOUND_COST_STEEL  = 25    // Steel spent to found a gang
-export const GANG_CAPACITY     = 12    // members per gang (1 boss + 11)
+export const GANG_CAPACITY     = 12    // MAX members per gang (1 boss + 11)
+const GANG_BASE_CAPACITY       = 4     // capacity at Lv 1 (1 boss + 3)
+// Capacity grows +1 per gang level, capped at GANG_CAPACITY — so the OG must
+// level the gang (via contributions) to open more recruit spots.
+export function capacityForLevel(level) {
+  return Math.min(GANG_CAPACITY, GANG_BASE_CAPACITY + (Math.max(1, level) - 1))
+}
 const APPLY_DECISION_MS = 8000         // simulated time for an OG to accept you
 
 export const ROLES = { BOSS: 'boss', OFFICER: 'officer', MEMBER: 'member' }
@@ -108,14 +114,15 @@ function buildAiGangs() {
     { id: 'g_ldl',   name: 'Lockdown Legion',  tag: 'LDL',   crest: '⛓️', avgLevel: 12, size: 7,  enrollment: ENROLLMENT.APPLY,  minLevel: 0 },
   ]
   return defs.map(d => {
-    const members = makeRoster(d.size, d.avgLevel)
     const level = Math.max(1, Math.round(d.avgLevel))
+    const capacity = capacityForLevel(level)
+    const members = makeRoster(Math.min(d.size, capacity), d.avgLevel)
     return {
       id: d.id, name: d.name, tag: d.tag, crest: d.crest,
       enrollment: d.enrollment, minLevel: d.minLevel,
       level,
       xp: xpForGangLevel(level),   // seed XP so leveling stays consistent if you join + donate
-      capacity: GANG_CAPACITY,
+      capacity,
       members,
       power: gangPower(members),
     }
@@ -191,10 +198,12 @@ export function donateToTreasury(amount, memberId = PLAYER_MEMBER_ID) {
   const treasury = (state.myGang.treasury || 0) + amt
   const contributions = { ...(state.myGang.contributions || {}) }
   contributions[memberId] = (contributions[memberId] || 0) + amt
-  // Every Hustle donated is gang XP — the gang levels up off contributions.
+  // Every Hustle donated is gang XP — the gang levels up off contributions,
+  // and each level opens another recruit spot (capacity).
   const xp = (state.myGang.xp || 0) + amt
   const level = gangLevelFromXp(xp)
-  commit({ ...state, myGang: { ...state.myGang, treasury, contributions, xp, level } })
+  const capacity = Math.max(state.myGang.capacity || 0, capacityForLevel(level))
+  commit({ ...state, myGang: { ...state.myGang, treasury, contributions, xp, level, capacity } })
 }
 
 // Buy the next level of a perk out of the treasury (OG-gated in the UI).
@@ -246,7 +255,7 @@ export function foundGang({ name, tag, crest, enrollment = ENROLLMENT.APPLY, min
     enrollment, minLevel: Math.max(0, minLevel | 0),
     level: 1,
     xp: 0,
-    capacity: GANG_CAPACITY,
+    capacity: capacityForLevel(1),
     members,
     power: gangPower(members),
     treasury: 0,
