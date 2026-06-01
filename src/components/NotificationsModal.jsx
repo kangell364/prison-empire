@@ -33,8 +33,8 @@ export function NotificationsModal({ onClose, onNavigate }) {
   return (
     <div className="app-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(5,5,10,0.6)', zIndex: 300, display: 'flex', flexDirection: 'column' }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
-        marginTop: 'auto', background: '#0d0d15', borderTop: `1px solid ${GOLD}33`,
-        borderRadius: '18px 18px 0 0', maxHeight: '78%', display: 'flex', flexDirection: 'column',
+        marginBottom: 'auto', background: '#0d0d15', borderBottom: `1px solid ${GOLD}33`,
+        borderRadius: '0 0 18px 18px', maxHeight: '78%', display: 'flex', flexDirection: 'column',
       }}>
         <div style={{ width: 40, height: 4, background: '#2a2a3a', borderRadius: 2, margin: '10px auto 8px' }} />
 
