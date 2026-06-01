@@ -47,7 +47,7 @@ export function ScoutScreen({ facility, inFlight, incomingRaid, onAttack, onClos
   const atMaxDef   = loyalty >= LOYALTY_MAX
 
   return (
-    <div style={{
+    <div className="app-overlay" style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
       display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 220,
     }} onClick={onClose}>

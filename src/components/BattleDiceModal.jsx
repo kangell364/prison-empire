@@ -275,7 +275,7 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
   const fightOver = phase === 'resolved' && (outcome === 'win' || outcome === 'lose' || outcome === 'draw' || outcome === 'wornout')
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: '#13131f', display: 'flex', alignItems: 'stretch', justifyContent: 'center', zIndex: 220 }}>
+    <div className="app-overlay" style={{ position: 'fixed', inset: 0, background: '#13131f', display: 'flex', alignItems: 'stretch', justifyContent: 'center', zIndex: 220 }}>
       <div style={{ padding: '20px 16px 100px', width: '100%', maxWidth: 390, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         <div style={{ width: 40, height: 4, background: '#2a2a3a', borderRadius: 2, margin: '0 auto 16px' }} />
 

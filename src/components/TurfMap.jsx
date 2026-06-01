@@ -122,7 +122,7 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack }) {
   }, [counties])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: '#0a0a0f', zIndex: 210, display: 'flex', flexDirection: 'column' }}>
+    <div className="app-overlay" style={{ position: 'fixed', inset: 0, background: '#0a0a0f', zIndex: 210, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px 8px' }}>
         <button className="btn btn-dark" onClick={onBack} style={{ padding: '8px 12px', fontSize: 13 }}>
           <i className="ti ti-arrow-left" /> Map

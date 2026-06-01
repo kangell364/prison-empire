@@ -8,6 +8,7 @@ const DIM  = '#666'
 
 const TABS = [
   { id: 'world',  label: 'WORLD CHAT',  icon: 'ti-world' },
+  { id: 'gang',   label: 'GANG CHAT',   icon: 'ti-users-group' },
   { id: 'player', label: 'PLAYER CHAT', icon: 'ti-message' },
   { id: 'fights', label: 'FIGHT LOGS',  icon: 'ti-swords' },
 ]
@@ -30,7 +31,7 @@ export function NotificationsModal({ onClose, onNavigate }) {
   const goRevenge = () => { if (onNavigate) onNavigate('battle'); onClose() }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(5,5,10,0.6)', zIndex: 300, display: 'flex', flexDirection: 'column' }} onClick={onClose}>
+    <div className="app-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(5,5,10,0.6)', zIndex: 300, display: 'flex', flexDirection: 'column' }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
         marginTop: 'auto', background: '#0d0d15', borderTop: `1px solid ${GOLD}33`,
         borderRadius: '18px 18px 0 0', maxHeight: '78%', display: 'flex', flexDirection: 'column',
@@ -38,15 +39,15 @@ export function NotificationsModal({ onClose, onNavigate }) {
         <div style={{ width: 40, height: 4, background: '#2a2a3a', borderRadius: 2, margin: '10px auto 8px' }} />
 
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: 6, padding: '4px 14px 12px', borderBottom: '0.5px solid #1e1e2a' }}>
+        <div style={{ display: 'flex', gap: 5, padding: '4px 12px 12px', borderBottom: '0.5px solid #1e1e2a' }}>
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
-              flex: 1, background: tab === t.id ? `${GOLD}18` : '#13131f',
+              flex: 1, minWidth: 0, background: tab === t.id ? `${GOLD}18` : '#13131f',
               border: `0.5px solid ${tab === t.id ? `${GOLD}55` : '#2a2a3a'}`,
-              borderRadius: 10, padding: '9px 0', color: tab === t.id ? GOLD : '#888',
-              fontSize: 10.5, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer',
+              borderRadius: 10, padding: '9px 2px', color: tab === t.id ? GOLD : '#888',
+              fontSize: 9, fontWeight: 700, letterSpacing: 0.2, whiteSpace: 'nowrap', cursor: 'pointer',
             }}>
-              <i className={`ti ${t.icon}`} style={{ fontSize: 12, marginRight: 4 }} />{t.label}
+              <i className={`ti ${t.icon}`} style={{ fontSize: 11, marginRight: 3 }} />{t.label}
             </button>
           ))}
         </div>
@@ -78,7 +79,7 @@ function FightLogs({ log, onRevenge }) {
           <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#13131f', border: `0.5px solid ${meta.c}33`, borderRadius: 12, padding: '10px 12px' }}>
             <i className={`ti ${meta.icon}`} style={{ color: meta.c, fontSize: 18, flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: '#ccc', fontSize: 12.5, lineHeight: 1.3 }}>{meta.text}</div>
+              <div style={{ color: '#ccc', fontSize: 12.5, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{meta.text}</div>
               <div style={{ color: DIM, fontSize: 10, marginTop: 2 }}>{e.oppLevel != null ? `Lv ${e.oppLevel} · ` : ''}{timeAgo(e.ts)}</div>
             </div>
             {pending && (
@@ -94,13 +95,12 @@ function FightLogs({ log, onRevenge }) {
 }
 
 function ChatPlaceholder({ kind }) {
-  return (
-    <Empty
-      icon={kind === 'world' ? 'ti-world' : 'ti-message'}
-      title={kind === 'world' ? 'World Chat' : 'Player Chat'}
-      sub="Coming with multiplayer — chat the whole yard or message a crew, right here."
-    />
-  )
+  const meta = kind === 'world'
+    ? { icon: 'ti-world', title: 'World Chat', sub: 'Coming with multiplayer — chat the whole yard, right here.' }
+    : kind === 'gang'
+      ? { icon: 'ti-users-group', title: 'Gang Chat', sub: 'Coming with multiplayer — talk strategy with your crew, right here.' }
+      : { icon: 'ti-message', title: 'Player Chat', sub: 'Coming with multiplayer — message another player, right here.' }
+  return <Empty icon={meta.icon} title={meta.title} sub={meta.sub} />
 }
 
 function Empty({ icon, title, sub }) {

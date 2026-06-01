@@ -64,6 +64,7 @@ export function CharacterDetailModal({
 
   return (
     <div
+      className="app-overlay"
       style={{
         position: 'fixed', inset: 0,
         background: '#0a0a0f',

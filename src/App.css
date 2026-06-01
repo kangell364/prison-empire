@@ -219,6 +219,21 @@ body {
     margin-left: -195px;
   }
 }
+
+/* Full-screen overlays (modals, bottom sheets, full-screen views like chat and
+   SWAP). On a real desktop the game is a centered 390px phone frame, but a
+   fixed; inset:0 overlay would span the whole window — wider than every other
+   view. Pin overlays to the same 390px column so the entire game is one width.
+   No-op on phones, where the frame already fills the viewport. */
+@media (pointer: fine) and (min-width: 800px) {
+  .app-overlay {
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%);
+    width: 390px !important;
+    max-width: 390px !important;
+  }
+}
 .nav-item {
   flex: 1;
   display: flex;

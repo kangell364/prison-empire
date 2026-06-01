@@ -50,7 +50,7 @@ export function SwapLookModal({ onClose }) {
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: '#0a0a0f', zIndex: 300, overflowY: 'auto' }}>
+    <div className="app-overlay" style={{ position: 'fixed', inset: 0, background: '#0a0a0f', zIndex: 300, overflowY: 'auto' }}>
       {/* Header: Back · title · Change Name */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 16px 6px' }}>
         <button className="btn btn-dark" onClick={onClose} style={{ padding: '8px 12px', fontSize: 13 }}>
