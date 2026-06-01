@@ -1,7 +1,7 @@
 import React from 'react'
 import { RARITY_COLORS } from '../data/gameData'
 import { Avatar, KoOverlay, KO_FILTER } from './Avatar'
-import { useVitals } from '../state/vitalsStore'
+import { useVitals, openNurse } from '../state/vitalsStore'
 
 const GOLD = '#c9a84c'
 const RED  = '#e74c3c'
@@ -39,7 +39,8 @@ export function CharacterDetailModal({
 }) {
   // KO the player's own portrait when knocked out (this modal opens for the
   // player from Home / leaderboards, and for opponents — only `isYou` greys out).
-  const playerKo = useVitals().ko
+  const vitals = useVitals()
+  const playerKo = vitals.ko
   if (!c) return null
   const koHero = !!c.isYou && playerKo
 
@@ -283,6 +284,21 @@ export function CharacterDetailModal({
           </div>
         )}
 
+        {/* Your live vitals — tap either to head to the nurse and recover. */}
+        {c.isYou && (
+          <div style={{ padding: '16px 18px 0' }}>
+            <SectionLabel>Vitals</SectionLabel>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              <StatTile icon="ti-heart" label="Health" color={RED} small
+                value={`${vitals.health.toLocaleString()}/${vitals.healthMax.toLocaleString()}`}
+                onClick={() => { onClose?.(); openNurse() }} />
+              <StatTile icon="ti-bolt" label="Stamina" color={GOLD} small
+                value={`${vitals.stamina.toLocaleString()}/${vitals.staminaMax.toLocaleString()}`}
+                onClick={() => { onClose?.(); openNurse() }} />
+            </div>
+          </div>
+        )}
+
         {/* PvP / ranked-player stats */}
         {c.wins != null && c.losses != null && (
           <div style={{ padding: '16px 18px 0' }}>
@@ -373,14 +389,15 @@ function SectionLabel({ children }) {
   )
 }
 
-function StatTile({ icon, label, value, color, small }) {
+function StatTile({ icon, label, value, color, small, onClick }) {
   return (
-    <div style={{
+    <div onClick={onClick} style={{
       background: '#13131f',
-      border: '0.5px solid #2a2a3a',
+      border: `0.5px solid ${onClick ? color + '55' : '#2a2a3a'}`,
       borderRadius: 10,
       padding: small ? '8px 8px' : '10px 10px',
       textAlign: 'center',
+      cursor: onClick ? 'pointer' : 'default',
     }}>
       <i className={`ti ${icon}`} style={{ color, fontSize: small ? 13 : 16, display: 'block', marginBottom: 2 }} />
       <div style={{
@@ -389,7 +406,7 @@ function StatTile({ icon, label, value, color, small }) {
       }}>{value}</div>
       <div style={{
         color: '#555', fontSize: small ? 9 : 10, marginTop: 3, letterSpacing: 0.5,
-      }}>{label}</div>
+      }}>{label}{onClick && <i className="ti ti-chevron-right" style={{ fontSize: 8, marginLeft: 2 }} />}</div>
     </div>
   )
 }
