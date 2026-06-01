@@ -1,5 +1,6 @@
 import React from 'react'
 import { sfx } from '../sounds'
+import { CommissaryPack } from './CommissaryPack'
 
 // Commissary Store view — opened from the home-screen STORE art. Full-screen
 // overlay with an X (top-right) to close back to the home screen. Placeholder
@@ -24,22 +25,8 @@ export function StoreModal({ onClose }) {
         </button>
       </div>
 
-      {/* Store art */}
-      <div style={{ padding: '6px 16px' }}>
-        <div className="card" style={{ overflow: 'hidden' }}>
-          <img src="/STORE.png" alt="Commissary Store"
-            style={{ display: 'block', width: '100%', height: 'auto' }} />
-        </div>
-      </div>
-
-      {/* Placeholder body */}
-      <div style={{ textAlign: 'center', padding: '24px 24px 110px', color: '#666' }}>
-        <i className="ti ti-building-store" style={{ fontSize: 34, color: '#2a2a3a' }} />
-        <div style={{ color: '#aaa', fontSize: 14, fontWeight: 600, marginTop: 10 }}>Store coming soon</div>
-        <div style={{ fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>
-          Spend your Hustle on gear, boosts, and more — right here.
-        </div>
-      </div>
+      {/* Commissary Pack — same pack as the Cards screen. */}
+      <CommissaryPack style={{ margin: '8px 16px 110px' }} />
     </div>
   )
 }
