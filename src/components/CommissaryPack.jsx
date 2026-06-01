@@ -336,7 +336,7 @@ function RevealedCard({ card, rarityColor, onAccept, cta = 'Add to Collection' }
         filter: `drop-shadow(0 0 14px ${rarityColor})`,
         display: 'flex', justifyContent: 'center',
       }}>
-        <Avatar src={card.avatar} emoji={card.emoji} size={120} radius={14} />
+        <Avatar src={card.avatar} emoji={card.emoji} size={180} radius={21} />
       </div>
 
       {/* Rarity bar */}
