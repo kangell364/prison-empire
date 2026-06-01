@@ -577,9 +577,13 @@ export default function MapScreen({ onNavigate }) {
         </div>
       </div>
 
-      {/* Your trap house — current location + relocate control */}
+      {/* Your trap house — current location + relocate control. In a gang, tap
+          the card to open the grow-and-sell shop. */}
       <div style={{ padding: '10px 16px 0' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#13131f', border: `0.5px solid ${moving ? GOLD + '66' : '#2a2a3a'}`, borderRadius: 14, padding: '10px 12px' }}>
+        <div
+          onClick={() => { if (inGang && !relocating) { sfx.tap(); onNavigate && onNavigate('traphouse') } }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#13131f', border: `0.5px solid ${moving ? GOLD + '66' : '#2a2a3a'}`, borderRadius: 14, padding: '10px 12px', cursor: inGang && !relocating ? 'pointer' : 'default' }}
+        >
           <div style={{ width: 32, height: 32, borderRadius: 9, background: `${GOLD}1f`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <i className={`ti ${moving ? 'ti-arrows-move' : 'ti-home'}`} style={{ color: GOLD, fontSize: 16 }} />
           </div>
@@ -590,15 +594,18 @@ export default function MapScreen({ onNavigate }) {
                 ? `Relocating to ${countyNameByFips[homeHouse.moving_to_fips] || 'destination'} County · ${fmtClock(moveRemaining)}`
                 : (homeFips ? `${countyNameByFips[homeFips] || 'Unknown'} County` : 'Unplaced')}
             </div>
+            {inGang && !moving && !relocating && (
+              <div style={{ color: '#2ecc71', fontSize: 10, marginTop: 2 }}><i className="ti ti-plant-2" style={{ marginRight: 3 }} />Tap to grow &amp; sell</div>
+            )}
           </div>
           {!moving && !relocating && (
-            <button className="btn" onClick={() => { sfx.tap(); setRelocating(true); setTurfView(null) }}
+            <button className="btn" onClick={(e) => { e.stopPropagation(); sfx.tap(); setRelocating(true); setTurfView(null) }}
               style={{ padding: '7px 11px', background: GOLD, color: '#0a0a0f', border: 'none', borderRadius: 9, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>
               <i className="ti ti-arrows-move" /> Relocate
             </button>
           )}
           {relocating && (
-            <button className="btn btn-dark" onClick={() => { sfx.tap(); setRelocating(false) }} style={{ padding: '7px 11px', fontSize: 11 }}>
+            <button className="btn btn-dark" onClick={(e) => { e.stopPropagation(); sfx.tap(); setRelocating(false) }} style={{ padding: '7px 11px', fontSize: 11 }}>
               Cancel
             </button>
           )}
