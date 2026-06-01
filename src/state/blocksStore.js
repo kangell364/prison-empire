@@ -19,6 +19,7 @@
 
 import { useEffect, useState } from 'react'
 import { addHustle, spendHustle } from './profileStore'
+import { gangBlockIncomeMult } from './gangStore'
 import { getProgress } from './progressionStore'
 
 // One block = the "merged 4×4" unit (~1.8km / ~1.1mi across — a neighborhood).
@@ -250,12 +251,14 @@ export function collect(gx, gy) {
 
 // Total Hustle/hr across every block you hold.
 export function yourBlockIncomePerHr() {
-  return yourBlocks().reduce((sum, b) => sum + (b.incomePerHr || 0), 0)
+  const base = yourBlocks().reduce((sum, b) => sum + (b.incomePerHr || 0), 0)
+  return Math.round(base * gangBlockIncomeMult())
 }
 
 // Total uncollected (pending) Hustle waiting across all your blocks.
 export function yourPendingIncome() {
-  return yourBlocks().reduce((sum, b) => sum + pendingIncome(b.gx, b.gy), 0)
+  const base = yourBlocks().reduce((sum, b) => sum + pendingIncome(b.gx, b.gy), 0)
+  return Math.round(base * gangBlockIncomeMult())
 }
 
 // Bank pending income from ALL your blocks in one pass (single credit + commit).
@@ -269,6 +272,7 @@ export function collectAllBlocks() {
     const got = pendingIncome(gx, gy)
     if (got > 0) { total += got; o.lastCollectedAt = now }
   }
+  total = Math.round(total * gangBlockIncomeMult())   // gang 'plug' perk boost
   if (total > 0) { addHustle(total); commit() }
   return total
 }

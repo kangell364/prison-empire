@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { PLAYER, CARDS_COLLECTION, RARITY_COLORS } from '../data/gameData'
-import { useDisplayName, useSteel, spendSteel } from '../state/profileStore'
+import { useDisplayName, useSteel, spendSteel, useHustle, spendHustle } from '../state/profileStore'
 import { useProgress } from '../state/progressionStore'
 import { baseAtk, baseDef, atkOf, defOf } from '../state/crewStore'
 import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
@@ -10,6 +10,8 @@ import {
   foundGang, joinGang, applyToGang, leaveGang,
   kickMember, promoteMember, demoteMember, addCardMember,
   setEnrollment, setMinLevel, syncPlayerMember,
+  donateToTreasury, buyPerk, getContribution,
+  PERKS, perkCost,
   CREATE_MIN_LEVEL, FOUND_COST_STEEL, ROLES, ENROLLMENT, PLAYER_MEMBER_ID,
 } from '../state/gangStore'
 import { sfx } from '../sounds'
@@ -250,6 +252,12 @@ function GangHub({ gang, player }) {
         </div>
       </div>
 
+      {/* Treasury */}
+      <Treasury gang={gang} />
+
+      {/* Perks */}
+      <Perks gang={gang} boss={boss} />
+
       {/* OG controls */}
       {boss && <OgControls gang={gang} />}
 
@@ -285,6 +293,109 @@ function GangHub({ gang, player }) {
 
       {showPicker && <CardPickerModal gang={gang} onClose={() => setShowPicker(false)} />}
     </>
+  )
+}
+
+function Treasury({ gang }) {
+  const hustle = useHustle()
+  const [showDonate, setShowDonate] = useState(false)
+  const mine = getContribution(PLAYER_MEMBER_ID)
+  return (
+    <div className="section">
+      <div className="section-label">Treasury</div>
+      <div className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: `${GOLD}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <i className="ti ti-flame" style={{ color: GOLD, fontSize: 22 }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: '#fff', fontSize: 20, fontWeight: 700 }}>{(gang.treasury || 0).toLocaleString()}</div>
+          <div style={{ color: DIM, fontSize: 11, marginTop: 1 }}>Gang Hustle · you gave {mine.toLocaleString()}</div>
+        </div>
+        <button className="btn btn-gold" onClick={() => { sfx.tap?.(); setShowDonate(true) }} style={{ padding: '9px 14px', flexShrink: 0 }}>
+          Donate
+        </button>
+      </div>
+      {showDonate && <DonateModal hustle={hustle} onClose={() => setShowDonate(false)} />}
+    </div>
+  )
+}
+
+function DonateModal({ hustle, onClose }) {
+  const [amt, setAmt] = useState('')
+  const n = Math.max(0, Math.floor(Number(amt) || 0))
+  const quick = [100, 1000, 10000]
+  const donate = () => {
+    const give = Math.min(n, hustle)
+    if (give <= 0) { sfx.deny?.(); return }
+    if (!spendHustle(give)) { sfx.deny?.(); return }
+    donateToTreasury(give)
+    sfx.buy?.()
+    onClose()
+  }
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 320, padding: 16 }} onClick={onClose}>
+      <div className="card card-pad" style={{ width: '100%', maxWidth: 340 }} onClick={e => e.stopPropagation()}>
+        <div style={{ color: '#fff', fontSize: 17, fontWeight: 700, marginBottom: 4 }}>Donate Hustle</div>
+        <div style={{ color: DIM, fontSize: 12, marginBottom: 14 }}>You hold {hustle.toLocaleString()} Hustle</div>
+        <input value={amt} onChange={e => setAmt(e.target.value.replace(/[^0-9]/g, ''))} placeholder="Amount" inputMode="numeric" autoFocus style={inputStyle} />
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+          {quick.map(q => (
+            <button key={q} onClick={() => setAmt(String(Math.min(q, hustle)))} style={chipStyle}>+{q >= 1000 ? `${q / 1000}k` : q}</button>
+          ))}
+          <button onClick={() => setAmt(String(hustle))} style={chipStyle}>Max</button>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-dark" style={{ flex: 1, padding: 12 }} onClick={onClose}>Cancel</button>
+          <button className="btn btn-gold" style={{ flex: 1, padding: 12, opacity: n > 0 && hustle > 0 ? 1 : 0.5 }} disabled={!(n > 0 && hustle > 0)} onClick={donate}>
+            Donate {Math.min(n, hustle).toLocaleString()}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Perks({ gang, boss }) {
+  return (
+    <div className="section">
+      <div className="section-label">Perks</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {PERKS.map(perk => {
+          const level = gang.perks?.[perk.id] || 0
+          const maxed = level >= perk.maxLevel
+          const cost = maxed ? 0 : perkCost(perk, level)
+          const bonusNow = Math.round(level * perk.perLevel * 100)
+          const bonusNext = Math.round((level + 1) * perk.perLevel * 100)
+          const afford = (gang.treasury || 0) >= cost
+          const canBuy = boss && !maxed && afford
+          return (
+            <div key={perk.id} className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12 }}>
+              <div style={{ fontSize: 26, width: 34, textAlign: 'center' }}>{perk.emoji}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>
+                  {perk.name} <span style={{ color: DIM, fontSize: 11 }}>· Lv {level}/{perk.maxLevel}</span>
+                </div>
+                <div style={{ color: GOLD, fontSize: 11, marginTop: 2 }}>
+                  +{bonusNow}% {perk.effect}{!maxed && <span style={{ color: DIM }}> → +{bonusNext}%</span>}
+                </div>
+              </div>
+              <button
+                className="btn"
+                onClick={() => { if (buyPerk(perk.id)) sfx.buy?.(); else sfx.deny?.() }}
+                disabled={!canBuy}
+                style={{
+                  flexShrink: 0, padding: '8px 12px', borderRadius: 10, fontSize: 11, fontWeight: 700, minWidth: 72,
+                  background: canBuy ? GOLD : '#1e1e2a', color: canBuy ? '#0a0a0f' : DIM,
+                  border: canBuy ? 'none' : '0.5px solid #2a2a3a', cursor: canBuy ? 'pointer' : 'default',
+                }}
+              >
+                {maxed ? 'MAX' : !boss ? 'OG only' : cost.toLocaleString()}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -408,3 +519,4 @@ function IconBtn({ icon, color, title, onClick }) {
   return <button title={title} onClick={onClick} style={{ width: 32, height: 32, borderRadius: 8, background: '#1e1e2a', border: `0.5px solid ${color}55`, color, fontSize: 14, cursor: 'pointer' }}><i className={`ti ${icon}`} /></button>
 }
 const inputStyle = { width: '100%', boxSizing: 'border-box', background: '#0a0a0f', border: '0.5px solid #2a2a3a', borderRadius: 10, padding: '11px 13px', color: '#fff', fontSize: 14, marginBottom: 14 }
+const chipStyle = { flex: 1, padding: '9px 2px', borderRadius: 10, background: '#13131f', border: '0.5px solid #2a2a3a', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }

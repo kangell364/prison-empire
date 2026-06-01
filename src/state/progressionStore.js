@@ -19,6 +19,7 @@ import {
 } from '../data/bossLadder'
 import { addHustle } from './profileStore'
 import { recordBossKo } from './fightLogStore'
+import { gangXpMult } from './gangStore'
 
 const KEY = 'pe_progression_v1'
 
@@ -107,7 +108,8 @@ export function recordHit(boss, dealt) {
 // many levels it covers. Negative (a lost attack) chips XP but NEVER de-levels —
 // it floors at the start of the current level. Returns levels gained (0 on loss).
 export function addXp(amount) {
-  const delta = Math.round(amount)
+  // Gang 'Jailhouse Lawyer' perk boosts XP gains (not losses).
+  const delta = Math.round(amount > 0 ? amount * gangXpMult() : amount)
   if (!delta) return 0
   let xp = state.xp + delta
   let level = state.level
@@ -146,8 +148,9 @@ function applyDefeat(boss) {
     ? state.defeated[tab]
     : [...(state.defeated[tab] || []), boss.slot]
 
-  // Bank XP and roll up however many levels it covers.
-  let xp = state.xp + boss.xp
+  // Bank XP and roll up however many levels it covers. Gang 'Jailhouse Lawyer'
+  // perk boosts the boss XP too.
+  let xp = state.xp + Math.round(boss.xp * gangXpMult())
   let level = state.level
   while (xp >= xpForLevel(level)) { xp -= xpForLevel(level); level++ }
 

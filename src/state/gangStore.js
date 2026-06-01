@@ -22,6 +22,16 @@ export const ROLES = { BOSS: 'boss', OFFICER: 'officer', MEMBER: 'member' }
 export const ENROLLMENT = { OPEN: 'open', APPLY: 'apply', INVITE: 'invite' }
 export const PLAYER_MEMBER_ID = 'player'
 
+// Gang perks — funded from the treasury, bought by the OG. Each adds a flat
+// `perLevel` bonus per level, up to `maxLevel`. The two shipped perks are wired
+// for real: 'plug' multiplies block income, 'lawyer' multiplies XP gains.
+export const PERKS = [
+  { id: 'plug',   name: 'The Plug',         emoji: '🔌', effect: 'Block income', perLevel: 0.10, maxLevel: 5, baseCost: 2000, growth: 1.8 },
+  { id: 'lawyer', name: 'Jailhouse Lawyer', emoji: '⚖️', effect: 'XP gained',    perLevel: 0.10, maxLevel: 5, baseCost: 2500, growth: 1.8 },
+]
+function perkById(id) { return PERKS.find(p => p.id === id) }
+export function perkCost(perk, level) { return Math.round(perk.baseCost * Math.pow(perk.growth, level)) }
+
 // ---- AI gang generation (browse list) -------------------------------
 const STREET_NAMES = [
   'Tiny', 'Lil Ghost', 'Big Sleep', 'Trigga', 'Smoke', 'Capone', 'Ice', 'Murda',
@@ -135,6 +145,49 @@ export function applicationStatus(gangId) {
   return (Date.now() - ts >= APPLY_DECISION_MS) ? 'accepted' : 'pending'
 }
 
+// ---- treasury + perks (reads) ---------------------------------------
+export function getTreasury()        { return state.myGang?.treasury || 0 }
+export function getPerkLevel(id)     { return state.myGang?.perks?.[id] || 0 }
+export function getContribution(mid) { return state.myGang?.contributions?.[mid] || 0 }
+
+// Multipliers other stores read (no React) to apply the active gang's perks.
+export function gangBlockIncomeMult() { return 1 + getPerkLevel('plug') * perkById('plug').perLevel }
+export function gangXpMult()          { return 1 + getPerkLevel('lawyer') * perkById('lawyer').perLevel }
+
+// ---- treasury + perks (writes) --------------------------------------
+
+// Donate to the treasury. The caller charges the player's Hustle first; this
+// just credits the pool and tracks who gave what.
+export function donateToTreasury(amount, memberId = PLAYER_MEMBER_ID) {
+  if (!state.myGang) return
+  const amt = Math.max(0, Math.floor(amount || 0))
+  if (!amt) return
+  const treasury = (state.myGang.treasury || 0) + amt
+  const contributions = { ...(state.myGang.contributions || {}) }
+  contributions[memberId] = (contributions[memberId] || 0) + amt
+  commit({ ...state, myGang: { ...state.myGang, treasury, contributions } })
+}
+
+// Buy the next level of a perk out of the treasury (OG-gated in the UI).
+export function buyPerk(perkId) {
+  if (!state.myGang) return false
+  const perk = perkById(perkId)
+  if (!perk) return false
+  const level = state.myGang.perks?.[perkId] || 0
+  if (level >= perk.maxLevel) return false
+  const cost = perkCost(perk, level)
+  if ((state.myGang.treasury || 0) < cost) return false
+  commit({
+    ...state,
+    myGang: {
+      ...state.myGang,
+      treasury: state.myGang.treasury - cost,
+      perks: { ...(state.myGang.perks || {}), [perkId]: level + 1 },
+    },
+  })
+  return true
+}
+
 // ---- writes ---------------------------------------------------------
 
 // Build the player's own member entry from live identity passed by the caller.
@@ -166,6 +219,9 @@ export function foundGang({ name, tag, crest, enrollment = ENROLLMENT.APPLY, min
     capacity: GANG_CAPACITY,
     members,
     power: gangPower(members),
+    treasury: 0,
+    perks: {},
+    contributions: {},
     founded: true,
   }
   commit({ ...state, myGang: gang })
