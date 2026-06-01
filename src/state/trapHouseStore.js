@@ -16,6 +16,10 @@ const KEY = 'pe_traphouse_v1'
 
 // ---- tuning knobs ---------------------------------------------------
 const START_PLOTS   = 3
+// Declared up here (NOT in the interior section below) because readInitial()
+// runs at module load and references it — a `const` declared later would be in
+// the temporal dead zone and crash the whole app at import time.
+const TABLE_START   = 1               // one free table
 export const PLOT_MAX = 9
 const SELL_PRICE     = 5          // Hustle per stash unit
 const PLOT_BASE_COST = 5000       // Hustle for the 4th plot, ×growth each after
@@ -180,7 +184,6 @@ export function buyUpgrade(kind, spend) {
 // the line and the sale credits the trap house BANK. The bank funds upgrades
 // (buy tables, +plants). Surplus later moves to a stash house (raidable).
 // =====================================================================
-const TABLE_START = 1                 // one free table
 export const TABLE_MAX = 5
 export const PLANTS_PER_LEVEL = 4     // each +plants upgrade adds 4 plant slots
 const CONTAINER_PER_PLANT = 6         // container holds this many units per plant
