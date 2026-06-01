@@ -316,6 +316,23 @@ export const PLAYER_LOOKS = [
   { id: 'look_133', name: 'Player Card 133', avatar: '/player-look-133.jpg', rarity: 'epic' },
   { id: 'look_134', name: 'Player Card 134', avatar: '/player-look-134.jpg', rarity: 'epic' },
   { id: 'look_135', name: 'Player Card 135', avatar: '/player-look-135.jpg', rarity: 'epic' },
+  { id: 'look_136', name: 'Player Card 136', avatar: '/player-look-136.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_137', name: 'Player Card 137', avatar: '/player-look-137.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_138', name: 'Player Card 138', avatar: '/player-look-138.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_139', name: 'Player Card 139', avatar: '/player-look-139.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_140', name: 'Player Card 140', avatar: '/player-look-140.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_141', name: 'Player Card 141', avatar: '/player-look-141.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_142', name: 'Player Card 142', avatar: '/player-look-142.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_143', name: 'Player Card 143', avatar: '/player-look-143.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_144', name: 'Player Card 144', avatar: '/player-look-144.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_145', name: 'Player Card 145', avatar: '/player-look-145.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_146', name: 'Player Card 146', avatar: '/player-look-146.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_147', name: 'Player Card 147', avatar: '/player-look-147.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_148', name: 'Player Card 148', avatar: '/player-look-148.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_149', name: 'Player Card 149', avatar: '/player-look-149.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_150', name: 'Player Card 150', avatar: '/player-look-150.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_151', name: 'Player Card 151', avatar: '/player-look-151.jpg', rarity: 'epic', sex: 'women' },
+  { id: 'look_152', name: 'Player Card 152', avatar: '/player-look-152.jpg', rarity: 'epic', sex: 'women' },
 ]
 export const DEFAULT_LOOK_ID = 'look_1'
 
