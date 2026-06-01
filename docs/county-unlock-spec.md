@@ -54,9 +54,41 @@ server-side dial — tune from telemetry once the real cap-vs-owned ratio is kno
 
 ## Clustered turf (block structure within a county)
 
-Keep the existing `0.004°` cell grid, but have NPCs own **clusters** of cells, not single
-cells. This makes a fresh county fast to fill (chunky grabs) and lets it deepen as it
-saturates — converging on today's per-cell grid.
+### DECIDED — MVP: merge the 4×4 into ONE block
+
+Ship this first. Instead of tracking 16 sub-cells per NPC, **redefine a "block" as the 4×4
+unit** — i.e. coarsen the grid from `0.004°` to `0.016°` (`GRID` constant in `blocksStore.js`).
+Each block then has:
+- **one NPC**, **one recruit card** (tap the block → the existing BlockSheet flow), **one
+  color fill** on recruit, and **one NPC icon near the block center**.
+- A real-world size of ~**1.1 mi** across (4 × ~440m) — a *neighborhood*, which reads far
+  better on the map and for GPS/real-location play than the tiny 440m cells.
+
+This is a small change: it's mostly the `GRID` value plus the recruit sheet that already
+exists. It drops the map to **~4.32M blocks** (69.1M ÷ 16), so the country map isn't a fog of
+tiny squares.
+
+**Capacity lever — pick the cap to match the feel you want** (same map, very different game):
+
+| Cap rule | Land per L100 player | Max L100 players (full US) |
+|---|---|---|
+| `25 × level` (today) | 2,500 blocks = 40,000 cells | **~1,727** (few, sprawling warlords) |
+| `400 × level` | 40,000 blocks | **~27,637** (many, neighborhood-sized turf) |
+
+Merging redefines what a "block" is, so the level cap now counts the *big* blocks — that's why
+`25 × level` yields ~1,727 maxed players, not 27,637. Scale the cap up if you want the higher
+headcount.
+
+**Trade-off:** a fixed 4×4 block drops the "deepens as it fills" subdivision below. That's the
+right MVP call (simpler, and the bigger blocks play better). The cluster/subdivision model is
+the **post-MVP evolution** — layer it back on when a hot block should split into four.
+
+### Post-MVP: clusters that subdivide as a county fills
+
+Keep the (now `0.016°`) block as the base unit, but let a saturated county **fracture its
+remaining NPC blocks into smaller ones** so density deepens with competition. Conceptually the
+same as keeping a finer grid where NPCs own **clusters** of cells that subdivide — fresh county
+chunky, full county fine.
 
 - **An NPC controls a cluster of cells.** Taking the NPC flips the whole cluster to you in one
   move. Cluster grain depends on the county's **local fill %** (see ladder).
