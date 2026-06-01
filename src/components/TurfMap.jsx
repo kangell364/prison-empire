@@ -60,7 +60,7 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack }) {
       // ~1.8km merged unit, a viewport holds 16× fewer, so you can pan/zoom way
       // out and still see colored turf (a generous metro-wide view). Past the cap
       // it's too zoomed out for blocks to be useful, so we stop drawing.
-      if ((x1 - x0) * (y1 - y0) > 2200) return
+      if ((x1 - x0) * (y1 - y0) > 3000) return
       const showIcons = map.getZoom() >= 13    // NPC icons only up close (perf + clutter)
       layer = L.layerGroup().addTo(map)
       for (let gx = x0; gx < x1; gx++) for (let gy = y0; gy < y1; gy++) {
