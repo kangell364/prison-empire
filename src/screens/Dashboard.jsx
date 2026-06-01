@@ -153,14 +153,13 @@ export default function Dashboard({ onNavigate }) {
       {/* Resources */}
       <div className="section">
         <div className="section-label">Commissary Store</div>
-        {/* STORE entry — tap the art to open the store view. Art is a placeholder
-            for now; another piece may replace it later. */}
+        {/* STORE entry — tap the art to open the store view. */}
         <div
           onClick={() => { sfx.tap?.(); setShowStore(true) }}
           className="card"
           style={{ overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
         >
-          <img src="/STORE.png" alt="Commissary Store"
+          <img src="/COMMISSARY.webp" alt="Commissary Store"
             style={{ display: 'block', width: '100%', height: 'auto' }} />
         </div>
       </div>
