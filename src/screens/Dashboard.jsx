@@ -12,6 +12,7 @@ import { Avatar, KoOverlay, KO_FILTER } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { SwapLookModal } from '../components/SwapLookModal'
 import { StoreModal } from '../components/StoreModal'
+import { useGang, GANG_CAPACITY } from '../state/gangStore'
 import { sfx } from '../sounds'
 
 export default function Dashboard({ onNavigate }) {
@@ -262,6 +263,12 @@ export default function Dashboard({ onNavigate }) {
         </div>
       </div>
 
+      {/* Your Gang — opens the full Gang view (found/join/manage). */}
+      <div className="section">
+        <div className="section-label">Your Gang</div>
+        <YourGangCard onNavigate={onNavigate} />
+      </div>
+
       {/* Leaderboard */}
       <div className="section">
         <div className="section-label">Texas Leaderboard</div>
@@ -388,4 +395,40 @@ function fmtCountdown(ms) {
   const m = Math.floor(total / 60)
   const s = total % 60
   return `${m}:${String(s).padStart(2, '0')}`
+}
+
+// Your Gang home card — shows your gang at a glance (or a join/found prompt),
+// and opens the full Gang view on tap.
+function YourGangCard({ onNavigate }) {
+  const { myGang } = useGang()
+  const open = () => { sfx.tap?.(); onNavigate('gang') }
+
+  if (!myGang) {
+    return (
+      <div onClick={open} className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}>
+        <div style={{ fontSize: 34 }}>🏴</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>You're not in a gang</div>
+          <div style={{ color: '#555', fontSize: 12, marginTop: 2 }}>Found your own or join one — tap to browse.</div>
+        </div>
+        <i className="ti ti-chevron-right" style={{ color: '#666', fontSize: 18 }} />
+      </div>
+    )
+  }
+
+  return (
+    <div onClick={open} className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}>
+      <div style={{ fontSize: 38, width: 46, textAlign: 'center' }}>{myGang.crest}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ color: '#fff', fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {myGang.name} <span style={{ color: '#555', fontSize: 11 }}>[{myGang.tag}]</span>
+        </div>
+        <div style={{ display: 'flex', gap: 12, marginTop: 3, color: '#555', fontSize: 12 }}>
+          <span>{myGang.members.length}/{GANG_CAPACITY} members</span>
+          <span style={{ color: '#c9a84c' }}>{myGang.power.toLocaleString()} PWR</span>
+        </div>
+      </div>
+      <i className="ti ti-chevron-right" style={{ color: '#666', fontSize: 18 }} />
+    </div>
+  )
 }
