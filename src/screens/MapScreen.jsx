@@ -7,6 +7,7 @@ import { ScoutScreen } from '../components/ScoutScreen'
 import { TurfMap } from '../components/TurfMap'
 import { BlockSheet } from '../components/BlockSheet'
 import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks } from '../state/blocksStore'
+import { useGang } from '../state/gangStore'
 import { useMapData, buildCityCountyMap, STATE_CODE_TO_FIPS, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
 import { knockOut } from '../state/vitalsStore'
 import { getBounty } from '../state/bountyStore'
@@ -298,7 +299,8 @@ function useDeviceLocation() {
 // ---------------------------------------------------------------------
 // MapScreen
 // ---------------------------------------------------------------------
-export default function MapScreen() {
+export default function MapScreen({ onNavigate }) {
+  const inGang = !!useGang().myGang   // trap house is gang-owned
   const [stateView, setStateView] = useState(null)          // null = country view
   const [turfView, setTurfView] = useState(null)            // Map 2 (turf map): { center:[lat,lng], label }
   const [blockSel, setBlockSel] = useState(null)            // tapped block { gx, gy }
@@ -782,6 +784,8 @@ export default function MapScreen() {
           counties={mapData?.counties}
           onBlockTap={(gx, gy) => setBlockSel({ gx, gy })}
           onBack={() => setTurfView(null)}
+          trapHouse={inGang && homeCoords ? { lat: homeCoords[1], lng: homeCoords[0] } : null}
+          onTrapHouseTap={() => onNavigate && onNavigate('traphouse')}
         />
       )}
 

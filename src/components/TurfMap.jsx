@@ -17,12 +17,14 @@ const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.pn
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
 const GOLD = '#c9a84c'
 
-export function TurfMap({ center, label, counties, onBlockTap, onBack }) {
+export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse, onTrapHouseTap }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const onBlockTapRef = useRef(onBlockTap)
+  const onTrapTapRef = useRef(onTrapHouseTap)
   const [countyName, setCountyName] = useState(label || '')   // live "which county am I in" HUD
   onBlockTapRef.current = onBlockTap
+  onTrapTapRef.current = onTrapHouseTap
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
@@ -86,6 +88,25 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack }) {
     return () => { map.off('moveend zoomend', draw); unsub(); if (layer) { try { map.removeLayer(layer) } catch {} } }
   }, [])
 
+  // Your gang's Trap House — a single marker at your home turf. Tap it to open
+  // the grow-and-sell shop. (Phase 2: map presence. Raids land in Phase 3.)
+  const tLat = trapHouse ? trapHouse.lat : null
+  const tLng = trapHouse ? trapHouse.lng : null
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || tLat == null || tLng == null) return
+    const icon = L.divIcon({
+      className: '', iconSize: [44, 52], iconAnchor: [22, 46],
+      html: `<div style="text-align:center;cursor:pointer">
+        <div style="width:38px;height:38px;border-radius:11px;background:#1a1510;border:2px solid ${GOLD};display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 2px 8px rgba(0,0,0,.7);margin:0 auto">🏚️</div>
+        <div style="margin:2px auto 0;width:8px;height:8px;background:${GOLD};transform:rotate(45deg);box-shadow:0 1px 3px rgba(0,0,0,.6)"></div>
+      </div>`,
+    })
+    const m = L.marker([tLat, tLng], { icon, zIndexOffset: 1000 }).addTo(map)
+    m.on('click', () => onTrapTapRef.current && onTrapTapRef.current())
+    return () => { try { map.removeLayer(m) } catch {} }
+  }, [tLat, tLng])
+
   // County borders + the live "which county am I in" HUD. Faint outlines for the
   // counties in view (so you can see where the lines are as you roam), the
   // county under the map CENTER highlighted gold, and its name pushed to the
@@ -138,6 +159,20 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack }) {
       </div>
       <div style={{ flex: 1, position: 'relative' }}>
         <div ref={containerRef} style={{ position: 'absolute', inset: 0, background: '#0d0d15' }} />
+        {/* Jump to your gang's Trap House on the map. */}
+        {trapHouse && (
+          <button
+            onClick={() => { const m = mapRef.current; if (m) m.flyTo([trapHouse.lat, trapHouse.lng], 15, { duration: 0.8 }) }}
+            style={{
+              position: 'absolute', bottom: 16, left: 12, zIndex: 500,
+              background: 'rgba(26,21,16,0.92)', border: `0.5px solid ${GOLD}88`, borderRadius: 10,
+              padding: '9px 13px', color: GOLD, fontSize: 12.5, fontWeight: 700, letterSpacing: 0.3,
+              boxShadow: '0 2px 8px rgba(0,0,0,.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            🏚️ My Trap House
+          </button>
+        )}
         {/* Live "you are in" county chip — updates as you pan across county lines. */}
         {countyName && (
           <div style={{

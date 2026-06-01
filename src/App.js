@@ -81,7 +81,7 @@ export default function App() {
   const renderScreen = () => {
     switch(screen) {
       case 'home':    return <Dashboard onNavigate={navigateTo} />
-      case 'map':     return <MapScreen />
+      case 'map':     return <MapScreen onNavigate={navigateTo} />
       case 'battle':  return <Fight />
       case 'cards':   return <Cards initialTab={cardsTab} />
       case 'yard':     return <Yard />
