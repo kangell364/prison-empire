@@ -27,6 +27,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   const [room, setRoom] = useState(0)
   const [land, setLand] = useState(isLandscape())
   const [rotated, setRotated] = useState(false)  // manual CSS rotate (works even with iOS orientation-lock on)
+  const [planted, setPlanted] = useState([])     // which plant slots are placed (each brings its bud + path)
 
   // True landscape — either the browser actually rotated, or we forced it via CSS.
   const wide = land || rotated
@@ -73,7 +74,10 @@ export default function TrapHouse({ onBack, isOwner = true }) {
       <div style={{ position: 'absolute', inset: 0 }}>
         {cur.key === 'shop' && <ShopFront art={cur.art} />}
         {cur.key === 'pack' && <PackingRoom />}
-        {cur.key === 'grow' && <GrowRoom />}
+        {cur.key === 'grow' && (
+          <GrowRoom planted={planted}
+            onFree={() => { sfx.buy?.(); setPlanted(p => p.includes('T1-P4') ? p : [...p, 'T1-P4']) }} />
+        )}
       </div>
 
       {/* Arrows — step between rooms. Left = toward the front, right = deeper. */}
@@ -193,9 +197,9 @@ const PLANT_SLOTS = GROW_TABLES
   .sort((a, b) => a.y - b.y)
 const plantW = (y) => 9.8 + 0.26 * (y - 47)    // plant width %, front (higher y) bigger
 
-// Which slots currently show a plant (preview while we place them one at a
-// time). Add/remove ids here, e.g. 'T1-P1'. Empty = no plants.
-const PLANTED = []
+// Which slots are planted is held in TrapHouse state (`planted`) and passed down,
+// so the FREE button (and future actions) can place plants at runtime. Each
+// placed slot brings its plant art + its bud + its bud-path.
 
 // Per-plant bud path — keyed by plant slot id, so each plant is self-contained:
 // its plant art, its bud, and its path/animation are locked together and run
@@ -226,15 +230,15 @@ const BIN_PILE = [
 ]
 const BINS_FULL = false  // preview: show every bin heaped with buds
 
-function GrowRoom() {
+function GrowRoom({ planted, onFree }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the plant overlays stay glued to the benches
           at any screen size / orientation. */}
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src="/grow-room.webp" alt="Grow Room" style={{ display: 'block', width: '100%', height: '100%' }} />
-        <BeltBud />
-        {PLANT_SLOTS.filter(s => PLANTED.includes(s.id)).map((s) => (
+        <BeltBud planted={planted} />
+        {PLANT_SLOTS.filter(s => planted.includes(s.id)).map((s) => (
           <img key={s.id} src="/plant.webp" alt="" aria-hidden data-slot={s.id}
             style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: `${plantW(s.y)}%`,
               transform: 'translate(-50%, -100%)', pointerEvents: 'none' }} />
@@ -249,11 +253,12 @@ function GrowRoom() {
           ))
         })}
 
-        {/* FREE button on Table 1's box — pulsing, ~box width. */}
-        {(() => {
+        {/* FREE button on Table 1's box — pulsing, ~box width. Places T1-P4 when
+            tapped, then disappears (the slot is now planted). */}
+        {!planted.includes('T1-P4') && (() => {
           const [x0, x1] = BINS[1]
           return (
-            <button onClick={() => sfx.tap?.()}
+            <button onClick={onFree}
               style={{ position: 'absolute', left: `${(x0 + x1) / 2}%`, top: '80%', transform: 'translate(-50%, -50%)',
                 width: `${((x1 - x0) * 0.9).toFixed(1)}%`, padding: '6px 0', borderRadius: 7,
                 background: '#2ecc71', color: '#063317', border: '1px solid #1f8a4a',
@@ -271,8 +276,8 @@ function GrowRoom() {
 // Each planted plant that has a bud-path runs its own bud down it, independently
 // of every other plant: back of belt → down the belt (growing with perspective)
 // → into the bin, where it vanishes. Keyframes + bud are keyed by plant slot id.
-function BeltBud() {
-  const active = Object.entries(BUD_PATHS).filter(([id]) => PLANTED.includes(id))
+function BeltBud({ planted }) {
+  const active = Object.entries(BUD_PATHS).filter(([id]) => planted.includes(id))
   const anim = (id) => `bud${id.replace(/-/g, '')}`
   const kf = active.map(([id, pts]) => {
     const frames = pts.map((p, i) => {
