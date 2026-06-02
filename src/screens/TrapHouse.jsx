@@ -323,9 +323,12 @@ function GrowRoom({ planted, bank, onPlace }) {
   )
 }
 
-// Every planted plant sends a bud down its table's shared bud-path (back of belt
-// → down the belt, growing with perspective → into the bin, where it vanishes).
-// Buds on the same table are staggered by plant number so they stay spaced out.
+// Buds ride their table's shared bud-path (back of belt → down the belt, growing
+// with perspective → into the bin). The path has FOUR evenly-spaced "lanes"
+// (phases at 0/25/50/75%); each plant is locked to one lane by its number. ALL
+// bud elements are mounted up front (hidden until their plant is placed) so the
+// animations stay phase-locked — the buds stay evenly spaced no matter when you
+// buy each plant.
 function BeltBud({ planted }) {
   const kf = Object.entries(BUD_PATHS).map(([t, pts]) => {
     const frames = pts.map((p, i) => {
@@ -340,14 +343,14 @@ function BeltBud({ planted }) {
     frames.splice(1, 0, '8% { opacity:1; }')   // fade in early
     return `@keyframes bud${t} { ${frames.join(' ')} }`
   }).join('\n')
-  const items = PLANT_SLOTS.filter(s => planted.includes(s.id) && BUD_PATHS[s.table])
   return (
     <>
       <style>{kf}</style>
-      {items.map(s => (
+      {PLANT_SLOTS.filter(s => BUD_PATHS[s.table]).map(s => (
         <img key={s.id} src="/bud.webp" alt="" aria-hidden data-bud={s.id}
           style={{ position: 'absolute', width: `${BUD_W}%`,
-            // stagger by plant number (1-4) so buds on one belt don't overlap
+            visibility: planted.includes(s.id) ? 'visible' : 'hidden',
+            // lane = plant number (1-4) → one of four evenly-spaced phases
             animation: `bud${s.table} ${BUD_SECS}s linear ${(-(s.plant - 1) * BUD_SECS / 4).toFixed(2)}s infinite`,
             pointerEvents: 'none' }} />
       ))}
