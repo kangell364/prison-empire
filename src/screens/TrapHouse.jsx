@@ -224,18 +224,17 @@ const plantW = (y) => 9.8 + 0.26 * (y - 47)    // plant width %, front (higher y
 // time). Add/remove ids here, e.g. 'T1-P1'. Empty = no plants.
 const PLANTED = ['T1-P4', 'T2-P4', 'T3-P4']
 
-// Belt item animation is on hold pending new art. The path data below is kept
-// for when it returns — each belt as % of the room-art box: back (far end) →
-// front (near edge, off the marked red centerline) → bin (the yellow box).
-/* PENDING-ART (belt item rides back→front then vanishes in the bin):
-const BELT_PATHS = {
-  1: { back: [33.3, 45.5], front: [24.7, 69.9], bin: [18.5, 77] },
-  2: { back: [54.5, 45.5], front: [55.6, 69.9], bin: [50.5, 77] },
-  3: { back: [76.5, 45.4], front: [88.2, 69.9], bin: [83.5, 77] },
+// Bud path per table — the marked red line, as a polyline of [x%, y%] waypoints
+// from the back of the belt, down the belt, and into the bin. A bud rides this
+// path then vanishes in the bin.
+const BUD_PATHS = {
+  1: [[30.0, 47.8], [27.1, 55.2], [23.9, 62.6], [21.1, 69.9], [20.6, 77.3], [20.1, 84.7]],
+  2: [[52.4, 48.0], [52.4, 55.4], [52.3, 62.8], [52.3, 70.2], [52.3, 77.6], [52.2, 85.0]],
+  3: [[75.2, 47.4], [78.3, 54.8], [81.8, 62.2], [85.2, 69.6], [85.3, 77.0], [85.3, 84.4]],
 }
-const BUD_W = 9         // item width, % of room-art box width
-const BELT_SECS = 3.0   // seconds for one full back→bin run (lower = faster)
-*/
+const BUD_W = 7         // bud width, % of room-art box width
+const BUD_SECS = 3.2    // seconds for one full run down the path
+const BUD_PCTS = [0, 20, 40, 58, 78, 100]  // keyframe % for the 6 waypoints
 
 // The collection bins (yellow boxes) at the front of each table: [x0, x1, yTop]
 // as % of the room-art box. A pile of buds fills each one when it's full.
@@ -249,7 +248,7 @@ const BIN_PILE = [
   [0.30, 2.4, 0.46], [0.70, 2.4, 0.46],
   [0.50, 4.0, 0.48],
 ]
-const BINS_FULL = true   // preview: show every bin heaped with buds
+const BINS_FULL = false  // preview: show every bin heaped with buds
 
 function GrowRoom({ house, onPlant }) {
   const tables = house.tables || []
@@ -259,8 +258,7 @@ function GrowRoom({ house, onPlant }) {
           at any screen size / orientation. */}
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src="/grow-room.webp" alt="Grow Room" style={{ display: 'block', width: '100%', height: '100%' }} />
-        {/* Belt item animation removed — waiting on new art. BELT_PATHS + the
-            ConveyorBelts component are kept below for when it's ready. */}
+        <BeltBud />
         {PLANT_SLOTS.filter(s => PLANTED.includes(s.id)).map((s) => (
           <img key={s.id} src="/plant.webp" alt="" aria-hidden data-slot={s.id}
             style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: `${plantW(s.y)}%`,
@@ -296,30 +294,33 @@ function GrowRoom({ house, onPlant }) {
   )
 }
 
-// PENDING-ART — belt item rides each belt's red centerline back→front (growing
-// with perspective) then drops into the bin and vanishes. Re-enable with the
-// new art by uncommenting this + BELT_PATHS above and <ConveyorBelts/> in GrowRoom.
-/*
-function ConveyorBelts() {
-  const kf = Object.entries(BELT_PATHS).map(([t, p]) => `
-    @keyframes bud${t} {
-      0%   { left:${p.back[0]}%;  top:${p.back[1]}%;  transform:translate(-50%,-88%) scale(.5);  opacity:0; }
-      10%  { opacity:1; }
-      72%  { left:${p.front[0]}%; top:${p.front[1]}%; transform:translate(-50%,-88%) scale(1);   opacity:1; }
-      100% { left:${p.bin[0]}%;   top:${p.bin[1]}%;   transform:translate(-50%,-60%) scale(.7);  opacity:0; }
-    }`).join('\n')
+// A bud rides each table's bud-path polyline from the back of the belt, down
+// the belt (growing with perspective), and into the bin where it vanishes.
+function BeltBud() {
+  const kf = Object.entries(BUD_PATHS).map(([t, pts]) => {
+    const frames = pts.map((p, i) => {
+      const pct = BUD_PCTS[i]
+      let extra = ''
+      if (i === 0) extra = ' transform:translate(-50%,-82%) scale(.45); opacity:0;'
+      else if (i === 3) extra = ' transform:translate(-50%,-82%) scale(1);'
+      else if (i === 4) extra = ' opacity:1;'
+      else if (i === pts.length - 1) extra = ' transform:translate(-50%,-55%) scale(.6); opacity:0;'
+      return `${pct}% { left:${p[0]}%; top:${p[1]}%;${extra} }`
+    })
+    frames.splice(1, 0, '8% { opacity:1; }')   // fade in early
+    return `@keyframes bud${t} { ${frames.join(' ')} }`
+  }).join('\n')
   return (
     <>
       <style>{kf}</style>
-      {Object.keys(BELT_PATHS).map(t => (
+      {Object.keys(BUD_PATHS).map(t => (
         <img key={t} src="/bud.webp" alt="" aria-hidden
           style={{ position: 'absolute', width: `${BUD_W}%`,
-            animation: `bud${t} ${BELT_SECS}s linear infinite`, pointerEvents: 'none' }} />
+            animation: `bud${t} ${BUD_SECS}s linear infinite`, pointerEvents: 'none' }} />
       ))}
     </>
   )
 }
-*/
 
 function TableSlot({ table, index, onPlant }) {
   if (!table) {
