@@ -237,6 +237,20 @@ const BUD_W = 9         // item width, % of room-art box width
 const BELT_SECS = 3.0   // seconds for one full back→bin run (lower = faster)
 */
 
+// The collection bins (yellow boxes) at the front of each table: [x0, x1, yTop]
+// as % of the room-art box. A pile of buds fills each one when it's full.
+const BINS = { 1: [7.7, 24.6, 70.7], 2: [42.1, 57.3, 71.0], 3: [76.4, 92.4, 71.2] }
+// Pile layout (back→front so nearer buds paint on top): [x-fraction across box,
+// dy% from rim, width as fraction of box width].
+const BIN_PILE = [
+  [0.18, -3.0, 0.34], [0.50, -3.4, 0.36], [0.82, -3.0, 0.34],
+  [0.34, -1.2, 0.40], [0.66, -1.2, 0.40],
+  [0.16, 0.6, 0.42], [0.50, 0.4, 0.46], [0.84, 0.6, 0.42],
+  [0.30, 2.4, 0.46], [0.70, 2.4, 0.46],
+  [0.50, 4.0, 0.48],
+]
+const BINS_FULL = true   // preview: show every bin heaped with buds
+
 function GrowRoom({ house, onPlant }) {
   const tables = house.tables || []
   return (
@@ -252,6 +266,15 @@ function GrowRoom({ house, onPlant }) {
             style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: `${plantW(s.y)}%`,
               transform: 'translate(-50%, -100%)', pointerEvents: 'none' }} />
         ))}
+        {/* Bins heaped full of buds. */}
+        {BINS_FULL && Object.values(BINS).flatMap(([x0, x1, yTop], b) => {
+          const bw = x1 - x0
+          return BIN_PILE.map(([xf, dy, wf], i) => (
+            <img key={`bin${b}-${i}`} src="/nug.webp" alt="" aria-hidden
+              style={{ position: 'absolute', left: `${x0 + bw * xf}%`, top: `${yTop + dy}%`, width: `${(wf * bw).toFixed(2)}%`,
+                transform: 'translate(-50%, -100%)', pointerEvents: 'none' }} />
+          ))
+        })}
       </div>
 
       {/* Interactive tables — docked above the room-dots bar, horizontally scrollable. */}
