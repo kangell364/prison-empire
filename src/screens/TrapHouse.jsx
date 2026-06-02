@@ -217,7 +217,7 @@ function GrowRoom({ house, onPlant }) {
         {PLANT_SPOTS.map((s, i) => (
           <img key={i} src="/plant.webp" alt="" aria-hidden
             style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: `${plantW(s.y)}%`,
-              transform: 'translate(-50%, -100%)', filter: 'drop-shadow(0 3px 4px rgba(0,0,0,0.35))', pointerEvents: 'none' }} />
+              transform: 'translate(-50%, -100%)', pointerEvents: 'none' }} />
         ))}
       </div>
 
