@@ -28,6 +28,15 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   const [land, setLand] = useState(isLandscape())
   const [rotated, setRotated] = useState(false)  // manual CSS rotate (works even with iOS orientation-lock on)
   const [planted, setPlanted] = useState([])     // which plant slots are placed (each brings its bud + path)
+  const [bank, setBank] = useState(10000)        // this store's bank balance ($)
+
+  // Place a plant slot, charging the bank (no-op if you can't afford it).
+  const placeSlot = (slot, cost) => {
+    if (bank < cost || planted.includes(slot)) return
+    setBank(b => b - cost)
+    setPlanted(p => [...p, slot])
+    sfx.buy?.()
+  }
 
   // True landscape — either the browser actually rotated, or we forced it via CSS.
   const wide = land || rotated
@@ -74,10 +83,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
       <div style={{ position: 'absolute', inset: 0 }}>
         {cur.key === 'shop' && <ShopFront art={cur.art} />}
         {cur.key === 'pack' && <PackingRoom />}
-        {cur.key === 'grow' && (
-          <GrowRoom planted={planted}
-            onFree={() => { sfx.buy?.(); setPlanted(p => p.includes('T1-P4') ? p : [...p, 'T1-P4']) }} />
-        )}
+        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} />}
       </div>
 
       {/* Arrows — step between rooms. Left = toward the front, right = deeper. */}
@@ -106,6 +112,11 @@ export default function TrapHouse({ onBack, isOwner = true }) {
             <i className={rotated ? 'ti ti-minimize' : 'ti ti-device-mobile-rotated'} style={{ color: rotated ? '#0a0a0f' : GOLD, fontSize: 17 }} />
           </button>
         )}
+        {/* Bank balance for this store. */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', background: 'rgba(26,21,16,0.85)', border: `0.5px solid ${GOLD}55`, borderRadius: 10, padding: '4px 11px' }}>
+          <span style={{ color: DIM, fontSize: 8, fontWeight: 700, letterSpacing: 1 }}>BANK</span>
+          <span style={{ color: GREEN, fontWeight: 800, fontSize: 14, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>${bank.toLocaleString()}</span>
+        </div>
       </div>
 
       {/* Floating room dots + hint — padded for the home indicator + side cutout. */}
@@ -202,19 +213,27 @@ const plantW = (y) => 9.8 + 0.26 * (y - 47)    // plant width %, front (higher y
 // placed slot brings its plant art + its bud + its bud-path.
 
 // Per-plant bud path — keyed by plant slot id, so each plant is self-contained:
-// its plant art, its bud, and its path/animation are locked together and run
-// independently of every other plant. Each path is the marked red line as a
-// polyline of [x%, y%] waypoints (back of belt → down the belt → into the bin).
-// Add an entry when a plant slot gets its path; a planted slot with no path here
-// just shows the plant (no bud yet).
+// One bud path per TABLE (the marked red line) — every plant on a table shares
+// it; buds are staggered by plant number so they don't overlap. [x%, y%]
+// waypoints: back of belt → down the belt → into the bin.
 const BUD_PATHS = {
-  'T1-P4': [[30.0, 47.8], [27.1, 55.2], [23.9, 62.6], [21.1, 69.9], [20.6, 77.3], [20.1, 84.7]],
-  'T2-P4': [[52.4, 48.0], [52.4, 55.4], [52.3, 62.8], [52.3, 70.2], [52.3, 77.6], [52.2, 85.0]],
-  'T3-P4': [[75.2, 47.4], [78.3, 54.8], [81.8, 62.2], [85.2, 69.6], [85.3, 77.0], [85.3, 84.4]],
+  1: [[30.0, 47.8], [27.1, 55.2], [23.9, 62.6], [21.1, 69.9], [20.6, 77.3], [20.1, 84.7]],
+  2: [[52.4, 48.0], [52.4, 55.4], [52.3, 62.8], [52.3, 70.2], [52.3, 77.6], [52.2, 85.0]],
+  3: [[75.2, 47.4], [78.3, 54.8], [81.8, 62.2], [85.2, 69.6], [85.3, 77.0], [85.3, 84.4]],
 }
 const BUD_W = 5.7       // bud width, % of room-art box width (rotated art, 25% smaller)
 const BUD_SECS = 6.4    // seconds for one full run down the path (slower = smaller)
 const BUD_PCTS = [0, 20, 40, 58, 78, 100]  // keyframe % for the 6 waypoints
+
+// Table 1's box button ladder, in placement order. The button shows the next
+// unplaced step: FREE places it for $0; UPGRADE costs `cost` (needs the funds in
+// the bank); once all are placed the button reads TBC and is disabled.
+const T1_STEPS = [
+  { slot: 'T1-P4', cost: 0, free: true },
+  { slot: 'T1-P3', cost: 0 },
+  { slot: 'T1-P2', cost: 2000 },
+  { slot: 'T1-P1', cost: 4000 },
+]
 
 // The collection bins (yellow boxes) at the front of each table: [x0, x1, yTop]
 // as % of the room-art box. A pile of buds fills each one when it's full.
@@ -230,7 +249,7 @@ const BIN_PILE = [
 ]
 const BINS_FULL = false  // preview: show every bin heaped with buds
 
-function GrowRoom({ planted, onFree }) {
+function GrowRoom({ planted, bank, onPlace }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the plant overlays stay glued to the benches
@@ -253,18 +272,31 @@ function GrowRoom({ planted, onFree }) {
           ))
         })}
 
-        {/* FREE button on Table 1's box — pulsing, ~box width. Places T1-P4 when
-            tapped, then disappears (the slot is now planted). */}
-        {!planted.includes('T1-P4') && (() => {
+        {/* Table 1's box button — steps through FREE → UPGRADE $X → TBC, placing
+            a plant each tap. UPGRADE only lights up / clicks when you can afford it. */}
+        {(() => {
           const [x0, x1] = BINS[1]
+          const step = T1_STEPS.find(s => !planted.includes(s.slot))
+          const base = {
+            position: 'absolute', left: `${(x0 + x1) / 2}%`, top: '84%', transform: 'translate(-50%, -50%)',
+            width: `${((x1 - x0) * 0.765).toFixed(1)}%`, padding: '5px 0', borderRadius: 7,
+            fontWeight: 900, fontSize: 11, letterSpacing: 1, zIndex: 4,
+          }
+          if (!step) {
+            return <button disabled style={{ ...base, background: '#34322c', color: '#7a766a', border: '1px solid #4a463c', cursor: 'not-allowed' }}>TBC</button>
+          }
+          if (step.free) {
+            return <button onClick={() => onPlace(step.slot, 0)}
+              style={{ ...base, background: '#2ecc71', color: '#063317', border: '1px solid #1f8a4a', cursor: 'pointer', animation: 'btnPulse 1.4s ease-in-out infinite' }}>FREE</button>
+          }
+          const afford = bank >= step.cost
           return (
-            <button onClick={onFree}
-              style={{ position: 'absolute', left: `${(x0 + x1) / 2}%`, top: '80%', transform: 'translate(-50%, -50%)',
-                width: `${((x1 - x0) * 0.9).toFixed(1)}%`, padding: '6px 0', borderRadius: 7,
-                background: '#2ecc71', color: '#063317', border: '1px solid #1f8a4a',
-                fontWeight: 900, fontSize: 13, letterSpacing: 1.5, cursor: 'pointer',
-                animation: 'freePulse 1.4s ease-in-out infinite', zIndex: 4 }}>
-              FREE
+            <button onClick={() => afford && onPlace(step.slot, step.cost)} disabled={!afford}
+              style={{ ...base,
+                background: afford ? GOLD : '#2a2722', color: afford ? '#1a1206' : '#6a665c',
+                border: `1px solid ${afford ? '#8a7330' : '#403c33'}`, cursor: afford ? 'pointer' : 'not-allowed',
+                animation: afford ? 'btnPulse 1.4s ease-in-out infinite' : 'none' }}>
+              UPGRADE ${step.cost.toLocaleString()}
             </button>
           )
         })()}
@@ -273,13 +305,11 @@ function GrowRoom({ planted, onFree }) {
   )
 }
 
-// Each planted plant that has a bud-path runs its own bud down it, independently
-// of every other plant: back of belt → down the belt (growing with perspective)
-// → into the bin, where it vanishes. Keyframes + bud are keyed by plant slot id.
+// Every planted plant sends a bud down its table's shared bud-path (back of belt
+// → down the belt, growing with perspective → into the bin, where it vanishes).
+// Buds on the same table are staggered by plant number so they stay spaced out.
 function BeltBud({ planted }) {
-  const active = Object.entries(BUD_PATHS).filter(([id]) => planted.includes(id))
-  const anim = (id) => `bud${id.replace(/-/g, '')}`
-  const kf = active.map(([id, pts]) => {
+  const kf = Object.entries(BUD_PATHS).map(([t, pts]) => {
     const frames = pts.map((p, i) => {
       const pct = BUD_PCTS[i]
       let extra = ''
@@ -290,15 +320,18 @@ function BeltBud({ planted }) {
       return `${pct}% { left:${p[0]}%; top:${p[1]}%;${extra} }`
     })
     frames.splice(1, 0, '8% { opacity:1; }')   // fade in early
-    return `@keyframes ${anim(id)} { ${frames.join(' ')} }`
+    return `@keyframes bud${t} { ${frames.join(' ')} }`
   }).join('\n')
+  const items = PLANT_SLOTS.filter(s => planted.includes(s.id) && BUD_PATHS[s.table])
   return (
     <>
       <style>{kf}</style>
-      {active.map(([id]) => (
-        <img key={id} src="/bud.webp" alt="" aria-hidden data-bud={id}
+      {items.map(s => (
+        <img key={s.id} src="/bud.webp" alt="" aria-hidden data-bud={s.id}
           style={{ position: 'absolute', width: `${BUD_W}%`,
-            animation: `${anim(id)} ${BUD_SECS}s linear infinite`, pointerEvents: 'none' }} />
+            // stagger by plant number (1-4) so buds on one belt don't overlap
+            animation: `bud${s.table} ${BUD_SECS}s linear ${(-(s.plant - 1) * BUD_SECS / 4).toFixed(2)}s infinite`,
+            pointerEvents: 'none' }} />
       ))}
     </>
   )
@@ -308,9 +341,9 @@ function Keyframes() {
   return (
     <style>{`
       @keyframes arrowPulse { 0%,100%{opacity:.7} 50%{opacity:1} }
-      @keyframes freePulse {
-        0%,100% { transform: translate(-50%,-50%) scale(1);    box-shadow: 0 0 0 0 rgba(46,204,113,.6); }
-        50%     { transform: translate(-50%,-50%) scale(1.07); box-shadow: 0 0 12px 4px rgba(46,204,113,.45); }
+      @keyframes btnPulse {
+        0%,100% { transform: translate(-50%,-50%) scale(1);    filter: brightness(1); }
+        50%     { transform: translate(-50%,-50%) scale(1.07); filter: brightness(1.18); }
       }
     `}</style>
   )
