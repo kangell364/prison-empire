@@ -248,6 +248,21 @@ function GrowRoom() {
                 transform: 'translate(-50%, -100%)', pointerEvents: 'none' }} />
           ))
         })}
+
+        {/* FREE button on Table 1's box — pulsing, ~box width. */}
+        {(() => {
+          const [x0, x1] = BINS[1]
+          return (
+            <button onClick={() => sfx.tap?.()}
+              style={{ position: 'absolute', left: `${(x0 + x1) / 2}%`, top: '80%', transform: 'translate(-50%, -50%)',
+                width: `${((x1 - x0) * 0.9).toFixed(1)}%`, padding: '6px 0', borderRadius: 7,
+                background: '#2ecc71', color: '#063317', border: '1px solid #1f8a4a',
+                fontWeight: 900, fontSize: 13, letterSpacing: 1.5, cursor: 'pointer',
+                animation: 'freePulse 1.4s ease-in-out infinite', zIndex: 4 }}>
+              FREE
+            </button>
+          )
+        })()}
       </div>
     </div>
   )
@@ -288,6 +303,10 @@ function Keyframes() {
   return (
     <style>{`
       @keyframes arrowPulse { 0%,100%{opacity:.7} 50%{opacity:1} }
+      @keyframes freePulse {
+        0%,100% { transform: translate(-50%,-50%) scale(1);    box-shadow: 0 0 0 0 rgba(46,204,113,.6); }
+        50%     { transform: translate(-50%,-50%) scale(1.07); box-shadow: 0 0 12px 4px rgba(46,204,113,.45); }
+      }
     `}</style>
   )
 }
