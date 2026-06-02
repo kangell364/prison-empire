@@ -233,9 +233,9 @@ const PLANTED = [
 // running (toward the front, heading to packing). Quad corners are % of the
 // room-art box: back-left, back-right, front-right, front-left.
 const BELT_QUADS = {
-  1: '29% 48%, 34% 46.5%, 26% 64%, 20.5% 62.5%',
-  2: '47% 47%, 54.5% 46.5%, 56% 67%, 49.5% 67%',
-  3: '71% 47%, 76.5% 50%, 87% 64%, 81% 61%',
+  1: '28.4% 45.3%, 33.6% 45.3%, 25.4% 67.6%, 18.9% 67.6%',
+  2: '49.2% 45.4%, 54.8% 45.4%, 55.4% 68%, 48.2% 68%',
+  3: '71.6% 45.3%, 76.4% 45.3%, 87.4% 68%, 80.4% 68%',
 }
 const BELT_SECS = 0.8     // seconds per seam cycle (lower = faster belt)
 
