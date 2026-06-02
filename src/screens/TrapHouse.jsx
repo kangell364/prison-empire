@@ -222,7 +222,7 @@ const plantW = (y) => 9.8 + 0.26 * (y - 47)    // plant width %, front (higher y
 
 // Which slots currently show a plant (preview while we place them one at a
 // time). Add/remove ids here, e.g. 'T1-P1'. Empty = no plants.
-const PLANTED = ['T1-P4', 'T2-P4', 'T3-P4']
+const PLANTED = []
 
 // Per-plant bud path — keyed by plant slot id, so each plant is self-contained:
 // its plant art, its bud, and its path/animation are locked together and run
