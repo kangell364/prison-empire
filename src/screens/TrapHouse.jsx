@@ -223,10 +223,10 @@ const BUD_PATHS = {
 }
 const BUD_W = 5.7       // bud width, % of room-art box width (rotated art, 25% smaller)
 const BUD_SECS = 25.6   // seconds for one full run down the path (higher = slower)
-// Keyframe % for the 6 waypoints. Belt travel (pts 0–3) takes ~96.7% of the run
-// (slow); the drop into the box (pts 3→4→5) is squeezed into the last ~3.3% so
-// the bud falls fast (≈3× the previous fall speed) once it hits the belt edge.
-const BUD_PCTS = [0, 32, 65, 96.7, 98.35, 100]
+// Keyframe % for the 6 waypoints. Belt travel (pts 0–3) takes ~98.9% of the run
+// (slow); the drop into the box (pts 3→4→5) is squeezed into the last ~1.1% so
+// the bud snaps into the box fast once it hits the belt edge.
+const BUD_PCTS = [0, 33, 66, 98.9, 99.45, 100]
 
 // Per-table box-button ladders, in placement order. Each button shows the next
 // unplaced step: FREE places for $0; UPGRADE costs `cost` (needs the funds in the
