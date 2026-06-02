@@ -194,11 +194,29 @@ function PackingRoom() {
 // The working production floor. The room art shows the grow benches; the
 // interactive tables dock along the bottom over a scrim so they stay readable.
 // Tables grow product into containers; the worker hauls full ones to the bank.
+
+// PREVIEW (not locked): 4 plants per bench, evenly spread, pot bases on the
+// table tops. Coordinates are % of the room-art box (1600x905); easy to nudge.
+const PLANT_W = 9.5            // plant width, % of the room-art box
+const PLANT_BASE_Y = 66        // pot base sits here, % from top
+const BENCHES = [[0.10, 0.34], [0.39, 0.63], [0.66, 0.90]]   // [x0,x1] of each bench
+const PLANT_SPOTS = BENCHES.flatMap(([x0, x1]) =>
+  [0, 1, 2, 3].map(i => (x0 + (x1 - x0) * (i + 0.5) / 4) * 100))   // 4 even x-centers per bench
+
 function GrowRoom({ house, onPlant }) {
   const tables = house.tables || []
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <img src="/grow-room.webp" alt="Grow Room" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
+      {/* Aspect-locked room box so the plant overlays stay glued to the benches
+          at any screen size / orientation. */}
+      <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
+        <img src="/grow-room.webp" alt="Grow Room" style={{ display: 'block', width: '100%', height: '100%' }} />
+        {PLANT_SPOTS.map((cx, i) => (
+          <img key={i} src="/plant.webp" alt="" aria-hidden
+            style={{ position: 'absolute', left: `${cx}%`, top: `${PLANT_BASE_Y}%`, width: `${PLANT_W}%`,
+              transform: 'translate(-50%, -100%)', filter: 'drop-shadow(0 3px 4px rgba(0,0,0,0.35))', pointerEvents: 'none' }} />
+        ))}
+      </div>
 
       {/* Interactive tables — docked above the room-dots bar, horizontally scrollable. */}
       <div style={{ position: 'absolute', left: 0, right: 0, bottom: 'calc(34px + env(safe-area-inset-bottom))', padding: '10px 12px 12px',
