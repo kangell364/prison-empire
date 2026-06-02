@@ -17,6 +17,12 @@ const DIM = '#7a7468'
 
 function cardOf(id) { return CARDS_COLLECTION.find(c => c.id === id) }
 
+function isLandscape() {
+  if (typeof window === 'undefined') return false
+  try { if (window.matchMedia) return window.matchMedia('(orientation: landscape)').matches } catch {}
+  return window.innerWidth > window.innerHeight
+}
+
 // The operation, front-to-back. Product flows front-ward (grow → pack → shelf);
 // the player walks back-ward with the arrows to manage it. Each room has its own
 // full-screen art; rooms without art yet render a styled placeholder scene.
@@ -32,11 +38,29 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   const house = useTrapHouse()
   const [room, setRoom] = useState(0)
   const [picking, setPicking] = useState(null)   // table index being planted
+  const [land, setLand] = useState(isLandscape())
 
   // Keep the economy live the whole time the interior is open, regardless of
   // which room you're standing in.
   useEffect(() => { const t = setInterval(tickProduction, 1000); return () => clearInterval(t) }, [])
   useEffect(() => { const t = setInterval(() => { workerHaul() }, 3500); return () => clearInterval(t) }, [])
+
+  // Track orientation — the room art is a landscape scene, so turning the phone
+  // sideways lets it fill the whole screen for a bigger view. (No gate; the room
+  // is always usable, it just grows when you rotate.)
+  useEffect(() => {
+    const f = () => setLand(isLandscape())
+    const delayed = () => setTimeout(f, 250)   // mobile dims settle a beat late
+    window.addEventListener('resize', f)
+    window.addEventListener('orientationchange', delayed)
+    let mq
+    try { mq = window.matchMedia('(orientation: landscape)'); mq.addEventListener ? mq.addEventListener('change', f) : mq.addListener(f) } catch {}
+    return () => {
+      window.removeEventListener('resize', f)
+      window.removeEventListener('orientationchange', delayed)
+      try { mq && (mq.removeEventListener ? mq.removeEventListener('change', f) : mq.removeListener(f)) } catch {}
+    }
+  }, [])
 
   const cur = ROOMS[room]
   const go = (dir) => {
@@ -46,39 +70,44 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: '#0c0a08', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: '#0c0a08', overflow: 'hidden' }}>
       <Keyframes />
 
-      {/* Top bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'rgba(0,0,0,0.6)', zIndex: 5 }}>
+      {/* Room fills the whole screen as a backdrop — so it grows to fill the
+          display when the phone is turned sideways. Controls float on top. */}
+      <div style={{ position: 'absolute', inset: 0 }}>
+        {cur.key === 'shop' && <ShopFront art={cur.art} />}
+        {cur.key === 'pack' && <PackingRoom />}
+        {cur.key === 'grow' && <GrowRoom house={house} onPlant={(i) => { sfx.tap?.(); setPicking(i) }} />}
+      </div>
+
+      {/* Arrows — step between rooms. Left = toward the front, right = deeper. */}
+      {room > 0 && <RoomArrow side="left"  label={ROOMS[room - 1].name} onClick={() => go(-1)} />}
+      {room < ROOMS.length - 1 && <RoomArrow side="right" label={ROOMS[room + 1].name} onClick={() => go(1)} />}
+
+      {/* Floating top bar — padded for the notch / Dynamic Island + side cutout. */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 5, display: 'flex', alignItems: 'center', gap: 10,
+        padding: 'calc(8px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 10px calc(14px + env(safe-area-inset-left))',
+        background: 'linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0) 100%)' }}>
         <button className="btn btn-dark" onClick={onBack} style={{ padding: '6px 11px', fontSize: 12 }}>
           <i className="ti ti-arrow-left" /> Out
         </button>
         <div style={{ minWidth: 0 }}>
-          <div style={{ color: cur.accent, fontSize: 9, fontWeight: 800, letterSpacing: 1.5 }}>TRAP HOUSE</div>
-          <div style={{ color: '#fff', fontSize: 15, fontWeight: 700, lineHeight: 1.1 }}>{cur.name}</div>
+          <div style={{ color: cur.accent, fontSize: 9, fontWeight: 800, letterSpacing: 1.5, textShadow: '0 1px 3px #000' }}>TRAP HOUSE</div>
+          <div style={{ color: '#fff', fontSize: 15, fontWeight: 700, lineHeight: 1.1, textShadow: '0 1px 4px #000' }}>{cur.name}</div>
         </div>
         <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#1a1510', border: `0.5px solid ${GOLD}55`, borderRadius: 10, padding: '6px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(26,21,16,0.85)', border: `0.5px solid ${GOLD}55`, borderRadius: 10, padding: '6px 12px' }}>
           <i className="ti ti-cash" style={{ color: GOLD, fontSize: 15 }} />
           <span style={{ color: GOLD, fontWeight: 800, fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>{getBank().toLocaleString()}</span>
           <span style={{ color: DIM, fontSize: 10 }}>bank</span>
         </div>
       </div>
 
-      {/* Room stage */}
-      <div style={{ flex: 1, position: 'relative', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-        {cur.key === 'shop' && <ShopFront art={cur.art} />}
-        {cur.key === 'pack' && <PackingRoom />}
-        {cur.key === 'grow' && <GrowRoom house={house} onPlant={(i) => { sfx.tap?.(); setPicking(i) }} />}
-
-        {/* Arrows — step between rooms. Left = toward the front, right = deeper. */}
-        {room > 0 && <RoomArrow side="left"  label={ROOMS[room - 1].name} onClick={() => go(-1)} />}
-        {room < ROOMS.length - 1 && <RoomArrow side="right" label={ROOMS[room + 1].name} onClick={() => go(1)} />}
-      </div>
-
-      {/* Room dots + hint */}
-      <div style={{ padding: '7px 14px 9px', background: 'rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+      {/* Floating room dots + hint — padded for the home indicator + side cutout. */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+        padding: '14px calc(14px + env(safe-area-inset-right)) calc(9px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left))',
+        background: 'linear-gradient(0deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%)' }}>
         <div style={{ display: 'flex', gap: 7 }}>
           {ROOMS.map((r, i) => (
             <button key={r.key} onClick={() => { sfx.tap?.(); setRoom(i) }}
@@ -86,7 +115,12 @@ export default function TrapHouse({ onBack, isOwner = true }) {
                 background: i === room ? r.accent : '#3a352c' }} aria-label={r.name} />
           ))}
         </div>
-        <div style={{ color: DIM, fontSize: 10.5, textAlign: 'center', lineHeight: 1.4, maxWidth: 340 }}>{cur.hint}</div>
+        {/* Hint only in portrait (where there's room); nudge to rotate for a bigger view. */}
+        {!land && (
+          <div style={{ color: DIM, fontSize: 10.5, textAlign: 'center', lineHeight: 1.4, maxWidth: 340, textShadow: '0 1px 3px #000' }}>
+            {cur.hint} <span style={{ color: '#9a8' }}>· turn your phone sideways for a bigger view</span>
+          </div>
+        )}
       </div>
 
       {picking != null && (
@@ -101,7 +135,7 @@ function RoomArrow({ side, label, onClick }) {
   const isLeft = side === 'left'
   return (
     <button onClick={onClick}
-      style={{ position: 'absolute', [side]: 10, top: '50%', transform: 'translateY(-50%)', zIndex: 6,
+      style={{ position: 'absolute', [side]: `calc(10px + env(safe-area-inset-${side}))`, top: '50%', transform: 'translateY(-50%)', zIndex: 6,
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
         background: 'rgba(0,0,0,0.55)', border: '0.5px solid rgba(255,255,255,0.18)', borderRadius: 14,
         padding: '12px 9px', cursor: 'pointer', backdropFilter: 'blur(2px)', animation: 'arrowPulse 2.4s ease-in-out infinite' }}>
@@ -143,8 +177,8 @@ function GrowRoom({ house, onPlant }) {
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <img src="/grow-room.webp" alt="Grow Room" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
 
-      {/* Interactive tables — docked along the bottom, horizontally scrollable. */}
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '10px 12px 12px',
+      {/* Interactive tables — docked above the room-dots bar, horizontally scrollable. */}
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 'calc(34px + env(safe-area-inset-bottom))', padding: '10px 12px 12px',
         background: 'linear-gradient(180deg, rgba(10,15,11,0) 0%, rgba(10,15,11,0.82) 38%)' }}>
         <div style={{ display: 'flex', gap: 10, overflowX: 'auto', alignItems: 'flex-end', paddingBottom: 2 }}>
           {tables.map((t, i) => <TableSlot key={i} table={t} index={i} onPlant={() => onPlant(i)} />)}
