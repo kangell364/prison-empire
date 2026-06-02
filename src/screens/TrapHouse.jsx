@@ -225,15 +225,31 @@ const BUD_W = 5.7       // bud width, % of room-art box width (rotated art, 25% 
 const BUD_SECS = 6.4    // seconds for one full run down the path (slower = smaller)
 const BUD_PCTS = [0, 20, 40, 58, 78, 100]  // keyframe % for the 6 waypoints
 
-// Table 1's box button ladder, in placement order. The button shows the next
-// unplaced step: FREE places it for $0; UPGRADE costs `cost` (needs the funds in
-// the bank); once all are placed the button reads TBC and is disabled.
-const T1_STEPS = [
-  { slot: 'T1-P4', cost: 0, free: true },
-  { slot: 'T1-P3', cost: 0 },
-  { slot: 'T1-P2', cost: 2000 },
-  { slot: 'T1-P1', cost: 4000 },
-]
+// Per-table box-button ladders, in placement order. Each button shows the next
+// unplaced step: FREE places for $0; UPGRADE costs `cost` (needs the funds in the
+// bank); once all are placed the button reads TBC. Table N's button only appears
+// once Table N-1 is fully unlocked (all 4 of its plants placed).
+const TABLE_STEPS = {
+  1: [
+    { slot: 'T1-P4', cost: 0, free: true },
+    { slot: 'T1-P3', cost: 0 },
+    { slot: 'T1-P2', cost: 2000 },
+    { slot: 'T1-P1', cost: 4000 },
+  ],
+  2: [
+    { slot: 'T2-P4', cost: 6000 },
+    { slot: 'T2-P3', cost: 8000 },
+    { slot: 'T2-P2', cost: 10000 },
+    { slot: 'T2-P1', cost: 12000 },
+  ],
+  3: [
+    { slot: 'T3-P4', cost: 24000 },
+    { slot: 'T3-P3', cost: 30000 },
+    { slot: 'T3-P2', cost: 36000 },
+    { slot: 'T3-P1', cost: 42000 },
+  ],
+}
+const tableComplete = (table, planted) => TABLE_STEPS[table].every(s => planted.includes(s.slot))
 
 // The collection bins (yellow boxes) at the front of each table: [x0, x1, yTop]
 // as % of the room-art box. A pile of buds fills each one when it's full.
@@ -272,26 +288,28 @@ function GrowRoom({ planted, bank, onPlace }) {
           ))
         })}
 
-        {/* Table 1's box button — steps through FREE → UPGRADE $X → TBC, placing
-            a plant each tap. UPGRADE only lights up / clicks when you can afford it. */}
-        {(() => {
-          const [x0, x1] = BINS[1]
-          const step = T1_STEPS.find(s => !planted.includes(s.slot))
+        {/* Box buttons — one per table. Each steps FREE → UPGRADE $X → TBC,
+            placing a plant per tap; UPGRADE lights/clicks only when affordable.
+            Table N's button appears only once Table N-1 is fully unlocked. */}
+        {[1, 2, 3].map(tbl => {
+          if (tbl > 1 && !tableComplete(tbl - 1, planted)) return null   // gate
+          const [x0, x1] = BINS[tbl]
+          const step = TABLE_STEPS[tbl].find(s => !planted.includes(s.slot))
           const base = {
             position: 'absolute', left: `${(x0 + x1) / 2}%`, top: '84%', transform: 'translate(-50%, -50%)',
             width: `${((x1 - x0) * 0.765).toFixed(1)}%`, padding: '5px 0', borderRadius: 7,
             fontWeight: 900, fontSize: 11, letterSpacing: 1, zIndex: 4,
           }
           if (!step) {
-            return <button disabled style={{ ...base, background: '#34322c', color: '#7a766a', border: '1px solid #4a463c', cursor: 'not-allowed' }}>TBC</button>
+            return <button key={tbl} disabled style={{ ...base, background: '#34322c', color: '#7a766a', border: '1px solid #4a463c', cursor: 'not-allowed' }}>TBC</button>
           }
           if (step.free) {
-            return <button onClick={() => onPlace(step.slot, 0)}
+            return <button key={tbl} onClick={() => onPlace(step.slot, 0)}
               style={{ ...base, background: '#2ecc71', color: '#063317', border: '1px solid #1f8a4a', cursor: 'pointer', animation: 'btnPulse 1.4s ease-in-out infinite' }}>FREE</button>
           }
           const afford = bank >= step.cost
           return (
-            <button onClick={() => afford && onPlace(step.slot, step.cost)} disabled={!afford}
+            <button key={tbl} onClick={() => afford && onPlace(step.slot, step.cost)} disabled={!afford}
               style={{ ...base,
                 background: afford ? GOLD : '#2a2722', color: afford ? '#1a1206' : '#6a665c',
                 border: `1px solid ${afford ? '#8a7330' : '#403c33'}`, cursor: afford ? 'pointer' : 'not-allowed',
@@ -299,7 +317,7 @@ function GrowRoom({ planted, bank, onPlace }) {
               UPGRADE ${step.cost.toLocaleString()}
             </button>
           )
-        })()}
+        })}
       </div>
     </div>
   )
