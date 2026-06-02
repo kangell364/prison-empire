@@ -232,7 +232,7 @@ const BUD_PATHS = {
   2: [[52.4, 48.0], [52.4, 55.4], [52.3, 62.8], [52.3, 70.2], [52.3, 77.6], [52.2, 85.0]],
   3: [[75.2, 47.4], [78.3, 54.8], [81.8, 62.2], [85.2, 69.6], [85.3, 77.0], [85.3, 84.4]],
 }
-const BUD_W = 7         // bud width, % of room-art box width
+const BUD_W = 5.7       // bud width, % of room-art box width (rotated art, 25% smaller)
 const BUD_SECS = 3.2    // seconds for one full run down the path
 const BUD_PCTS = [0, 20, 40, 58, 78, 100]  // keyframe % for the 6 waypoints
 
