@@ -195,13 +195,16 @@ function PackingRoom() {
 // interactive tables dock along the bottom over a scrim so they stay readable.
 // Tables grow product into containers; the worker hauls full ones to the bank.
 
-// PREVIEW (not locked): 4 plants per bench, evenly spread, pot bases on the
-// table tops. Coordinates are % of the room-art box (1600x905); easy to nudge.
-const PLANT_W = 10.7           // plant width, % of the room-art box
-const PLANT_BASE_Y = 58.5      // pot base sits on the table top, % from top
-const BENCHES = [[0.11, 0.36], [0.39, 0.63], [0.66, 0.90]]   // [x0,x1] of each table
-const PLANT_SPOTS = BENCHES.flatMap(([x0, x1]) =>
-  [0, 1, 2, 3].map(i => (x0 + (x1 - x0) * (i + 0.5) / 4) * 100))   // 4 even x-centers per bench
+// PREVIEW (not locked): plant spots taken straight off the red X marks on the
+// art — 4 per table, running front-to-back along each table's wooden strip.
+// {x,y} are pot-base % of the room-art box (1600x905). Sorted back-to-front so
+// nearer plants overlay; perspective sizing makes front plants larger.
+const PLANT_SPOTS = [
+  { x: 17.1, y: 62.7 }, { x: 20.3, y: 56.9 }, { x: 22.8, y: 52.0 }, { x: 25.1, y: 47.6 },  // left
+  { x: 44.5, y: 64.3 }, { x: 45.7, y: 57.1 }, { x: 46.8, y: 51.5 }, { x: 47.4, y: 46.6 },  // middle
+  { x: 70.4, y: 46.6 }, { x: 72.3, y: 51.6 }, { x: 74.3, y: 57.7 }, { x: 76.4, y: 64.7 },  // right
+].sort((a, b) => a.y - b.y)
+const plantW = (y) => 5.0 + 0.135 * (y - 47)   // plant width %, front (higher y) bigger
 
 function GrowRoom({ house, onPlant }) {
   const tables = house.tables || []
@@ -211,9 +214,9 @@ function GrowRoom({ house, onPlant }) {
           at any screen size / orientation. */}
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src="/grow-room.webp" alt="Grow Room" style={{ display: 'block', width: '100%', height: '100%' }} />
-        {PLANT_SPOTS.map((cx, i) => (
+        {PLANT_SPOTS.map((s, i) => (
           <img key={i} src="/plant.webp" alt="" aria-hidden
-            style={{ position: 'absolute', left: `${cx}%`, top: `${PLANT_BASE_Y}%`, width: `${PLANT_W}%`,
+            style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: `${plantW(s.y)}%`,
               transform: 'translate(-50%, -100%)', filter: 'drop-shadow(0 3px 4px rgba(0,0,0,0.35))', pointerEvents: 'none' }} />
         ))}
       </div>
