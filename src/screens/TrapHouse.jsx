@@ -233,9 +233,9 @@ const PLANTED = [
 // running (toward the front, heading to packing). Quad corners are % of the
 // room-art box: back-left, back-right, front-right, front-left.
 const BELT_QUADS = {
-  1: '28.9% 46.7%, 32.8% 46.7%, 40.7% 62.2%, 22.6% 62.2%',
-  2: '50.7% 47%, 54.4% 47%, 65.3% 62.2%, 50% 62.2%',
-  3: '73% 46.7%, 76.8% 46.7%, 91% 62.2%, 66.6% 62.2%',
+  1: '29% 48%, 34% 46.5%, 26% 64%, 20.5% 62.5%',
+  2: '47% 47%, 54.5% 46.5%, 56% 67%, 49.5% 67%',
+  3: '71% 47%, 76.5% 50%, 87% 64%, 81% 61%',
 }
 const BELT_SECS = 0.8     // seconds per seam cycle (lower = faster belt)
 
@@ -284,7 +284,7 @@ function ConveyorBelts() {
       {Object.entries(BELT_QUADS).map(([table, quad]) => (
         <div key={table} aria-hidden
           style={{ position: 'absolute', inset: 0, clipPath: `polygon(${quad})`, pointerEvents: 'none',
-            background: 'repeating-linear-gradient(180deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 11px, rgba(0,0,0,0.30) 11px, rgba(255,255,255,0.10) 13px, rgba(0,0,0,0) 16px)',
+            background: 'repeating-linear-gradient(180deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 11px, rgba(0,0,0,0.45) 11px, rgba(0,0,0,0.45) 13px, rgba(0,0,0,0) 16px)',
             animation: `beltScroll ${BELT_SECS}s linear infinite`, mixBlendMode: 'multiply' }} />
       ))}
     </>
