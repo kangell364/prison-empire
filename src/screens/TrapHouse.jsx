@@ -39,6 +39,10 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   const [room, setRoom] = useState(0)
   const [picking, setPicking] = useState(null)   // table index being planted
   const [land, setLand] = useState(isLandscape())
+  const [rotated, setRotated] = useState(false)  // manual CSS rotate (works even with iOS orientation-lock on)
+
+  // True landscape — either the browser actually rotated, or we forced it via CSS.
+  const wide = land || rotated
 
   // Keep the economy live the whole time the interior is open, regardless of
   // which room you're standing in.
@@ -69,8 +73,17 @@ export default function TrapHouse({ onBack, isOwner = true }) {
     sfx.tap?.(); setRoom(next)
   }
 
+  // When the phone won't auto-rotate (iOS orientation lock), the rotate button
+  // CSS-spins the whole interior 90° and swaps its dimensions, so holding the
+  // phone sideways shows a true fullscreen landscape room.
+  const containerStyle = rotated
+    ? { position: 'fixed', zIndex: 400, background: '#0c0a08', overflow: 'hidden',
+        width: '100vh', height: '100vw', top: '50%', left: '50%',
+        transform: 'translate(-50%, -50%) rotate(90deg)', transformOrigin: 'center center' }
+    : { position: 'fixed', inset: 0, zIndex: 400, background: '#0c0a08', overflow: 'hidden' }
+
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: '#0c0a08', overflow: 'hidden' }}>
+    <div style={containerStyle}>
       <Keyframes />
 
       {/* Room fills the whole screen as a backdrop — so it grows to fill the
@@ -97,6 +110,16 @@ export default function TrapHouse({ onBack, isOwner = true }) {
           <div style={{ color: '#fff', fontSize: 15, fontWeight: 700, lineHeight: 1.1, textShadow: '0 1px 4px #000' }}>{cur.name}</div>
         </div>
         <div style={{ flex: 1 }} />
+        {/* Rotate to fullscreen landscape — only when the browser isn't already
+            landscape (otherwise it'd double-rotate). Works with iOS lock on. */}
+        {!land && (
+          <button onClick={() => { sfx.tap?.(); setRotated(r => !r) }}
+            title={rotated ? 'Exit fullscreen' : 'Rotate to fullscreen'}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 9,
+              background: rotated ? GOLD : 'rgba(26,21,16,0.85)', border: `0.5px solid ${GOLD}55`, cursor: 'pointer' }}>
+            <i className={rotated ? 'ti ti-minimize' : 'ti ti-device-mobile-rotated'} style={{ color: rotated ? '#0a0a0f' : GOLD, fontSize: 17 }} />
+          </button>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(26,21,16,0.85)', border: `0.5px solid ${GOLD}55`, borderRadius: 10, padding: '6px 12px' }}>
           <i className="ti ti-cash" style={{ color: GOLD, fontSize: 15 }} />
           <span style={{ color: GOLD, fontWeight: 800, fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>{getBank().toLocaleString()}</span>
@@ -115,10 +138,10 @@ export default function TrapHouse({ onBack, isOwner = true }) {
                 background: i === room ? r.accent : '#3a352c' }} aria-label={r.name} />
           ))}
         </div>
-        {/* Hint only in portrait (where there's room); nudge to rotate for a bigger view. */}
-        {!land && (
+        {/* Hint only when not in the big landscape view (portrait, upright). */}
+        {!wide && (
           <div style={{ color: DIM, fontSize: 10.5, textAlign: 'center', lineHeight: 1.4, maxWidth: 340, textShadow: '0 1px 3px #000' }}>
-            {cur.hint} <span style={{ color: '#9a8' }}>· turn your phone sideways for a bigger view</span>
+            {cur.hint} <span style={{ color: '#9a8' }}>· tap ⟳ then turn the phone sideways for a bigger view</span>
           </div>
         )}
       </div>
