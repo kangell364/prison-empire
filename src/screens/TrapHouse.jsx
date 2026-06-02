@@ -222,27 +222,18 @@ const plantW = (y) => 9.8 + 0.26 * (y - 47)    // plant width %, front (higher y
 
 // Which slots currently show a plant (preview while we place them one at a
 // time). Add/remove ids here, e.g. 'T1-P1'. Empty = no plants.
-const PLANTED = [
-  'T1-P1', 'T1-P2', 'T1-P3', 'T1-P4',
-  'T2-P1', 'T2-P2', 'T2-P3', 'T2-P4',
-  'T3-P1', 'T3-P2', 'T3-P3', 'T3-P4',
-]
+const PLANTED = ['T1-P4', 'T2-P4', 'T3-P4']
 
-// Conveyor belts — the gray roller strip on each table. We overlay scrolling
-// seam-lines clipped to each belt's quad so the belt surface looks like it's
-// running (toward the front, heading to packing). Quad corners are % of the
-// room-art box: back-left, back-right, front-right, front-left.
-// Belt centerlines (back-center → front-center), derived from the marked red
-// box corners. A constant-width, always-horizontal yellow line rides this path:
-// its center follows the belt (shifting sideways with the lean) but it never
-// tilts or changes width.
+// Each belt's path as % of the room-art box: back (far end) → front (near edge,
+// off the marked red centerline) → bin (the yellow box). A bud rides back→front
+// down the belt, then drops into the bin and vanishes.
 const BELT_PATHS = {
-  1: { back: [33.3, 45.5], front: [24.7, 69.9] },
-  2: { back: [54.5, 45.5], front: [55.6, 69.9] },
-  3: { back: [76.5, 45.4], front: [88.2, 69.9] },
+  1: { back: [33.3, 45.5], front: [24.7, 69.9], bin: [18.5, 77] },
+  2: { back: [54.5, 45.5], front: [55.6, 69.9], bin: [50.5, 77] },
+  3: { back: [76.5, 45.4], front: [88.2, 69.9], bin: [83.5, 77] },
 }
 const BUD_W = 9         // bud width, % of room-art box width
-const BELT_SECS = 3.0   // seconds for one back→front pass (lower = faster)
+const BELT_SECS = 3.0   // seconds for one full back→bin run (lower = faster)
 
 function GrowRoom({ house, onPlant }) {
   const tables = house.tables || []
@@ -279,15 +270,16 @@ function GrowRoom({ house, onPlant }) {
   )
 }
 
-// A single bud rides down each table — travels the belt's centerline from back
-// to front, growing with perspective, fading in/out for a seamless loop.
+// A single bud rides down each table — travels the belt's red centerline from
+// back to front (growing with perspective), then drops into the bin and
+// vanishes. Loops.
 function ConveyorBelts() {
   const kf = Object.entries(BELT_PATHS).map(([t, p]) => `
     @keyframes bud${t} {
       0%   { left:${p.back[0]}%;  top:${p.back[1]}%;  transform:translate(-50%,-88%) scale(.5);  opacity:0; }
-      12%  { opacity:1; }
-      88%  { opacity:1; }
-      100% { left:${p.front[0]}%; top:${p.front[1]}%; transform:translate(-50%,-88%) scale(1);   opacity:0; }
+      10%  { opacity:1; }
+      72%  { left:${p.front[0]}%; top:${p.front[1]}%; transform:translate(-50%,-88%) scale(1);   opacity:1; }
+      100% { left:${p.bin[0]}%;   top:${p.bin[1]}%;   transform:translate(-50%,-60%) scale(.7);  opacity:0; }
     }`).join('\n')
   return (
     <>
