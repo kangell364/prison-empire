@@ -228,6 +228,17 @@ const PLANTED = [
   'T3-P1', 'T3-P2', 'T3-P3', 'T3-P4',
 ]
 
+// Conveyor belts: product rides each table's gray belt from the back toward the
+// front (heading to packing), growing with perspective. Endpoints are % of the
+// room-art box, fit to each belt's centerline off the art.
+const BELTS = [
+  { table: 1, back: [29.2, 46], front: [34.9, 64] },
+  { table: 2, back: [51.3, 46], front: [61.3, 64] },
+  { table: 3, back: [73.4, 46], front: [86.5, 64] },
+]
+const BELT_ITEMS = 3      // items riding each belt at once
+const BELT_SECS = 3.6     // seconds for one back→front trip
+
 function GrowRoom({ house, onPlant }) {
   const tables = house.tables || []
   return (
@@ -236,6 +247,7 @@ function GrowRoom({ house, onPlant }) {
           at any screen size / orientation. */}
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src="/grow-room.webp" alt="Grow Room" style={{ display: 'block', width: '100%', height: '100%' }} />
+        <ConveyorProduct />
         {PLANT_SLOTS.filter(s => PLANTED.includes(s.id)).map((s) => (
           <img key={s.id} src="/plant.webp" alt="" aria-hidden data-slot={s.id}
             style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: `${plantW(s.y)}%`,
@@ -259,6 +271,33 @@ function GrowRoom({ house, onPlant }) {
         </div>
       </div>
     </div>
+  )
+}
+
+// Animated product riding the conveyor belts — small buds travel back→front on
+// each belt, on a staggered loop, growing with perspective. Lives inside the
+// aspect box so its % coordinates line up with the belts.
+function ConveyorProduct() {
+  const keyframes = BELTS.map(b => `
+    @keyframes belt${b.table} {
+      0%   { left:${b.back[0]}%;  top:${b.back[1]}%;  transform:translate(-50%,-62%) scale(.55); opacity:0; }
+      10%  { opacity:1; }
+      90%  { opacity:1; }
+      100% { left:${b.front[0]}%; top:${b.front[1]}%; transform:translate(-50%,-62%) scale(1.05); opacity:0; }
+    }`).join('\n')
+  return (
+    <>
+      <style>{keyframes}</style>
+      {BELTS.flatMap(b => Array.from({ length: BELT_ITEMS }, (_, i) => (
+        <div key={`${b.table}-${i}`} aria-hidden
+          style={{ position: 'absolute', width: '3.2%', aspectRatio: '1.1 / 1',
+            borderRadius: '52% 52% 46% 46%',
+            background: 'radial-gradient(circle at 36% 30%, #86d18a 0%, #3a9d44 45%, #18491f 100%)',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.45)',
+            animation: `belt${b.table} ${BELT_SECS}s linear ${(i * BELT_SECS / BELT_ITEMS).toFixed(2)}s infinite`,
+            pointerEvents: 'none' }} />
+      )))}
+    </>
   )
 }
 
