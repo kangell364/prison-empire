@@ -294,8 +294,10 @@ function GrowRoom({ house, onPlant }) {
   )
 }
 
-// A bud rides each table's bud-path polyline from the back of the belt, down
-// the belt (growing with perspective), and into the bin where it vanishes.
+// Each planted plant sends a bud down its table's bud-path (back of belt → down
+// the belt, growing with perspective → into the bin, where it vanishes). The
+// keyframes are per-table (one path each); plants on the same table are
+// staggered by plant number so the buds flow continuously rather than overlap.
 function BeltBud() {
   const kf = Object.entries(BUD_PATHS).map(([t, pts]) => {
     const frames = pts.map((p, i) => {
@@ -310,13 +312,16 @@ function BeltBud() {
     frames.splice(1, 0, '8% { opacity:1; }')   // fade in early
     return `@keyframes bud${t} { ${frames.join(' ')} }`
   }).join('\n')
+  const planted = PLANT_SLOTS.filter(s => PLANTED.includes(s.id))
   return (
     <>
       <style>{kf}</style>
-      {Object.keys(BUD_PATHS).map(t => (
-        <img key={t} src="/bud.webp" alt="" aria-hidden
+      {planted.map(s => (
+        <img key={s.id} src="/bud.webp" alt="" aria-hidden data-bud={s.id}
           style={{ position: 'absolute', width: `${BUD_W}%`,
-            animation: `bud${t} ${BUD_SECS}s linear infinite`, pointerEvents: 'none' }} />
+            // stagger by plant number (1-4) so buds on one belt don't sync up
+            animation: `bud${s.table} ${BUD_SECS}s linear ${(-(s.plant - 1) * BUD_SECS / 4).toFixed(2)}s infinite`,
+            pointerEvents: 'none' }} />
       ))}
     </>
   )
