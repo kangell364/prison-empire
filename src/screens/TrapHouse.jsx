@@ -228,16 +228,16 @@ const PLANTED = [
   'T3-P1', 'T3-P2', 'T3-P3', 'T3-P4',
 ]
 
-// Conveyor belts: product rides each table's gray belt from the back toward the
-// front (heading to packing), growing with perspective. Endpoints are % of the
-// room-art box, fit to each belt's centerline off the art.
-const BELTS = [
-  { table: 1, back: [29.2, 46], front: [34.9, 64] },
-  { table: 2, back: [51.3, 46], front: [61.3, 64] },
-  { table: 3, back: [73.4, 46], front: [86.5, 64] },
-]
-const BELT_ITEMS = 3      // items riding each belt at once
-const BELT_SECS = 3.6     // seconds for one back→front trip
+// Conveyor belts — the gray roller strip on each table. We overlay scrolling
+// seam-lines clipped to each belt's quad so the belt surface looks like it's
+// running (toward the front, heading to packing). Quad corners are % of the
+// room-art box: back-left, back-right, front-right, front-left.
+const BELT_QUADS = {
+  1: '28.9% 46.7%, 32.8% 46.7%, 40.7% 62.2%, 22.6% 62.2%',
+  2: '50.7% 47%, 54.4% 47%, 65.3% 62.2%, 50% 62.2%',
+  3: '73% 46.7%, 76.8% 46.7%, 91% 62.2%, 66.6% 62.2%',
+}
+const BELT_SECS = 0.8     // seconds per seam cycle (lower = faster belt)
 
 function GrowRoom({ house, onPlant }) {
   const tables = house.tables || []
@@ -247,7 +247,7 @@ function GrowRoom({ house, onPlant }) {
           at any screen size / orientation. */}
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src="/grow-room.webp" alt="Grow Room" style={{ display: 'block', width: '100%', height: '100%' }} />
-        <ConveyorProduct />
+        <ConveyorBelts />
         {PLANT_SLOTS.filter(s => PLANTED.includes(s.id)).map((s) => (
           <img key={s.id} src="/plant.webp" alt="" aria-hidden data-slot={s.id}
             style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: `${plantW(s.y)}%`,
@@ -274,29 +274,19 @@ function GrowRoom({ house, onPlant }) {
   )
 }
 
-// Animated product riding the conveyor belts — small buds travel back→front on
-// each belt, on a staggered loop, growing with perspective. Lives inside the
-// aspect box so its % coordinates line up with the belts.
-function ConveyorProduct() {
-  const keyframes = BELTS.map(b => `
-    @keyframes belt${b.table} {
-      0%   { left:${b.back[0]}%;  top:${b.back[1]}%;  transform:translate(-50%,-62%) scale(.55); opacity:0; }
-      10%  { opacity:1; }
-      90%  { opacity:1; }
-      100% { left:${b.front[0]}%; top:${b.front[1]}%; transform:translate(-50%,-62%) scale(1.05); opacity:0; }
-    }`).join('\n')
+// Scrolling belt surface — for each table, a layer clipped to the belt quad
+// with repeating seam-lines that scroll toward the front, so the belt looks
+// like it's running. Lives inside the aspect box so the clip % line up.
+function ConveyorBelts() {
   return (
     <>
-      <style>{keyframes}</style>
-      {BELTS.flatMap(b => Array.from({ length: BELT_ITEMS }, (_, i) => (
-        <div key={`${b.table}-${i}`} aria-hidden
-          style={{ position: 'absolute', width: '3.2%', aspectRatio: '1.1 / 1',
-            borderRadius: '52% 52% 46% 46%',
-            background: 'radial-gradient(circle at 36% 30%, #86d18a 0%, #3a9d44 45%, #18491f 100%)',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.45)',
-            animation: `belt${b.table} ${BELT_SECS}s linear ${(i * BELT_SECS / BELT_ITEMS).toFixed(2)}s infinite`,
-            pointerEvents: 'none' }} />
-      )))}
+      <style>{`@keyframes beltScroll { from { background-position: 0 0; } to { background-position: 0 16px; } }`}</style>
+      {Object.entries(BELT_QUADS).map(([table, quad]) => (
+        <div key={table} aria-hidden
+          style={{ position: 'absolute', inset: 0, clipPath: `polygon(${quad})`, pointerEvents: 'none',
+            background: 'repeating-linear-gradient(180deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 11px, rgba(0,0,0,0.30) 11px, rgba(255,255,255,0.10) 13px, rgba(0,0,0,0) 16px)',
+            animation: `beltScroll ${BELT_SECS}s linear infinite`, mixBlendMode: 'multiply' }} />
+      ))}
     </>
   )
 }
