@@ -237,8 +237,9 @@ const BELT_PATHS = {
   2: { back: [54.5, 45.5], front: [55.6, 69.9] },
   3: { back: [76.5, 45.4], front: [88.2, 69.9] },
 }
-const BELT_LINE_W = 6.5   // yellow line width, % of room-art box (constant)
-const BELT_SECS = 1.4     // seconds for one back→front pass (lower = faster)
+const BELT_LINE_W = 6.5    // yellow line width, % of room-art box (constant)
+const BELT_SECS = 1.8      // seconds for one back→front pass (lower = faster)
+const BELT_LINE_COUNT = 3  // how many evenly-spaced lines ride each belt at once
 
 function GrowRoom({ house, onPlant }) {
   const tables = house.tables || []
@@ -290,12 +291,16 @@ function ConveyorBelts() {
   return (
     <>
       <style>{kf}</style>
-      {Object.keys(BELT_PATHS).map(t => (
-        <div key={t} aria-hidden
-          style={{ position: 'absolute', width: `${BELT_LINE_W}%`, height: '1.1%',
-            background: '#ffd400', borderRadius: '2px', transform: 'translate(-50%, -50%)',
-            animation: `beltY${t} ${BELT_SECS}s linear infinite`, pointerEvents: 'none' }} />
-      ))}
+      {Object.keys(BELT_PATHS).flatMap(t =>
+        Array.from({ length: BELT_LINE_COUNT }, (_, i) => (
+          <div key={`${t}-${i}`} aria-hidden
+            style={{ position: 'absolute', width: `${BELT_LINE_W}%`, height: '1.1%',
+              background: '#ffd400', borderRadius: '2px', transform: 'translate(-50%, -50%)',
+              // negative delay pre-distributes the lines evenly along the belt
+              animation: `beltY${t} ${BELT_SECS}s linear ${(-i * BELT_SECS / BELT_LINE_COUNT).toFixed(2)}s infinite`,
+              pointerEvents: 'none' }} />
+        ))
+      )}
     </>
   )
 }
