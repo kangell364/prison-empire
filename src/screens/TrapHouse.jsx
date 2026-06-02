@@ -222,7 +222,7 @@ const plantW = (y) => 9.8 + 0.26 * (y - 47)    // plant width %, front (higher y
 
 // Which slots currently show a plant (preview while we place them one at a
 // time). Add/remove ids here, e.g. 'T1-P1'. Empty = no plants.
-const PLANTED = ['T1-P4', 'T2-P4', 'T3-P4', 'T1-P3', 'T2-P3', 'T3-P3']
+const PLANTED = ['T1-P4', 'T2-P4', 'T3-P4', 'T1-P3', 'T2-P3', 'T3-P3', 'T1-P2', 'T2-P2', 'T3-P2']
 
 function GrowRoom({ house, onPlant }) {
   const tables = house.tables || []
