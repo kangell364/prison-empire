@@ -241,8 +241,15 @@ const BELT_PATHS = {
   2: { back: [54.5, 45.5], front: [55.6, 69.9] },
   3: { back: [76.5, 45.4], front: [88.2, 69.9] },
 }
-const BELT_LINE_W = 6.5   // yellow line width, % of room-art box (constant)
-const BELT_SECS = 1.4     // seconds for one back→front pass (lower = faster)
+const BELT_BOX = [1600, 905]  // room-art box px, for belt-angle math
+const SEG_LEN = 8.5       // marker length along the belt, % of box width
+const SEG_THICK = 1.3     // marker thickness, % of box height
+const BELT_SECS = 1.6     // seconds for one back→front pass (lower = faster)
+// Screen angle of a belt's red path (so the marker lies along it).
+const beltAngle = (p) => Math.atan2(
+  (p.front[1] - p.back[1]) / 100 * BELT_BOX[1],
+  (p.front[0] - p.back[0]) / 100 * BELT_BOX[0]
+) * 180 / Math.PI
 
 function GrowRoom({ house, onPlant }) {
   const tables = house.tables || []
@@ -279,25 +286,26 @@ function GrowRoom({ house, onPlant }) {
   )
 }
 
-// Moving belt line — a constant-width, always-horizontal yellow bar whose
-// center rides each belt's red centerline path from back to front (shifting
-// sideways with the lean, never tilting, never resizing). Fades in/out at the
-// ends so the loop is seamless.
+// Moving belt marker — a short yellow glow that rides each belt's red
+// centerline from back to front, oriented ALONG the line (so it traces the
+// path like a marker running down a track). Fades in/out for a seamless loop.
 function ConveyorBelts() {
   const kf = Object.entries(BELT_PATHS).map(([t, p]) => `
     @keyframes beltY${t} {
       0%   { left:${p.back[0]}%;  top:${p.back[1]}%;  opacity:0; }
-      14%  { opacity:1; }
-      86%  { opacity:1; }
+      12%  { opacity:1; }
+      88%  { opacity:1; }
       100% { left:${p.front[0]}%; top:${p.front[1]}%; opacity:0; }
     }`).join('\n')
   return (
     <>
       <style>{kf}</style>
-      {Object.keys(BELT_PATHS).map(t => (
+      {Object.entries(BELT_PATHS).map(([t, p]) => (
         <div key={t} aria-hidden
-          style={{ position: 'absolute', width: `${BELT_LINE_W}%`, height: '1.1%',
-            background: '#ffd400', borderRadius: '2px', transform: 'translate(-50%, -50%)',
+          style={{ position: 'absolute', width: `${SEG_LEN}%`, height: `${SEG_THICK}%`,
+            background: 'linear-gradient(90deg, rgba(255,212,0,0) 0%, #ffd400 45%, #fff3a0 55%, rgba(255,212,0,0) 100%)',
+            borderRadius: '3px',
+            transform: `translate(-50%, -50%) rotate(${beltAngle(p).toFixed(1)}deg)`,
             animation: `beltY${t} ${BELT_SECS}s linear infinite`, pointerEvents: 'none' }} />
       ))}
     </>
