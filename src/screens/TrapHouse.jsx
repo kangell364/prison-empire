@@ -28,7 +28,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   const [land, setLand] = useState(isLandscape())
   const [rotated, setRotated] = useState(false)  // manual CSS rotate (works even with iOS orientation-lock on)
   const [planted, setPlanted] = useState([])     // which plant slots are placed (each brings its bud + path)
-  const [bank, setBank] = useState(10000)        // this store's bank balance ($)
+  const [bank, setBank] = useState(200000)       // this store's bank balance ($) — full bank for testing
 
   // Place a plant slot, charging the bank (no-op if you can't afford it).
   const placeSlot = (slot, cost) => {
