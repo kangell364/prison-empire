@@ -232,12 +232,17 @@ const PLANTED = [
 // seam-lines clipped to each belt's quad so the belt surface looks like it's
 // running (toward the front, heading to packing). Quad corners are % of the
 // room-art box: back-left, back-right, front-right, front-left.
-const BELT_QUADS = {
-  1: '28.4% 45.3%, 33.6% 45.3%, 25.4% 67.6%, 18.9% 67.6%',
-  2: '49.2% 45.4%, 54.8% 45.4%, 55.4% 68%, 48.2% 68%',
-  3: '71.6% 45.3%, 76.4% 45.3%, 87.4% 68%, 80.4% 68%',
+// Belt centerlines (back-center → front-center), derived from the marked red
+// box corners. A constant-width, always-horizontal yellow line rides this path:
+// its center follows the belt (shifting sideways with the lean) but it never
+// tilts or changes width.
+const BELT_PATHS = {
+  1: { back: [33.3, 45.5], front: [24.7, 69.9] },
+  2: { back: [54.5, 45.5], front: [55.6, 69.9] },
+  3: { back: [76.5, 45.4], front: [88.2, 69.9] },
 }
-const BELT_SECS = 0.8     // seconds per seam cycle (lower = faster belt)
+const BELT_LINE_W = 6.5   // yellow line width, % of room-art box (constant)
+const BELT_SECS = 1.4     // seconds for one back→front pass (lower = faster)
 
 function GrowRoom({ house, onPlant }) {
   const tables = house.tables || []
@@ -274,18 +279,26 @@ function GrowRoom({ house, onPlant }) {
   )
 }
 
-// Scrolling belt surface — for each table, a layer clipped to the belt quad
-// with repeating seam-lines that scroll toward the front, so the belt looks
-// like it's running. Lives inside the aspect box so the clip % line up.
+// Moving belt line — a constant-width, always-horizontal yellow bar whose
+// center rides each belt's red centerline path from back to front (shifting
+// sideways with the lean, never tilting, never resizing). Fades in/out at the
+// ends so the loop is seamless.
 function ConveyorBelts() {
+  const kf = Object.entries(BELT_PATHS).map(([t, p]) => `
+    @keyframes beltY${t} {
+      0%   { left:${p.back[0]}%;  top:${p.back[1]}%;  opacity:0; }
+      14%  { opacity:1; }
+      86%  { opacity:1; }
+      100% { left:${p.front[0]}%; top:${p.front[1]}%; opacity:0; }
+    }`).join('\n')
   return (
     <>
-      <style>{`@keyframes beltScroll { from { background-position: 0 0; } to { background-position: 0 16px; } }`}</style>
-      {Object.entries(BELT_QUADS).map(([table, quad]) => (
-        <div key={table} aria-hidden
-          style={{ position: 'absolute', inset: 0, clipPath: `polygon(${quad})`, pointerEvents: 'none',
-            background: 'repeating-linear-gradient(180deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 11px, rgba(0,0,0,0.45) 11px, rgba(0,0,0,0.45) 13px, rgba(0,0,0,0) 16px)',
-            animation: `beltScroll ${BELT_SECS}s linear infinite`, mixBlendMode: 'multiply' }} />
+      <style>{kf}</style>
+      {Object.keys(BELT_PATHS).map(t => (
+        <div key={t} aria-hidden
+          style={{ position: 'absolute', width: `${BELT_LINE_W}%`, height: '1.1%',
+            background: '#ffd400', borderRadius: '2px', transform: 'translate(-50%, -50%)',
+            animation: `beltY${t} ${BELT_SECS}s linear infinite`, pointerEvents: 'none' }} />
       ))}
     </>
   )
