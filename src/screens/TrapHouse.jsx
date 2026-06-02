@@ -222,7 +222,11 @@ const plantW = (y) => 9.8 + 0.26 * (y - 47)    // plant width %, front (higher y
 
 // Which slots currently show a plant (preview while we place them one at a
 // time). Add/remove ids here, e.g. 'T1-P1'. Empty = no plants.
-const PLANTED = []
+const PLANTED = [
+  'T1-P1', 'T1-P2', 'T1-P3', 'T1-P4',
+  'T2-P1', 'T2-P2', 'T2-P3', 'T2-P4',
+  'T3-P1', 'T3-P2', 'T3-P3', 'T3-P4',
+]
 
 // Conveyor belts — the gray roller strip on each table. We overlay scrolling
 // seam-lines clipped to each belt's quad so the belt surface looks like it's
@@ -237,9 +241,8 @@ const BELT_PATHS = {
   2: { back: [54.5, 45.5], front: [55.6, 69.9] },
   3: { back: [76.5, 45.4], front: [88.2, 69.9] },
 }
-const BELT_LINE_W = 6.5    // yellow line width, % of room-art box (constant)
-const BELT_SECS = 1.8      // seconds for one back→front pass (lower = faster)
-const BELT_LINE_COUNT = 3  // how many evenly-spaced lines ride each belt at once
+const BELT_LINE_W = 6.5   // yellow line width, % of room-art box (constant)
+const BELT_SECS = 1.4     // seconds for one back→front pass (lower = faster)
 
 function GrowRoom({ house, onPlant }) {
   const tables = house.tables || []
@@ -291,16 +294,12 @@ function ConveyorBelts() {
   return (
     <>
       <style>{kf}</style>
-      {Object.keys(BELT_PATHS).flatMap(t =>
-        Array.from({ length: BELT_LINE_COUNT }, (_, i) => (
-          <div key={`${t}-${i}`} aria-hidden
-            style={{ position: 'absolute', width: `${BELT_LINE_W}%`, height: '1.1%',
-              background: '#ffd400', borderRadius: '2px', transform: 'translate(-50%, -50%)',
-              // negative delay pre-distributes the lines evenly along the belt
-              animation: `beltY${t} ${BELT_SECS}s linear ${(-i * BELT_SECS / BELT_LINE_COUNT).toFixed(2)}s infinite`,
-              pointerEvents: 'none' }} />
-        ))
-      )}
+      {Object.keys(BELT_PATHS).map(t => (
+        <div key={t} aria-hidden
+          style={{ position: 'absolute', width: `${BELT_LINE_W}%`, height: '1.1%',
+            background: '#ffd400', borderRadius: '2px', transform: 'translate(-50%, -50%)',
+            animation: `beltY${t} ${BELT_SECS}s linear infinite`, pointerEvents: 'none' }} />
+      ))}
     </>
   )
 }
