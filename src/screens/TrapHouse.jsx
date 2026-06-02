@@ -195,16 +195,34 @@ function PackingRoom() {
 // interactive tables dock along the bottom over a scrim so they stay readable.
 // Tables grow product into containers; the worker hauls full ones to the bank.
 
-// PREVIEW (not locked): plant spots taken straight off the red X marks on the
-// art — 4 per table, running front-to-back along each table's wooden strip.
-// {x,y} are pot-base % of the room-art box (1600x905). Sorted back-to-front so
-// nearer plants overlay; perspective sizing makes front plants larger.
-const PLANT_SPOTS = [
-  { x: 17.1, y: 62.7 }, { x: 20.3, y: 56.9 }, { x: 22.8, y: 52.0 }, { x: 25.1, y: 47.6 },  // left
-  { x: 44.5, y: 64.3 }, { x: 45.7, y: 57.1 }, { x: 46.8, y: 51.5 }, { x: 47.4, y: 46.6 },  // middle
-  { x: 70.4, y: 46.6 }, { x: 72.3, y: 51.6 }, { x: 74.3, y: 57.7 }, { x: 76.4, y: 64.7 },  // right
-].sort((a, b) => a.y - b.y)
+// Grow tables, named Table 1 (far left) → Table 2 (middle) → Table 3 (far
+// right). Each table has 4 plant slots numbered front-to-back: Plant 1 is
+// nearest the viewer (front of the table), Plant 4 is at the back by the window.
+// {x,y} = pot-base position as % of the room-art box (1600x905), read off the
+// marked art. Reference any slot as "Table X, Plant Y" (id `TX-PY`).
+const GROW_TABLES = [
+  { table: 1, slots: [
+    { plant: 1, x: 17.1, y: 62.7 }, { plant: 2, x: 20.3, y: 56.9 },
+    { plant: 3, x: 22.8, y: 52.0 }, { plant: 4, x: 25.1, y: 47.6 } ] },
+  { table: 2, slots: [
+    { plant: 1, x: 44.5, y: 64.3 }, { plant: 2, x: 45.7, y: 57.1 },
+    { plant: 3, x: 46.8, y: 51.5 }, { plant: 4, x: 47.4, y: 46.6 } ] },
+  { table: 3, slots: [
+    { plant: 1, x: 76.4, y: 64.7 }, { plant: 2, x: 74.3, y: 57.7 },
+    { plant: 3, x: 72.3, y: 51.6 }, { plant: 4, x: 70.4, y: 46.6 } ] },
+]
+
+// Flattened slots, each tagged with its id; sorted back-to-front so nearer
+// plants paint over farther ones. (To add plants one at a time later, filter
+// this list by which slots are actually planted.)
+const PLANT_SLOTS = GROW_TABLES
+  .flatMap(t => t.slots.map(s => ({ ...s, table: t.table, id: `T${t.table}-P${s.plant}` })))
+  .sort((a, b) => a.y - b.y)
 const plantW = (y) => 9.8 + 0.26 * (y - 47)    // plant width %, front (higher y) bigger
+
+// Which slots currently show a plant (preview while we place them one at a
+// time). Add/remove ids here, e.g. 'T1-P1'. Empty = no plants.
+const PLANTED = ['T1-P4', 'T2-P4', 'T3-P4']
 
 function GrowRoom({ house, onPlant }) {
   const tables = house.tables || []
@@ -214,8 +232,8 @@ function GrowRoom({ house, onPlant }) {
           at any screen size / orientation. */}
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src="/grow-room.webp" alt="Grow Room" style={{ display: 'block', width: '100%', height: '100%' }} />
-        {PLANT_SPOTS.map((s, i) => (
-          <img key={i} src="/plant.webp" alt="" aria-hidden
+        {PLANT_SLOTS.filter(s => PLANTED.includes(s.id)).map((s) => (
+          <img key={s.id} src="/plant.webp" alt="" aria-hidden data-slot={s.id}
             style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: `${plantW(s.y)}%`,
               transform: 'translate(-50%, -100%)', pointerEvents: 'none' }} />
         ))}
