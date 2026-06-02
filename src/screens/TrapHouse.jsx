@@ -204,7 +204,7 @@ const PLANT_SPOTS = [
   { x: 44.5, y: 64.3 }, { x: 45.7, y: 57.1 }, { x: 46.8, y: 51.5 }, { x: 47.4, y: 46.6 },  // middle
   { x: 70.4, y: 46.6 }, { x: 72.3, y: 51.6 }, { x: 74.3, y: 57.7 }, { x: 76.4, y: 64.7 },  // right
 ].sort((a, b) => a.y - b.y)
-const plantW = (y) => 10.8 + 0.29 * (y - 47)   // plant width %, front (higher y) bigger
+const plantW = (y) => 9.8 + 0.26 * (y - 47)    // plant width %, front (higher y) bigger
 
 function GrowRoom({ house, onPlant }) {
   const tables = house.tables || []
