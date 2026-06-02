@@ -224,16 +224,19 @@ const plantW = (y) => 9.8 + 0.26 * (y - 47)    // plant width %, front (higher y
 // time). Add/remove ids here, e.g. 'T1-P1'. Empty = no plants.
 const PLANTED = ['T1-P4', 'T2-P4', 'T3-P4']
 
-// Bud path per table — the marked red line, as a polyline of [x%, y%] waypoints
-// from the back of the belt, down the belt, and into the bin. A bud rides this
-// path then vanishes in the bin.
+// Per-plant bud path — keyed by plant slot id, so each plant is self-contained:
+// its plant art, its bud, and its path/animation are locked together and run
+// independently of every other plant. Each path is the marked red line as a
+// polyline of [x%, y%] waypoints (back of belt → down the belt → into the bin).
+// Add an entry when a plant slot gets its path; a planted slot with no path here
+// just shows the plant (no bud yet).
 const BUD_PATHS = {
-  1: [[30.0, 47.8], [27.1, 55.2], [23.9, 62.6], [21.1, 69.9], [20.6, 77.3], [20.1, 84.7]],
-  2: [[52.4, 48.0], [52.4, 55.4], [52.3, 62.8], [52.3, 70.2], [52.3, 77.6], [52.2, 85.0]],
-  3: [[75.2, 47.4], [78.3, 54.8], [81.8, 62.2], [85.2, 69.6], [85.3, 77.0], [85.3, 84.4]],
+  'T1-P4': [[30.0, 47.8], [27.1, 55.2], [23.9, 62.6], [21.1, 69.9], [20.6, 77.3], [20.1, 84.7]],
+  'T2-P4': [[52.4, 48.0], [52.4, 55.4], [52.3, 62.8], [52.3, 70.2], [52.3, 77.6], [52.2, 85.0]],
+  'T3-P4': [[75.2, 47.4], [78.3, 54.8], [81.8, 62.2], [85.2, 69.6], [85.3, 77.0], [85.3, 84.4]],
 }
 const BUD_W = 5.7       // bud width, % of room-art box width (rotated art, 25% smaller)
-const BUD_SECS = 3.2    // seconds for one full run down the path
+const BUD_SECS = 6.4    // seconds for one full run down the path (slower = smaller)
 const BUD_PCTS = [0, 20, 40, 58, 78, 100]  // keyframe % for the 6 waypoints
 
 // The collection bins (yellow boxes) at the front of each table: [x0, x1, yTop]
@@ -294,12 +297,13 @@ function GrowRoom({ house, onPlant }) {
   )
 }
 
-// Each planted plant sends a bud down its table's bud-path (back of belt → down
-// the belt, growing with perspective → into the bin, where it vanishes). The
-// keyframes are per-table (one path each); plants on the same table are
-// staggered by plant number so the buds flow continuously rather than overlap.
+// Each planted plant that has a bud-path runs its own bud down it, independently
+// of every other plant: back of belt → down the belt (growing with perspective)
+// → into the bin, where it vanishes. Keyframes + bud are keyed by plant slot id.
 function BeltBud() {
-  const kf = Object.entries(BUD_PATHS).map(([t, pts]) => {
+  const active = Object.entries(BUD_PATHS).filter(([id]) => PLANTED.includes(id))
+  const anim = (id) => `bud${id.replace(/-/g, '')}`
+  const kf = active.map(([id, pts]) => {
     const frames = pts.map((p, i) => {
       const pct = BUD_PCTS[i]
       let extra = ''
@@ -310,18 +314,15 @@ function BeltBud() {
       return `${pct}% { left:${p[0]}%; top:${p[1]}%;${extra} }`
     })
     frames.splice(1, 0, '8% { opacity:1; }')   // fade in early
-    return `@keyframes bud${t} { ${frames.join(' ')} }`
+    return `@keyframes ${anim(id)} { ${frames.join(' ')} }`
   }).join('\n')
-  const planted = PLANT_SLOTS.filter(s => PLANTED.includes(s.id))
   return (
     <>
       <style>{kf}</style>
-      {planted.map(s => (
-        <img key={s.id} src="/bud.webp" alt="" aria-hidden data-bud={s.id}
+      {active.map(([id]) => (
+        <img key={id} src="/bud.webp" alt="" aria-hidden data-bud={id}
           style={{ position: 'absolute', width: `${BUD_W}%`,
-            // stagger by plant number (1-4) so buds on one belt don't sync up
-            animation: `bud${s.table} ${BUD_SECS}s linear ${(-(s.plant - 1) * BUD_SECS / 4).toFixed(2)}s infinite`,
-            pointerEvents: 'none' }} />
+            animation: `${anim(id)} ${BUD_SECS}s linear infinite`, pointerEvents: 'none' }} />
       ))}
     </>
   )
