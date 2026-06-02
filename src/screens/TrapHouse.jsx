@@ -224,16 +224,18 @@ const plantW = (y) => 9.8 + 0.26 * (y - 47)    // plant width %, front (higher y
 // time). Add/remove ids here, e.g. 'T1-P1'. Empty = no plants.
 const PLANTED = ['T1-P4', 'T2-P4', 'T3-P4']
 
-// Each belt's path as % of the room-art box: back (far end) → front (near edge,
-// off the marked red centerline) → bin (the yellow box). A bud rides back→front
-// down the belt, then drops into the bin and vanishes.
+// Belt item animation is on hold pending new art. The path data below is kept
+// for when it returns — each belt as % of the room-art box: back (far end) →
+// front (near edge, off the marked red centerline) → bin (the yellow box).
+/* PENDING-ART (belt item rides back→front then vanishes in the bin):
 const BELT_PATHS = {
   1: { back: [33.3, 45.5], front: [24.7, 69.9], bin: [18.5, 77] },
   2: { back: [54.5, 45.5], front: [55.6, 69.9], bin: [50.5, 77] },
   3: { back: [76.5, 45.4], front: [88.2, 69.9], bin: [83.5, 77] },
 }
-const BUD_W = 9         // bud width, % of room-art box width
+const BUD_W = 9         // item width, % of room-art box width
 const BELT_SECS = 3.0   // seconds for one full back→bin run (lower = faster)
+*/
 
 function GrowRoom({ house, onPlant }) {
   const tables = house.tables || []
@@ -243,7 +245,8 @@ function GrowRoom({ house, onPlant }) {
           at any screen size / orientation. */}
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src="/grow-room.webp" alt="Grow Room" style={{ display: 'block', width: '100%', height: '100%' }} />
-        <ConveyorBelts />
+        {/* Belt item animation removed — waiting on new art. BELT_PATHS + the
+            ConveyorBelts component are kept below for when it's ready. */}
         {PLANT_SLOTS.filter(s => PLANTED.includes(s.id)).map((s) => (
           <img key={s.id} src="/plant.webp" alt="" aria-hidden data-slot={s.id}
             style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: `${plantW(s.y)}%`,
@@ -270,9 +273,10 @@ function GrowRoom({ house, onPlant }) {
   )
 }
 
-// A single bud rides down each table — travels the belt's red centerline from
-// back to front (growing with perspective), then drops into the bin and
-// vanishes. Loops.
+// PENDING-ART — belt item rides each belt's red centerline back→front (growing
+// with perspective) then drops into the bin and vanishes. Re-enable with the
+// new art by uncommenting this + BELT_PATHS above and <ConveyorBelts/> in GrowRoom.
+/*
 function ConveyorBelts() {
   const kf = Object.entries(BELT_PATHS).map(([t, p]) => `
     @keyframes bud${t} {
@@ -292,6 +296,7 @@ function ConveyorBelts() {
     </>
   )
 }
+*/
 
 function TableSlot({ table, index, onPlant }) {
   if (!table) {
