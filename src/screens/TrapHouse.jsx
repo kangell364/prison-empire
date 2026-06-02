@@ -197,9 +197,9 @@ function PackingRoom() {
 
 // PREVIEW (not locked): 4 plants per bench, evenly spread, pot bases on the
 // table tops. Coordinates are % of the room-art box (1600x905); easy to nudge.
-const PLANT_W = 9.5            // plant width, % of the room-art box
-const PLANT_BASE_Y = 66        // pot base sits here, % from top
-const BENCHES = [[0.10, 0.34], [0.39, 0.63], [0.66, 0.90]]   // [x0,x1] of each bench
+const PLANT_W = 10.7           // plant width, % of the room-art box
+const PLANT_BASE_Y = 58.5      // pot base sits on the table top, % from top
+const BENCHES = [[0.11, 0.36], [0.39, 0.63], [0.66, 0.90]]   // [x0,x1] of each table
 const PLANT_SPOTS = BENCHES.flatMap(([x0, x1]) =>
   [0, 1, 2, 3].map(i => (x0 + (x1 - x0) * (i + 0.5) / 4) * 100))   // 4 even x-centers per bench
 
