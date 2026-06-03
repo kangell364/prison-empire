@@ -9,6 +9,14 @@ const GREEN = '#2ecc71'
 const BLUE = '#4a9eff'
 const DIM = '#7a7468'
 
+// The room screen's operating state (plants, bank, bud + packed counts) is kept
+// in this one localStorage blob so the whole line resumes across reloads.
+const SAVE_KEY = 'pe_traphouse_room_v1'
+function loadSaved() {
+  try { const raw = localStorage.getItem(SAVE_KEY); if (raw) return JSON.parse(raw) || {} } catch {}
+  return {}
+}
+
 function isLandscape() {
   if (typeof window === 'undefined') return false
   try { if (window.matchMedia) return window.matchMedia('(orientation: landscape)').matches } catch {}
@@ -30,14 +38,16 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   const [room, setRoom] = useState(0)
   const [land, setLand] = useState(isLandscape())
   const [rotated, setRotated] = useState(false)  // manual CSS rotate (works even with iOS orientation-lock on)
-  const [planted, setPlanted] = useState([])     // which plant slots are placed (each brings its bud + path)
-  const [bank, setBank] = useState(200000)       // this store's bank balance ($) — full bank for testing
+  // Persisted operating state — lazy-loaded from localStorage so the line resumes.
+  const [saved] = useState(loadSaved)
+  const [planted, setPlanted] = useState(() => Array.isArray(saved.planted) ? saved.planted : [])  // placed plant slots (each brings its bud + path)
+  const [bank, setBank] = useState(() => typeof saved.bank === 'number' ? saved.bank : 200000)      // this store's bank balance ($) — full bank for testing
   // Running tally of buds delivered into each table's bin. One bud "drops" each
   // time its path animation completes a loop; the counter on the box reflects it.
-  const [budCounts, setBudCounts] = useState({ 1: 0, 2: 0, 3: 0 })
+  const [budCounts, setBudCounts] = useState(() => saved.budCounts || { 1: 0, 2: 0, 3: 0 })
   const countBud = (table) => setBudCounts(c => ({ ...c, [table]: (c[table] || 0) + 1 }))
   // Which Grow Card is planted on each table (the card the player added).
-  const [tableCards, setTableCards] = useState({})
+  const [tableCards, setTableCards] = useState(() => saved.tableCards || {})
   // Which table the "+ Add" slot was tapped for — opens the card picker.
   const [picking, setPicking] = useState(null)
 
@@ -61,17 +71,26 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   // As the monkey rolls through the grow room (B) he passes each box right→left,
   // zeroing its bud counter and banking the count. Passing the packing room's
   // right box (C) deposits the whole haul into that box's counter.
-  const [packCount, setPackCount] = useState(0)   // packing right-box total
-  const carryRef = useRef(0)                       // buds collected this trip
+  // Packing right-box totals, kept SEPARATE per plant card (keyed by plant id),
+  // so the box shows one running counter per strain. The trip's haul is likewise
+  // collected per strain so each grow box adds to its own line.
+  const [packCounts, setPackCounts] = useState(() => saved.packCounts || {})
+  const carryRef = useRef({})                       // this trip's haul, by plant id
   const budCountsRef = useRef(budCounts)
   useEffect(() => { budCountsRef.current = budCounts }, [budCounts])
+  // The plant card on each table — read inside the pass timers, so mirror to a ref.
+  const tableCardsRef = useRef(tableCards)
+  useEffect(() => { tableCardsRef.current = tableCards }, [tableCards])
   useEffect(() => {
-    if (skate.phase === 'A') { carryRef.current = 0; return }   // new trip — empty hands
+    if (skate.phase === 'A') { carryRef.current = {}; return }  // new trip — empty hands
     if (skate.phase === 'B') {
       const timers = [3, 2, 1].map(tbl => {                     // right → left
         const [x0, x1] = BINS[tbl]
         return setTimeout(() => {
-          carryRef.current += (budCountsRef.current[tbl] || 0)
+          // Bank this box's buds under its plant card, keeping strains separate.
+          const id = tableCardsRef.current[tbl]
+          const n = budCountsRef.current[tbl] || 0
+          if (id && n) carryRef.current[id] = (carryRef.current[id] || 0) + n
           setBudCounts(c => ({ ...c, [tbl]: 0 }))
         }, passTimeMs((x0 + x1) / 2, SKATE_MS.B))
       })
@@ -81,14 +100,24 @@ export default function TrapHouse({ onBack, isOwner = true }) {
       const [x0, x1] = PACK_RIGHT_BIN
       const t = setTimeout(() => {
         // Capture the haul before resetting — the setState updater runs lazily,
-        // so reading carryRef inside it would see the already-zeroed value.
+        // so reading carryRef inside it would see the already-emptied value.
         const haul = carryRef.current
-        carryRef.current = 0
-        setPackCount(n => n + haul)
+        carryRef.current = {}
+        setPackCounts(pc => {
+          const next = { ...pc }
+          for (const id in haul) next[id] = (next[id] || 0) + haul[id]
+          return next
+        })
       }, passTimeMs((x0 + x1) / 2, SKATE_MS.C))
       return () => clearTimeout(t)
     }
   }, [skate.phase])
+
+  // Persist the operating state on every change so a reload resumes the line:
+  // plants placed, bank, per-box bud counts, table cards, and packed totals.
+  useEffect(() => {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ planted, bank, budCounts, tableCards, packCounts })) } catch {}
+  }, [planted, bank, budCounts, tableCards, packCounts])
 
   // Place a plant slot, charging the bank (no-op if you can't afford it).
   const placeSlot = (slot, cost) => {
@@ -153,7 +182,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
           display when the phone is turned sideways. Controls float on top. */}
       <div style={{ position: 'absolute', inset: 0 }}>
         {cur.key === 'shop' && <ShopFront art={cur.art} />}
-        {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} packCount={packCount} />}
+        {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} packCounts={packCounts} />}
         {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} onBud={countBud} tableCards={tableCards} onAdd={setPicking} skatePhase={skate.phase} skateStart={skate.start} />}
       </div>
 
@@ -291,8 +320,13 @@ const passTimeMs = (centerPct, durMs) => Math.round((50 + ROLL_EDGE - centerPct)
 // (read off packing-room.webp). The skater deposits his haul into this box.
 const PACK_RIGHT_BIN = [70.5, 87.2, 44.5]
 
-function PackingRoom({ skatePhase = 'idle', skateStart = 0, onSkateClick, packCount = 0 }) {
+function PackingRoom({ skatePhase = 'idle', skateStart = 0, onSkateClick, packCounts = {} }) {
   const [px0, px1, pyTop] = PACK_RIGHT_BIN
+  // One row per plant card the box has banked — strain name with its count beside
+  // it, kept separate per strain.
+  const rows = Object.entries(packCounts)
+    .map(([id, n]) => ({ strain: PLANTS.find(p => p.id === id), n }))
+    .filter(r => r.strain && r.n > 0)
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the skater stays glued to the floor at any
@@ -300,30 +334,31 @@ function PackingRoom({ skatePhase = 'idle', skateStart = 0, onSkateClick, packCo
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src="/packing-room.webp" alt="Packing Room" style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain' }} />
 
-        {/* Packed-product counter on the right box — the skater deposits his
-            grow-room haul here as he rolls past. Hidden until the first deposit. */}
-        {packCount > 0 && (
+        {/* Packed-product counters on the right box — the skater deposits his
+            grow-room haul here as he rolls past, one running tally per strain.
+            Sits down over the box face. Hidden until the first deposit. */}
+        {rows.length > 0 && (
         <div style={{
           position: 'absolute', left: `${(px0 + px1) / 2}%`, top: `${pyTop}%`,
-          transform: 'translate(-50%, -135%)', zIndex: 4, pointerEvents: 'none',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+          transform: 'translate(-50%, 14%)', zIndex: 4, pointerEvents: 'none',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
         }}>
-          <span style={{
-            color: '#fff', fontSize: 8, fontWeight: 800, letterSpacing: 0.6,
-            background: 'rgba(10,8,5,0.78)', borderRadius: 4, padding: '1px 6px',
-            textShadow: '0 1px 2px #000', whiteSpace: 'nowrap',
-          }}>PACKED</span>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            background: 'rgba(10,8,5,0.82)', border: `1px solid ${GOLD}66`, borderRadius: 999,
-            padding: '2px 8px', boxShadow: '0 2px 7px rgba(0,0,0,0.55)',
-          }}>
-            <img src="/bud.webp" alt="" style={{ width: 13, height: 13, objectFit: 'contain' }} />
-            <span key={packCount} style={{
-              color: GREEN, fontWeight: 900, fontSize: 13, fontVariantNumeric: 'tabular-nums',
-              lineHeight: 1, animation: 'budTick 0.35s ease-out',
-            }}>{packCount.toLocaleString()}</span>
-          </div>
+          {rows.map(({ strain, n }) => (
+            <div key={strain.id} style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'rgba(10,8,5,0.82)', border: `1px solid ${GOLD}66`, borderRadius: 999,
+              padding: '2px 9px', boxShadow: '0 2px 7px rgba(0,0,0,0.55)',
+            }}>
+              <span style={{
+                color: '#fff', fontSize: 9, fontWeight: 800, letterSpacing: 0.6,
+                textShadow: '0 1px 2px #000', whiteSpace: 'nowrap', textTransform: 'uppercase',
+              }}>{strain.name}</span>
+              <span key={n} style={{
+                color: GREEN, fontWeight: 900, fontSize: 13, fontVariantNumeric: 'tabular-nums',
+                lineHeight: 1, animation: 'budTick 0.35s ease-out',
+              }}>{n.toLocaleString()}</span>
+            </div>
+          ))}
         </div>
         )}
 
