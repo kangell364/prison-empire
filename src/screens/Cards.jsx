@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { CARDS_COLLECTION, RARITY_COLORS } from '../data/gameData'
+import { CARDS_COLLECTION, RARITY_COLORS, SKILLS, PLAYER } from '../data/gameData'
 import { useCardCounts, mergeCard, getOwnedTuples, STACK_SIZE } from '../state/cardsStore'
 import {
   baseAtk, baseDef, useCrew,
@@ -36,8 +36,11 @@ function sectionLabelFor(filter, ownedCount, totalCount) {
   return filter
 }
 
-export default function Cards({ initialTab = 'collection' }) {
-  const [tab, setTab] = useState(initialTab)   // 'collection' | 'crew'
+export default function Cards({ initialTab = 'player' }) {
+  // Top-level tabs: 'player' (Player Cards) | 'skill' (Skill Cards) | 'crew'.
+  // 'collection' is the legacy id for the player grid — normalize it so old
+  // deep-links still land on Player Cards. Default view is Player Cards.
+  const [tab, setTab] = useState(initialTab === 'collection' ? 'player' : initialTab)
   const [selectedCard, setSelectedCard]   = useState(null)
   const [mergeReveal, setMergeReveal]     = useState(null)   // { card, toLevel } during merge animation
   // Active filter chip for the collection grid. 'All' / 'Owned' / one of
@@ -96,89 +99,80 @@ export default function Cards({ initialTab = 'collection' }) {
 
       <TabSwitcher tab={tab} onTab={setTab} />
 
-      {/* Pack Banner + open machine — shared with the Commissary Store view. */}
-      <CommissaryPack />
+      {/* PLAYER CARDS — pack banner, rarity filters, and the owned/locked grid. */}
+      {tab === 'player' && (
+        <>
+          {/* Pack Banner + open machine — shared with the Commissary Store view. */}
+          <CommissaryPack />
 
-      {/* Filter chips — each one filters the collection grid below. Wraps so
-          every type is visible at once instead of scrolling horizontally. */}
-      <div style={{ padding: '14px 16px 0', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {FILTERS.map(f => {
-          const active = filter === f
-          return (
-            <div
-              key={f}
-              onClick={() => setFilter(f)}
-              style={{
-                background: active ? '#c9a84c18' : '#13131f',
-                border: `0.5px solid ${active ? '#c9a84c44' : '#2a2a3a'}`,
-                borderRadius: 20,
-                padding: '5px 14px',
-                color: active ? '#c9a84c' : '#888',
-                fontSize: 12,
-                cursor: 'pointer',
-              }}
-            >{f}</div>
-          )
-        })}
-      </div>
+          <FilterChips filter={filter} setFilter={setFilter} />
 
-      {/* Cards Grid — one tile per (card_id, card_level) the player has,
-          plus locked placeholders for catalog entries they haven't seen yet.
-          Filter chip narrows the list. */}
-      <div className="section" style={{ marginTop: 14 }}>
-        <div className="section-label">
-          {sectionLabelFor(filter, ownedSet.size, CARDS_COLLECTION.length)}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {(() => {
-            const owned = getOwnedTuples()    // sorted by id asc, level desc
-            const ownedKey = new Set(owned.map(t => `${t.id}:${t.level}`))
-            const tiles = []
+          {/* Cards Grid — one tile per (card_id, card_level) the player has,
+              plus locked placeholders for catalog entries not seen yet. */}
+          <div className="section" style={{ marginTop: 14 }}>
+            <div className="section-label">
+              {sectionLabelFor(filter, ownedSet.size, CARDS_COLLECTION.length)}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {(() => {
+                const owned = getOwnedTuples()    // sorted by id asc, level desc
+                const ownedKey = new Set(owned.map(t => `${t.id}:${t.level}`))
+                const tiles = []
 
-            // Owned tuples first — each gets its own tile with type, count, merge.
-            owned.forEach(t => {
-              const card = CARDS_COLLECTION.find(c => c.id === t.id)
-              if (!card) return
-              if (!matchesFilter(card, filter, /* owned */ true)) return
-              tiles.push(
-                <CollectionTile
-                  key={`${t.id}:${t.level}`}
-                  card={card}
-                  cardLevel={t.level}
-                  count={t.count}
-                  inCrew={inCrewSet.has(t.id)}
-                  upgrades={readUpgrade(upgradesMap, t.id, t.level)}
-                  onTap={() => setSelectedCard({ card, cardLevel: t.level, count: t.count })}
-                />
-              )
-            })
+                // Owned tuples first — each gets its own tile with type, count, merge.
+                owned.forEach(t => {
+                  const card = CARDS_COLLECTION.find(c => c.id === t.id)
+                  if (!card) return
+                  if (!matchesFilter(card, filter, /* owned */ true)) return
+                  tiles.push(
+                    <CollectionTile
+                      key={`${t.id}:${t.level}`}
+                      card={card}
+                      cardLevel={t.level}
+                      count={t.count}
+                      inCrew={inCrewSet.has(t.id)}
+                      upgrades={readUpgrade(upgradesMap, t.id, t.level)}
+                      onTap={() => setSelectedCard({ card, cardLevel: t.level, count: t.count })}
+                    />
+                  )
+                })
 
-            // Locked placeholders for any catalog card the player has zero of
-            // at Lvl 1. 'Owned' filter hides these.
-            CARDS_COLLECTION.forEach(card => {
-              if (ownedKey.has(`${card.id}:1`)) return
-              if (!matchesFilter(card, filter, /* owned */ false)) return
-              tiles.push(<LockedTile key={`locked:${card.id}`} card={card} />)
-            })
+                // Locked placeholders for any catalog card the player has zero of
+                // at Lvl 1. 'Owned' filter hides these.
+                CARDS_COLLECTION.forEach(card => {
+                  if (ownedKey.has(`${card.id}:1`)) return
+                  if (!matchesFilter(card, filter, /* owned */ false)) return
+                  tiles.push(<LockedTile key={`locked:${card.id}`} card={card} />)
+                })
 
-            if (tiles.length === 0) {
-              return (
-                <div style={{
-                  gridColumn: '1 / -1',
-                  background: '#13131f',
-                  border: '0.5px solid #1e1e2a',
-                  borderRadius: 12,
-                  padding: 20, textAlign: 'center',
-                  color: '#555', fontSize: 12,
-                }}>
-                  No {filter.toLowerCase()} cards yet.
-                </div>
-              )
-            }
-            return tiles
-          })()}
-        </div>
-      </div>
+                if (tiles.length === 0) {
+                  return (
+                    <div style={{
+                      gridColumn: '1 / -1',
+                      background: '#13131f',
+                      border: '0.5px solid #1e1e2a',
+                      borderRadius: 12,
+                      padding: 20, textAlign: 'center',
+                      color: '#555', fontSize: 12,
+                    }}>
+                      No {filter.toLowerCase()} cards yet.
+                    </div>
+                  )
+                }
+                return tiles
+              })()}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* SKILL CARDS — same rarity filters over the skill catalog. */}
+      {tab === 'skill' && (
+        <>
+          <FilterChips filter={filter} setFilter={setFilter} />
+          <SkillCollection filter={filter} />
+        </>
+      )}
 
       {/* Card Detail — universal modal so it's consistent with all other
           character cards (no bottom-sheet gap, big cinematic hero). */}
@@ -531,12 +525,13 @@ function LockedTile({ card }) {
 
 function TabSwitcher({ tab, onTab }) {
   const TABS = [
-    { id: 'collection', label: 'Collection', icon: 'ti-cards' },
-    { id: 'crew',       label: 'My Crew',    icon: 'ti-users' },
+    { id: 'player', label: 'Player Cards', icon: 'ti-user' },
+    { id: 'skill',  label: 'Skill Cards',  icon: 'ti-bolt' },
+    { id: 'crew',   label: 'My Crew',      icon: 'ti-users' },
   ]
   return (
     <div style={{
-      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6,
+      display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6,
       padding: '14px 16px 0',
     }}>
       {TABS.map(t => {
@@ -547,13 +542,13 @@ function TabSwitcher({ tab, onTab }) {
             onClick={() => onTab(t.id)}
             className="btn"
             style={{
-              padding: '10px 14px',
+              padding: '10px 8px',
               background: active ? '#c9a84c18' : '#13131f',
               border: `0.5px solid ${active ? '#c9a84c66' : '#2a2a3a'}`,
               color: active ? '#c9a84c' : '#888',
               borderRadius: 12,
-              fontSize: 13, fontWeight: 500,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              fontSize: 12, fontWeight: 500,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
             }}
           >
             <i className={`ti ${t.icon}`} aria-hidden="true" />
@@ -561,6 +556,129 @@ function TabSwitcher({ tab, onTab }) {
           </button>
         )
       })}
+    </div>
+  )
+}
+
+// Shared rarity filter chips — used by both the Player Cards and Skill Cards
+// tabs. Wraps so every type is visible at once.
+function FilterChips({ filter, setFilter }) {
+  return (
+    <div style={{ padding: '14px 16px 0', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {FILTERS.map(f => {
+        const active = filter === f
+        return (
+          <div
+            key={f}
+            onClick={() => setFilter(f)}
+            style={{
+              background: active ? '#c9a84c18' : '#13131f',
+              border: `0.5px solid ${active ? '#c9a84c44' : '#2a2a3a'}`,
+              borderRadius: 20,
+              padding: '5px 14px',
+              color: active ? '#c9a84c' : '#888',
+              fontSize: 12,
+              cursor: 'pointer',
+            }}
+          >{f}</div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------
+// Skill Cards tab
+// ---------------------------------------------------------------------
+
+// Has the player learned this skill? Mirrors the Training tab, which reads
+// PLAYER.learnedSkills (real persistence arrives with the Supabase pass).
+const isSkillLearned = (skill) => !!PLAYER.learnedSkills[skill.id]
+
+// The Skill Cards grid — same rarity filters as Player Cards, over the SKILLS
+// catalog. 'Owned' = learned. Empty catalog shows a placeholder.
+function SkillCollection({ filter }) {
+  const ownedCount = SKILLS.filter(isSkillLearned).length
+  const label = filter === 'All'   ? `Skill Cards (${ownedCount}/${SKILLS.length})`
+              : filter === 'Owned' ? `Learned (${ownedCount})`
+              : filter
+  const shown = SKILLS.filter(s => matchesFilter(s, filter, isSkillLearned(s)))
+
+  return (
+    <div className="section" style={{ marginTop: 14 }}>
+      <div className="section-label">{label}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {shown.length === 0 ? (
+          <div style={{
+            gridColumn: '1 / -1',
+            background: '#13131f', border: '0.5px solid #1e1e2a',
+            borderRadius: 12, padding: 20, textAlign: 'center',
+            color: '#555', fontSize: 12,
+          }}>
+            {SKILLS.length === 0 ? 'No skill cards yet.' : `No ${filter.toLowerCase()} skill cards.`}
+          </div>
+        ) : shown.map(skill => (
+          <SkillTile key={skill.id} skill={skill} owned={isSkillLearned(skill)} learnedLevel={PLAYER.learnedSkills[skill.id]?.level || 0} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Skill card tile — the stat-tile layout (SKILL badge, art, name, DMG + LVL
+// boxes), matching the player Collection tiles so every card type reads alike.
+function SkillTile({ skill, owned, learnedLevel = 0 }) {
+  const rarityColor = RARITY_COLORS[skill.rarity] || '#c9a84c'
+  return (
+    <div style={{
+      background: '#13131f',
+      border: `0.5px solid ${rarityColor}44`,
+      borderRadius: 16,
+      padding: '22px 14px 14px',
+      position: 'relative',
+      overflow: 'hidden',
+      opacity: owned ? 1 : 0.55,
+    }}>
+      {/* Rarity top bar */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: rarityColor }} />
+
+      {/* Type label (top-left) */}
+      <div style={{ position: 'absolute', top: 6, left: 8, color: '#888', fontSize: 8, fontWeight: 700, letterSpacing: 1.5 }}>SKILL</div>
+
+      {/* Owned-level / rarity badge (top-right) */}
+      <div style={{ position: 'absolute', top: 6, right: 8, color: rarityColor, fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'capitalize' }}>
+        {owned ? `LV ${learnedLevel}` : skill.rarity}
+      </div>
+
+      {/* Art */}
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 6px' }}>
+        <Avatar src={skill.avatar} emoji={skill.emoji} size={56} radius={8}
+          style={{ background: '#1e1e2a', border: `1px solid ${rarityColor}55` }} />
+      </div>
+
+      {/* Name */}
+      <div style={{ color: '#fff', fontSize: 12, fontWeight: 600, textAlign: 'center', marginBottom: 2 }}>{skill.name}</div>
+
+      {/* Category */}
+      <div style={{ color: rarityColor, fontSize: 10, textAlign: 'center', textTransform: 'capitalize', marginBottom: 10 }}>
+        {skill.category}
+      </div>
+
+      {/* Stat tiles — DMG + LVL, same two-box layout as player cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        <div style={{ background: '#1e1e2a', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+          <div style={{ color: '#555', fontSize: 8, letterSpacing: 1, fontWeight: 700 }}>DMG</div>
+          <div style={{ color: '#e74c3c', fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+            +{skill.perLevelAttack}<span style={{ fontSize: 8, color: '#777', fontWeight: 600 }}>/lv</span>
+          </div>
+        </div>
+        <div style={{ background: '#1e1e2a', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+          <div style={{ color: '#555', fontSize: 8, letterSpacing: 1, fontWeight: 700 }}>LVL</div>
+          <div style={{ color: '#c9a84c', fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+            {learnedLevel}<span style={{ fontSize: 8, color: '#777', fontWeight: 600 }}>/{skill.maxLevel}</span>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

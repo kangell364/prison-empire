@@ -664,10 +664,30 @@ export function streetRep(p) {
 // Intentionally EMPTY — the original skills were removed so a fresh set can be
 // authored. Every consumer handles an empty list: players have no skills to
 // learn/equip, and bosses get empty loadouts (opponentSkillLoadout returns {}).
-// Add new skills here in the same shape as before:
-//   { id, name, shortName, emoji, description, category, minLevel, maxLevel,
-//     perLevelAttack, baseLearnCost: { knowledge, hustle }, upgradeCostFor }
-export const SKILLS = []
+// Add new skills here in the same shape as below:
+//   { id, name, shortName, emoji, rarity, description, category, minLevel,
+//     maxLevel, perLevelAttack, baseLearnCost: { knowledge, hustle },
+//     upgradeCostFor }
+export const SKILLS = [
+  {
+    id: 'skull_crusher',
+    name: 'SKULL CRUSHER',
+    shortName: 'Skull Crusher',
+    emoji: '💀',
+    avatar: '/skill-skull-crusher.jpg',
+    rarity: 'epic',
+    description: 'A bone-shattering overhand that caves the skull in. Big bonus damage when it lands.',
+    category: 'Brawl',
+    minLevel: 1,
+    maxLevel: 100,
+    perLevelAttack: 45,                           // +45 attack per skill level (heavy hitter)
+    baseLearnCost:    { knowledge: 20, hustle: 3_000 },
+    upgradeCostFor: (currentLevel) => ({
+      knowledge: 20 + currentLevel * 5,
+      hustle:    3_000 * (currentLevel + 1),
+    }),
+  },
+]
 
 // PvP reward multiplier. Killing someone N levels above you = N× reward.
 // Same level or lower = 1× (clamped). User-facing rule we surface in the UI.

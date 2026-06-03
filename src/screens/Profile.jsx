@@ -3,7 +3,7 @@ import { PLAYER, PLAYER_LOOKS, CARDS_COLLECTION, TRAITS, RARITY_COLORS, SKILLS }
 import { sfx } from '../sounds'
 import { useHustle, usePlayerLook, useDisplayName } from '../state/profileStore'
 import { useVitals } from '../state/vitalsStore'
-import { KoOverlay, KO_FILTER } from '../components/Avatar'
+import { Avatar, KoOverlay, KO_FILTER } from '../components/Avatar'
 import { useCrew, atkOf, defOf } from '../state/crewStore'
 import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
 import { useProgress } from '../state/progressionStore'
@@ -473,57 +473,73 @@ function TrainingTab() {
   )
 }
 
+// Skill card — vertical stat-tile layout (SKILL badge, art, name, ability
+// text, then DMG + LVL stat tiles), matching the player Collection cards so
+// every card type reads the same. Learn/upgrade action lives below the tiles.
 function SkillCard({ skill, learned, canUpgrade, feedback, onLearn, onUpgrade }) {
   const isLearned   = !!learned
   const curLevel    = learned?.level || 0
   const atMax       = curLevel >= skill.maxLevel
   const cost        = isLearned ? skill.upgradeCostFor(curLevel) : skill.baseLearnCost
+  const rarityColor = RARITY_COLORS[skill.rarity] || GOLD
 
   return (
-    <div className="card card-pad" style={{
-      padding: 14, position: 'relative', overflow: 'hidden',
-      borderColor: isLearned ? `${GOLD}55` : '#2a2a3a',
-      background: isLearned
-        ? 'linear-gradient(135deg, #15110a 0%, #13131f 70%)'
-        : '#13131f',
+    <div className="card" style={{
+      padding: '22px 14px 14px', position: 'relative', overflow: 'hidden',
+      borderColor: `${rarityColor}44`, background: '#13131f',
     }}>
-      {isLearned && (
-        <div style={{
-          position: 'absolute', top: 0, right: 0,
-          background: GOLD, color: '#0a0a0f',
-          fontSize: 9, fontWeight: 800, letterSpacing: 1.2,
-          padding: '3px 10px',
-          borderBottomLeftRadius: 10,
-        }}>LV {curLevel}{atMax ? ' · MAX' : ''}</div>
-      )}
+      {/* Rarity top bar */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: rarityColor }} />
 
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <div style={{
-          width: 56, height: 56, borderRadius: 12,
-          background: '#1e1e2a',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 28, flexShrink: 0,
-          border: isLearned ? `1px solid ${GOLD}55` : '0.5px solid #2a2a3a',
-        }}>{skill.emoji}</div>
+      {/* Type badge (top-left) — SKILL, like PLAYER on the collection cards */}
+      <div style={{ position: 'absolute', top: 6, left: 10, color: '#888', fontSize: 8, fontWeight: 700, letterSpacing: 1.5 }}>SKILL</div>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: GOLD, fontSize: 9, fontWeight: 700, letterSpacing: 1, marginBottom: 1 }}>
-            {skill.category.toUpperCase()}
-          </div>
-          <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>{skill.name}</div>
-          <div style={{ color: '#888', fontSize: 11, lineHeight: 1.4, marginTop: 4 }}>
-            {skill.description}
-          </div>
-          <div style={{ color: '#666', fontSize: 10, marginTop: 6 }}>
-            {isLearned
-              ? <>Current effect: <span style={{ color: RED, fontWeight: 600 }}>+{curLevel * skill.perLevelAttack} attack</span> when triggered</>
-              : <>Level 1 effect: <span style={{ color: RED, fontWeight: 600 }}>+{skill.perLevelAttack} attack</span> when triggered</>
-            }
-          </div>
-          <div style={{ color: DIM, fontSize: 10, marginTop: 2 }}>
-            Min Level: {skill.minLevel} · Max Skill Level: {skill.maxLevel}
+      {/* Level / rarity badge (top-right) */}
+      <div style={{ position: 'absolute', top: 6, right: 10, color: rarityColor, fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'capitalize' }}>
+        {isLearned ? `LV ${curLevel}${atMax ? ' · MAX' : ''}` : skill.rarity}
+      </div>
+
+      {/* Art */}
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 8px' }}>
+        <Avatar src={skill.avatar} emoji={skill.emoji} size={96} radius={12}
+          style={{ background: '#1e1e2a', border: `1px solid ${rarityColor}55` }} />
+      </div>
+
+      {/* Name */}
+      <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, textAlign: 'center', letterSpacing: 0.5 }}>
+        {skill.name}
+      </div>
+      {/* Category */}
+      <div style={{ color: rarityColor, fontSize: 10, textAlign: 'center', textTransform: 'capitalize', marginTop: 1, marginBottom: 8 }}>
+        {skill.category}
+      </div>
+
+      {/* Ability text */}
+      <div style={{ color: '#999', fontSize: 11, lineHeight: 1.45, textAlign: 'center', marginBottom: 10, padding: '0 4px' }}>
+        {skill.description}
+      </div>
+
+      {/* Stat tiles — DMG + LVL (same two-box layout as the player cards) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        <div style={{ background: '#1e1e2a', borderRadius: 8, padding: '7px 8px', textAlign: 'center' }}>
+          <div style={{ color: '#555', fontSize: 8, letterSpacing: 1, fontWeight: 700 }}>DMG</div>
+          <div style={{ color: RED, fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+            +{skill.perLevelAttack}<span style={{ fontSize: 9, color: '#777', fontWeight: 600 }}> /lv</span>
           </div>
         </div>
+        <div style={{ background: '#1e1e2a', borderRadius: 8, padding: '7px 8px', textAlign: 'center' }}>
+          <div style={{ color: '#555', fontSize: 8, letterSpacing: 1, fontWeight: 700 }}>LVL</div>
+          <div style={{ color: GOLD, fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+            {curLevel}<span style={{ fontSize: 9, color: '#777', fontWeight: 600 }}>/{skill.maxLevel}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Current effect line */}
+      <div style={{ color: '#666', fontSize: 10, textAlign: 'center', marginTop: 8 }}>
+        {isLearned
+          ? <>Fires for <span style={{ color: RED, fontWeight: 600 }}>+{curLevel * skill.perLevelAttack} attack</span> when a roll lands on its slot</>
+          : <>Learn for <span style={{ color: RED, fontWeight: 600 }}>+{skill.perLevelAttack} attack</span> at Lv 1</>}
       </div>
 
       {/* Feedback */}
@@ -534,7 +550,7 @@ function SkillCard({ skill, learned, canUpgrade, feedback, onLearn, onUpgrade })
           border: `0.5px solid ${GREEN}55`,
           borderRadius: 8,
           padding: '6px 8px',
-          fontSize: 11, color: GREEN, lineHeight: 1.4,
+          fontSize: 11, color: GREEN, lineHeight: 1.4, textAlign: 'center',
         }}>
           ✓ {feedback.kind === 'learn'
             ? `Learned ${skill.shortName} at Level 1.`
@@ -544,29 +560,21 @@ function SkillCard({ skill, learned, canUpgrade, feedback, onLearn, onUpgrade })
 
       {/* Cost + action */}
       {!atMax && (
-        <div style={{
-          marginTop: 12,
-          display: 'flex', alignItems: 'center', gap: 10,
-          paddingTop: 10,
-          borderTop: '0.5px solid #1e1e2a',
-        }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ color: '#666', fontSize: 9, letterSpacing: 1 }}>COST</div>
-            <div style={{ color: GREEN, fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
-              {cost.knowledge} knowledge · {cost.hustle.toLocaleString()} Hustle
-            </div>
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: '0.5px solid #1e1e2a' }}>
+          <div style={{ color: GREEN, fontSize: 11, textAlign: 'center', marginBottom: 8, fontVariantNumeric: 'tabular-nums' }}>
+            {cost.knowledge} knowledge · {cost.hustle.toLocaleString()} Hustle
           </div>
           <button
             onClick={isLearned ? onUpgrade : onLearn}
             disabled={isLearned && !canUpgrade}
             style={{
+              width: '100%',
               background: (isLearned && !canUpgrade) ? '#1e1e2a' : GOLD,
               color: (isLearned && !canUpgrade) ? '#555' : '#0a0a0f',
               border: 'none', borderRadius: 8,
-              padding: '10px 16px',
+              padding: '12px 16px',
               fontSize: 12, fontWeight: 700, letterSpacing: 1,
               cursor: (isLearned && !canUpgrade) ? 'not-allowed' : 'pointer',
-              flexShrink: 0,
             }}
           >
             {isLearned ? (canUpgrade ? 'UPGRADE' : 'LV CAP') : 'LEARN'}

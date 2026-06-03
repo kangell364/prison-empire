@@ -35,7 +35,7 @@ export default function App() {
   const [screen, setScreen] = useState('home')
   // Which tab the Cards screen opens on. Set to 'crew' when jumping straight to
   // the My Crew view (e.g. tapping a crew slot on the home screen).
-  const [cardsTab, setCardsTab] = useState('collection')
+  const [cardsTab, setCardsTab] = useState('player')
   const [muted, setMutedState] = useState(isMuted())
   const [showNotifs, setShowNotifs] = useState(false)
   const unread = useUnreadCount()
@@ -67,14 +67,14 @@ export default function App() {
   const handleNav = (id) => {
     if (id !== screen) sfx.tap()
     // Bottom-nav Cards always lands on the collection tab.
-    if (id === 'cards') setCardsTab('collection')
+    if (id === 'cards') setCardsTab('player')
     setScreen(id)
   }
 
   // Navigation for in-screen links (e.g. Dashboard). Accepts an optional tab so
   // a caller can deep-link into the Cards screen's My Crew view.
   const navigateTo = (id, opts) => {
-    if (id === 'cards') setCardsTab(opts?.tab || 'collection')
+    if (id === 'cards') setCardsTab(opts?.tab || 'player')
     setScreen(id)
   }
 
