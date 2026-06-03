@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { sfx } from '../sounds'
 import { PLANTS, plantCashValue, RARITY_COLORS } from '../data/gameData'
 import { getOwnedPlantTuples } from '../state/plantCardsStore'
@@ -56,6 +56,38 @@ export default function TrapHouse({ onBack, isOwner = true }) {
     const next = skate.phase === 'A' ? 'B' : skate.phase === 'B' ? 'C' : skate.phase === 'C' ? 'D' : 'idle'
     const t = setTimeout(() => setSkate({ phase: next, start: Date.now() }), SKATE_MS[skate.phase])
     return () => clearTimeout(t)
+  }, [skate.phase])
+
+  // As the monkey rolls through the grow room (B) he passes each box right→left,
+  // zeroing its bud counter and banking the count. Passing the packing room's
+  // right box (C) deposits the whole haul into that box's counter.
+  const [packCount, setPackCount] = useState(0)   // packing right-box total
+  const carryRef = useRef(0)                       // buds collected this trip
+  const budCountsRef = useRef(budCounts)
+  useEffect(() => { budCountsRef.current = budCounts }, [budCounts])
+  useEffect(() => {
+    if (skate.phase === 'A') { carryRef.current = 0; return }   // new trip — empty hands
+    if (skate.phase === 'B') {
+      const timers = [3, 2, 1].map(tbl => {                     // right → left
+        const [x0, x1] = BINS[tbl]
+        return setTimeout(() => {
+          carryRef.current += (budCountsRef.current[tbl] || 0)
+          setBudCounts(c => ({ ...c, [tbl]: 0 }))
+        }, passTimeMs((x0 + x1) / 2, SKATE_MS.B))
+      })
+      return () => timers.forEach(clearTimeout)
+    }
+    if (skate.phase === 'C') {
+      const [x0, x1] = PACK_RIGHT_BIN
+      const t = setTimeout(() => {
+        // Capture the haul before resetting — the setState updater runs lazily,
+        // so reading carryRef inside it would see the already-zeroed value.
+        const haul = carryRef.current
+        carryRef.current = 0
+        setPackCount(n => n + haul)
+      }, passTimeMs((x0 + x1) / 2, SKATE_MS.C))
+      return () => clearTimeout(t)
+    }
   }, [skate.phase])
 
   // Place a plant slot, charging the bank (no-op if you can't afford it).
@@ -121,7 +153,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
           display when the phone is turned sideways. Controls float on top. */}
       <div style={{ position: 'absolute', inset: 0 }}>
         {cur.key === 'shop' && <ShopFront art={cur.art} />}
-        {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} />}
+        {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} packCount={packCount} />}
         {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} onBud={countBud} tableCards={tableCards} onAdd={setPicking} skatePhase={skate.phase} skateStart={skate.start} />}
       </div>
 
@@ -248,14 +280,51 @@ const SKATE_ANIM = {
   C: { name: 'rollRightToLeft', secs: 5.2 },
   D: { name: 'rollEnterLeft',   secs: 2.6 },
 }
+// The group translateX runs from +ROLL_EDGE% to −ROLL_EDGE% across a room (must
+// match the 85% in the roll keyframes). The monkey's on-screen center is
+// therefore (50 + ROLL_EDGE)% at phase start, sweeping to (50 − ROLL_EDGE)%.
+const ROLL_EDGE = 85
+// Milliseconds into a right→left phase at which the monkey's center passes a
+// given on-screen x (% of the room box). Used to time box collection/deposit.
+const passTimeMs = (centerPct, durMs) => Math.round((50 + ROLL_EDGE - centerPct) * durMs / (2 * ROLL_EDGE))
+// Packing room's right-hand collection box: [x0, x1, yTop] as % of the room box
+// (read off packing-room.webp). The skater deposits his haul into this box.
+const PACK_RIGHT_BIN = [70.5, 87.2, 44.5]
 
-function PackingRoom({ skatePhase = 'idle', skateStart = 0, onSkateClick }) {
+function PackingRoom({ skatePhase = 'idle', skateStart = 0, onSkateClick, packCount = 0 }) {
+  const [px0, px1, pyTop] = PACK_RIGHT_BIN
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the skater stays glued to the floor at any
           screen size / orientation. */}
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src="/packing-room.webp" alt="Packing Room" style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain' }} />
+
+        {/* Packed-product counter on the right box — the skater deposits his
+            grow-room haul here as he rolls past. */}
+        <div style={{
+          position: 'absolute', left: `${(px0 + px1) / 2}%`, top: `${pyTop}%`,
+          transform: 'translate(-50%, -135%)', zIndex: 4, pointerEvents: 'none',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+        }}>
+          <span style={{
+            color: '#fff', fontSize: 8, fontWeight: 800, letterSpacing: 0.6,
+            background: 'rgba(10,8,5,0.78)', borderRadius: 4, padding: '1px 6px',
+            textShadow: '0 1px 2px #000', whiteSpace: 'nowrap',
+          }}>PACKED</span>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            background: 'rgba(10,8,5,0.82)', border: `1px solid ${GOLD}66`, borderRadius: 999,
+            padding: '2px 8px', boxShadow: '0 2px 7px rgba(0,0,0,0.55)',
+          }}>
+            <img src="/bud.webp" alt="" style={{ width: 13, height: 13, objectFit: 'contain' }} />
+            <span key={packCount} style={{
+              color: GREEN, fontWeight: 900, fontSize: 13, fontVariantNumeric: 'tabular-nums',
+              lineHeight: 1, animation: 'budTick 0.35s ease-out',
+            }}>{packCount.toLocaleString()}</span>
+          </div>
+        </div>
+
         {/* Skater monkey lives in the packing room for every phase except B
             (when he's rolling through the grow room). */}
         {skatePhase !== 'B' && (
