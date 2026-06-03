@@ -131,6 +131,9 @@ export function generateBoss(tab, level, slot) {
   if (tab === 'guards' && level === 1 && slot === 4) {
     look = { ...look, avatar: '/guard-boss-4.jpg' }
   }
+  if (tab === 'guards' && level === 1 && slot === 5) {
+    look = { ...look, avatar: '/guard-boss-5.jpg' }
+  }
 
   return {
     id: `${tab}-${level}-${slot}`,
