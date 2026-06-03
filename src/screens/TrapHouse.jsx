@@ -162,13 +162,25 @@ function RoomArrow({ side, label, onClick }) {
 function ShopFront({ art }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <img src={art} alt="Shop Front" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
-      {/* Thug-life character standing in the storefront. */}
-      <img src="/thug-6.png" alt="" style={{
-        position: 'absolute', bottom: '5%', left: '50%', transform: 'translateX(-50%)',
-        height: '60%', width: 'auto', objectFit: 'contain',
-        filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))', pointerEvents: 'none',
-      }} />
+      {/* Aspect-locked room box so the clerk lines up with the counter at any size. */}
+      <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
+        <img src={art} alt="Shop Front" style={{ display: 'block', width: '100%', height: '100%' }} />
+        {/* Nodding clerk standing BEHIND the counter — clipped at the counter
+            top so his body is hidden; only his head/shoulders nod above it. */}
+        <div style={{ position: 'absolute', inset: 0, clipPath: 'inset(0 0 48% 0)', pointerEvents: 'none' }}>
+          <div style={{
+            position: 'absolute', left: '45%', bottom: '14%', transform: 'translateX(-50%)',
+            height: '64%', aspectRatio: '229 / 581',
+            filter: 'drop-shadow(0 6px 10px rgba(0,0,0,0.45))',
+          }}>
+            <img src="/thug-4-body.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain' }} />
+            <img src="/thug-4-head.png" alt="" style={{
+              position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain',
+              transformOrigin: '50% 30%', animation: 'thugNod 2.6s ease-in-out infinite',
+            }} />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -180,19 +192,13 @@ function PackingRoom() {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <img src="/packing-room.webp" alt="Packing Room" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
-      {/* Thug-life character standing on the floor — head split onto its own
-          layer so it can nod "yes" (pivot at the neck, ~30% down). */}
-      <div style={{
+      {/* Thug-life character standing on the packing-room floor (swapped in
+          from the front room). */}
+      <img src="/thug-6.png" alt="" style={{
         position: 'absolute', bottom: '4%', left: '50%', transform: 'translateX(-50%)',
-        height: '62%', aspectRatio: '229 / 581', pointerEvents: 'none',
-        filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))',
-      }}>
-        <img src="/thug-4-body.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain' }} />
-        <img src="/thug-4-head.png" alt="" style={{
-          position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain',
-          transformOrigin: '50% 30%', animation: 'thugNod 2.6s ease-in-out infinite',
-        }} />
-      </div>
+        height: '62%', width: 'auto', objectFit: 'contain',
+        filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))', pointerEvents: 'none',
+      }} />
     </div>
   )
 }
@@ -294,13 +300,6 @@ function GrowRoom({ planted, bank, onPlace }) {
           at any screen size / orientation. */}
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src="/grow-room.webp" alt="Grow Room" style={{ display: 'block', width: '100%', height: '100%' }} />
-        {/* Thug-life character standing on the grow-room floor (off to the
-            side so he doesn't cover the benches). */}
-        <img src="/thug-5.png" alt="" style={{
-          position: 'absolute', left: '13%', bottom: '4%', transform: 'translateX(-50%)',
-          height: '52%', width: 'auto', objectFit: 'contain',
-          filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))', pointerEvents: 'none', zIndex: 5,
-        }} />
         <BeltBud planted={planted} />
         {PLANT_SLOTS.filter(s => planted.includes(s.id)).map((s) => (
           <img key={s.id} src="/plant.webp" alt="" aria-hidden data-slot={s.id}
