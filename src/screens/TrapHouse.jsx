@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { sfx } from '../sounds'
+import { PLANTS, plantCashValue, RARITY_COLORS } from '../data/gameData'
+import { getOwnedPlantTuples } from '../state/plantCardsStore'
+import { Avatar } from '../components/Avatar'
 
 const GOLD = '#c9a84c'
 const GREEN = '#2ecc71'
@@ -33,12 +36,27 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   // time its path animation completes a loop; the counter on the box reflects it.
   const [budCounts, setBudCounts] = useState({ 1: 0, 2: 0, 3: 0 })
   const countBud = (table) => setBudCounts(c => ({ ...c, [table]: (c[table] || 0) + 1 }))
+  // Which Grow Card is planted on each table (the card the player added).
+  const [tableCards, setTableCards] = useState({})
+  // Which table the "+ Add" slot was tapped for — opens the card picker.
+  const [picking, setPicking] = useState(null)
 
   // Place a plant slot, charging the bank (no-op if you can't afford it).
   const placeSlot = (slot, cost) => {
     if (bank < cost || planted.includes(slot)) return
     setBank(b => b - cost)
     setPlanted(p => [...p, slot])
+    sfx.buy?.()
+  }
+
+  // Add a chosen Grow Card to a table — fills its first (P4) plant slot and
+  // records the card. Triggered by picking a card in the "+ Add" picker.
+  const addPlant = (table, plant) => {
+    const slot = firstSlot(table)
+    if (planted.includes(slot)) return
+    setTableCards(tc => ({ ...tc, [table]: plant.id }))
+    setPlanted(p => [...p, slot])
+    setPicking(null)
     sfx.buy?.()
   }
 
@@ -87,7 +105,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
       <div style={{ position: 'absolute', inset: 0 }}>
         {cur.key === 'shop' && <ShopFront art={cur.art} />}
         {cur.key === 'pack' && <PackingRoom />}
-        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} onBud={countBud} />}
+        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} onBud={countBud} tableCards={tableCards} onAdd={setPicking} />}
       </div>
 
       {/* Arrows — step between rooms. Left = toward the front, right = deeper. */}
@@ -141,6 +159,16 @@ export default function TrapHouse({ onBack, isOwner = true }) {
           </div>
         )}
       </div>
+
+      {/* Grow Card picker — opens from a box's "+ Add" slot; picking a card
+          plants it in that table's first (P4) slot. */}
+      {picking != null && (
+        <PlantPicker
+          table={picking}
+          onPick={(plant) => addPlant(picking, plant)}
+          onClose={() => setPicking(null)}
+        />
+      )}
     </div>
   )
 }
@@ -258,31 +286,33 @@ const BUD_SECS = 25.6   // seconds for one full run down the path (higher = slow
 // the bud snaps into the box fast once it hits the belt edge.
 const BUD_PCTS = [0, 33, 66, 98.9, 99.45, 100]
 
-// Per-table box-button ladders, in placement order. Each button shows the next
-// unplaced step: FREE places for $0; UPGRADE costs `cost` (needs the funds in the
-// bank); once all are placed the button reads TBC. Table N's button only appears
-// once Table N-1 is fully unlocked (all 4 of its plants placed).
+// Per-table box ladders, in placement order. The FIRST slot (P4) is filled by
+// adding a Grow Card via the "+ Add" slot (see GrowRoom) — no cost. The
+// remaining slots are paid UPGRADE steps (need the funds in the bank). Once all
+// four are placed, the box shows nothing.
 const TABLE_STEPS = {
   1: [
-    { slot: 'T1-P4', cost: 0, free: true },
-    { slot: 'T1-P3', cost: 0 },
-    { slot: 'T1-P2', cost: 2000 },
-    { slot: 'T1-P1', cost: 4000 },
+    { slot: 'T1-P4' },
+    { slot: 'T1-P3', cost: 2000 },
+    { slot: 'T1-P2', cost: 4000 },
+    { slot: 'T1-P1', cost: 6000 },
   ],
   2: [
-    { slot: 'T2-P4', cost: 6000 },
+    { slot: 'T2-P4' },
     { slot: 'T2-P3', cost: 8000 },
     { slot: 'T2-P2', cost: 10000 },
     { slot: 'T2-P1', cost: 12000 },
   ],
   3: [
-    { slot: 'T3-P4', cost: 24000 },
+    { slot: 'T3-P4' },
     { slot: 'T3-P3', cost: 30000 },
     { slot: 'T3-P2', cost: 36000 },
     { slot: 'T3-P1', cost: 42000 },
   ],
 }
-const tableComplete = (table, planted) => TABLE_STEPS[table].every(s => planted.includes(s.slot))
+// First (P4) slot of a table — filled by the "+ Add" card pick.
+const firstSlot = (table) => TABLE_STEPS[table][0].slot
+const tableStarted = (table, planted) => planted.includes(firstSlot(table))
 
 // The collection bins (yellow boxes) at the front of each table: [x0, x1, yTop]
 // as % of the room-art box. A pile of buds fills each one when it's full.
@@ -298,7 +328,7 @@ const BIN_PILE = [
 ]
 const BINS_FULL = false  // preview: show every bin heaped with buds
 
-function GrowRoom({ planted, bank, onPlace, budCounts = {}, onBud }) {
+function GrowRoom({ planted, bank, onPlace, budCounts = {}, onBud, tableCards = {}, onAdd }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the plant overlays stay glued to the benches
@@ -321,25 +351,30 @@ function GrowRoom({ planted, bank, onPlace, budCounts = {}, onBud }) {
           ))
         })}
 
-        {/* Box buttons — one per table. Each steps FREE → UPGRADE $X → TBC,
-            placing a plant per tap; UPGRADE lights/clicks only when affordable.
-            Table N's button appears only once Table N-1 is fully unlocked. */}
+        {/* Box slots — one per table. An empty table shows a "+ Add" slot that
+            opens the Grow Card picker (places the card in the P4 spot). Once
+            started, it steps through UPGRADE $X. A finished table shows nothing. */}
         {[1, 2, 3].map(tbl => {
-          if (tbl > 1 && !tableComplete(tbl - 1, planted)) return null   // gate
           const [x0, x1] = BINS[tbl]
-          const step = TABLE_STEPS[tbl].find(s => !planted.includes(s.slot))
           const base = {
             position: 'absolute', left: `${(x0 + x1) / 2}%`, top: '84%', transform: 'translate(-50%, -50%)',
             width: `${((x1 - x0) * 0.765).toFixed(1)}%`, padding: '5px 0', borderRadius: 7,
             fontWeight: 900, fontSize: 11, letterSpacing: 1, zIndex: 4,
           }
-          if (!step) {
-            return <button key={tbl} disabled style={{ ...base, background: '#34322c', color: '#7a766a', border: '1px solid #4a463c', cursor: 'not-allowed' }}>TBC</button>
+          // Empty table → "+ Add" card slot (like adding a player card).
+          if (!tableStarted(tbl, planted)) {
+            return (
+              <button key={tbl} onClick={() => onAdd(tbl)}
+                style={{ ...base, background: 'rgba(201,168,76,0.14)', color: GOLD,
+                  border: `1.5px dashed ${GOLD}`, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                  animation: 'btnPulse 1.4s ease-in-out infinite' }}>
+                <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add
+              </button>
+            )
           }
-          if (step.free) {
-            return <button key={tbl} onClick={() => onPlace(step.slot, 0)}
-              style={{ ...base, background: '#2ecc71', color: '#063317', border: '1px solid #1f8a4a', cursor: 'pointer', animation: 'btnPulse 1.4s ease-in-out infinite' }}>FREE</button>
-          }
+          const step = TABLE_STEPS[tbl].find(s => !planted.includes(s.slot))
+          if (!step) return null   // table fully planted — no button
           const afford = bank >= step.cost
           return (
             <button key={tbl} onClick={() => afford && onPlace(step.slot, step.cost)} disabled={!afford}
@@ -359,22 +394,102 @@ function GrowRoom({ planted, bank, onPlace, budCounts = {}, onBud }) {
           if (!planted.some(id => id.startsWith(`T${tbl}-`))) return null
           const [x0, x1, yTop] = BINS[tbl]
           const n = budCounts[tbl] || 0
+          const strain = PLANTS.find(p => p.id === tableCards[tbl])
           return (
             <div key={`cnt${tbl}`} style={{
               position: 'absolute', left: `${(x0 + x1) / 2}%`, top: `${yTop}%`,
               transform: 'translate(-50%, -135%)', zIndex: 4, pointerEvents: 'none',
-              display: 'flex', alignItems: 'center', gap: 4,
-              background: 'rgba(10,8,5,0.82)', border: `1px solid ${GOLD}66`, borderRadius: 999,
-              padding: '2px 8px', boxShadow: '0 2px 7px rgba(0,0,0,0.55)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
             }}>
-              <img src="/bud.webp" alt="" style={{ width: 13, height: 13, objectFit: 'contain' }} />
-              <span key={n} style={{
-                color: GREEN, fontWeight: 900, fontSize: 13, fontVariantNumeric: 'tabular-nums',
-                lineHeight: 1, animation: 'budTick 0.35s ease-out',
-              }}>{n.toLocaleString()}</span>
+              {strain && (
+                <span style={{
+                  color: '#fff', fontSize: 8, fontWeight: 800, letterSpacing: 0.6,
+                  background: 'rgba(10,8,5,0.78)', borderRadius: 4, padding: '1px 6px',
+                  textShadow: '0 1px 2px #000', whiteSpace: 'nowrap',
+                }}>{strain.name}</span>
+              )}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                background: 'rgba(10,8,5,0.82)', border: `1px solid ${GOLD}66`, borderRadius: 999,
+                padding: '2px 8px', boxShadow: '0 2px 7px rgba(0,0,0,0.55)',
+              }}>
+                <img src="/bud.webp" alt="" style={{ width: 13, height: 13, objectFit: 'contain' }} />
+                <span key={n} style={{
+                  color: GREEN, fontWeight: 900, fontSize: 13, fontVariantNumeric: 'tabular-nums',
+                  lineHeight: 1, animation: 'budTick 0.35s ease-out',
+                }}>{n.toLocaleString()}</span>
+              </div>
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+// Grow Card picker — the "+ Add" slot opens this. Shows the player's owned plant
+// cards (one tile per card, best level owned); tapping one plants it. Mirrors the
+// crew card-picker pattern (an in-screen chooser, not a navigation away).
+function PlantPicker({ table, onPick, onClose }) {
+  const byId = new Map()
+  getOwnedPlantTuples().forEach(t => {
+    const cur = byId.get(t.id)
+    if (!cur || t.level > cur.level) byId.set(t.id, t)
+  })
+  const cards = [...byId.values()]
+    .map(t => ({ plant: PLANTS.find(p => p.id === t.id), level: t.level }))
+    .filter(x => x.plant)
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'absolute', inset: 0, zIndex: 30,
+      background: 'rgba(6,5,3,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 'calc(18px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom))',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 420, maxHeight: '90%', overflowY: 'auto',
+        background: '#13110d', border: `1px solid ${GOLD}44`, borderRadius: 16, padding: 16,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ color: '#fff', fontSize: 16, fontWeight: 800 }}>Your Grow Cards</div>
+          <button onClick={onClose} aria-label="Close" style={{
+            width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.08)',
+            border: '0.5px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 16, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}><i className="ti ti-x" /></button>
+        </div>
+        <div style={{ color: DIM, fontSize: 11, margin: '4px 0 14px' }}>Pick a card to plant on Table {table}.</div>
+
+        {cards.length === 0 ? (
+          <div style={{ background: '#1a1712', border: '0.5px solid #2a2722', borderRadius: 12, padding: 20, textAlign: 'center', color: '#7a766a', fontSize: 12 }}>
+            No grow cards yet — get one from the Cards screen.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {cards.map(({ plant, level }) => {
+              const rc = RARITY_COLORS[plant.rarity] || GOLD
+              return (
+                <button key={plant.id} onClick={() => { sfx.tap?.(); onPick(plant) }} style={{
+                  background: '#1a1712', border: `1px solid ${rc}55`, borderRadius: 12, padding: 10,
+                  cursor: 'pointer', textAlign: 'center',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
+                    <Avatar src={plant.avatar} emoji={plant.emoji} size={74} radius={10} style={{ border: `1px solid ${rc}55` }} />
+                  </div>
+                  <div style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>
+                    {plant.name}{level > 1 && <span style={{ color: rc }}> · LVL {level}</span>}
+                  </div>
+                  <div style={{ color: '#3fb950', fontSize: 11, fontWeight: 800, marginTop: 2 }}>
+                    ${plantCashValue(plant, level).toLocaleString()}
+                  </div>
+                  <div style={{ marginTop: 8, background: GOLD, color: '#1a1206', borderRadius: 7, padding: '5px 0', fontWeight: 900, fontSize: 11, letterSpacing: 1 }}>
+                    PLANT
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )

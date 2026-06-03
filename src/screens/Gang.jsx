@@ -256,22 +256,6 @@ function GangHub({ gang, player, onNavigate }) {
         </div>
       </div>
 
-      {/* Trap House — the gang's grow-and-sell operation. */}
-      <div className="section">
-        <div
-          onClick={() => { sfx.tap?.(); onNavigate && onNavigate('traphouse') }}
-          className="card card-pad"
-          style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
-        >
-          <div style={{ fontSize: 30, width: 40, textAlign: 'center' }}>🏚️</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>Trap House</div>
-            <div style={{ color: DIM, fontSize: 12, marginTop: 2 }}>Grow & sell — plant your cards, harvest, cash out.</div>
-          </div>
-          <i className="ti ti-chevron-right" style={{ color: '#666', fontSize: 18 }} />
-        </div>
-      </div>
-
       {/* Treasury */}
       <Treasury gang={gang} />
 
