@@ -29,6 +29,10 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   const [rotated, setRotated] = useState(false)  // manual CSS rotate (works even with iOS orientation-lock on)
   const [planted, setPlanted] = useState([])     // which plant slots are placed (each brings its bud + path)
   const [bank, setBank] = useState(200000)       // this store's bank balance ($) — full bank for testing
+  // Running tally of buds delivered into each table's bin. One bud "drops" each
+  // time its path animation completes a loop; the counter on the box reflects it.
+  const [budCounts, setBudCounts] = useState({ 1: 0, 2: 0, 3: 0 })
+  const countBud = (table) => setBudCounts(c => ({ ...c, [table]: (c[table] || 0) + 1 }))
 
   // Place a plant slot, charging the bank (no-op if you can't afford it).
   const placeSlot = (slot, cost) => {
@@ -83,7 +87,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
       <div style={{ position: 'absolute', inset: 0 }}>
         {cur.key === 'shop' && <ShopFront art={cur.art} />}
         {cur.key === 'pack' && <PackingRoom />}
-        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} />}
+        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} onBud={countBud} />}
       </div>
 
       {/* Arrows — step between rooms. Left = toward the front, right = deeper. */}
@@ -294,14 +298,14 @@ const BIN_PILE = [
 ]
 const BINS_FULL = false  // preview: show every bin heaped with buds
 
-function GrowRoom({ planted, bank, onPlace }) {
+function GrowRoom({ planted, bank, onPlace, budCounts = {}, onBud }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the plant overlays stay glued to the benches
           at any screen size / orientation. */}
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src="/grow-room.webp" alt="Grow Room" style={{ display: 'block', width: '100%', height: '100%' }} />
-        <BeltBud planted={planted} />
+        <BeltBud planted={planted} onBud={onBud} />
         {PLANT_SLOTS.filter(s => planted.includes(s.id)).map((s) => (
           <img key={s.id} src="/plant.webp" alt="" aria-hidden data-slot={s.id}
             style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: `${plantW(s.y)}%`,
@@ -347,6 +351,30 @@ function GrowRoom({ planted, bank, onPlace }) {
             </button>
           )
         })}
+
+        {/* Bud counters — one per box, showing the running tally of buds that
+            have dropped into it. Only shown once the table has a plant feeding
+            it. The number pops each time it ticks (keyed on the count). */}
+        {[1, 2, 3].map(tbl => {
+          if (!planted.some(id => id.startsWith(`T${tbl}-`))) return null
+          const [x0, x1, yTop] = BINS[tbl]
+          const n = budCounts[tbl] || 0
+          return (
+            <div key={`cnt${tbl}`} style={{
+              position: 'absolute', left: `${(x0 + x1) / 2}%`, top: `${yTop}%`,
+              transform: 'translate(-50%, -135%)', zIndex: 4, pointerEvents: 'none',
+              display: 'flex', alignItems: 'center', gap: 4,
+              background: 'rgba(10,8,5,0.82)', border: `1px solid ${GOLD}66`, borderRadius: 999,
+              padding: '2px 8px', boxShadow: '0 2px 7px rgba(0,0,0,0.55)',
+            }}>
+              <img src="/bud.webp" alt="" style={{ width: 13, height: 13, objectFit: 'contain' }} />
+              <span key={n} style={{
+                color: GREEN, fontWeight: 900, fontSize: 13, fontVariantNumeric: 'tabular-nums',
+                lineHeight: 1, animation: 'budTick 0.35s ease-out',
+              }}>{n.toLocaleString()}</span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -358,7 +386,7 @@ function GrowRoom({ planted, bank, onPlace }) {
 // bud elements are mounted up front (hidden until their plant is placed) so the
 // animations stay phase-locked — the buds stay evenly spaced no matter when you
 // buy each plant.
-function BeltBud({ planted }) {
+function BeltBud({ planted, onBud }) {
   const kf = Object.entries(BUD_PATHS).map(([t, pts]) => {
     const frames = pts.map((p, i) => {
       const pct = BUD_PCTS[i]
@@ -377,6 +405,9 @@ function BeltBud({ planted }) {
       <style>{kf}</style>
       {PLANT_SLOTS.filter(s => BUD_PATHS[s.table]).map(s => (
         <img key={s.id} src="/bud.webp" alt="" aria-hidden data-bud={s.id}
+          // Each loop = one bud delivered into this table's box. All buds are
+          // mounted (for phase-lock) even when hidden, so only count planted ones.
+          onAnimationIteration={() => { if (onBud && planted.includes(s.id)) onBud(s.table) }}
           style={{ position: 'absolute', width: `${BUD_W}%`,
             visibility: planted.includes(s.id) ? 'visible' : 'hidden',
             // lane = plant number (1-4) → one of four evenly-spaced phases
@@ -394,6 +425,11 @@ function Keyframes() {
       @keyframes btnPulse {
         0%,100% { transform: translate(-50%,-50%) scale(1);    filter: brightness(1); }
         50%     { transform: translate(-50%,-50%) scale(1.07); filter: brightness(1.18); }
+      }
+      @keyframes budTick {
+        0%   { transform: scale(1); }
+        40%  { transform: scale(1.45); color: #fff; }
+        100% { transform: scale(1); }
       }
     `}</style>
   )

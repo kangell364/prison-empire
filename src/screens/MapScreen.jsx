@@ -7,7 +7,6 @@ import { ScoutScreen } from '../components/ScoutScreen'
 import { TurfMap } from '../components/TurfMap'
 import { BlockSheet } from '../components/BlockSheet'
 import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks } from '../state/blocksStore'
-import { useGang } from '../state/gangStore'
 import { useMapData, buildCityCountyMap, STATE_CODE_TO_FIPS, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
 import { knockOut } from '../state/vitalsStore'
 import { getBounty } from '../state/bountyStore'
@@ -300,7 +299,6 @@ function useDeviceLocation() {
 // MapScreen
 // ---------------------------------------------------------------------
 export default function MapScreen({ onNavigate }) {
-  const inGang = !!useGang().myGang   // trap house is gang-owned
   const [stateView, setStateView] = useState(null)          // null = country view
   const [turfView, setTurfView] = useState(null)            // Map 2 (turf map): { center:[lat,lng], label }
   const [blockSel, setBlockSel] = useState(null)            // tapped block { gx, gy }
@@ -577,12 +575,12 @@ export default function MapScreen({ onNavigate }) {
         </div>
       </div>
 
-      {/* Your trap house — current location + relocate control. In a gang, tap
-          the card to open the grow-and-sell shop. */}
+      {/* Your trap house — your own grow-and-sell operation (not gang-gated).
+          Tap the card to walk the rooms; or relocate it to another county. */}
       <div style={{ padding: '10px 16px 0' }}>
         <div
-          onClick={() => { if (inGang && !relocating) { sfx.tap(); onNavigate && onNavigate('traphouse') } }}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#13131f', border: `0.5px solid ${moving ? GOLD + '66' : '#2a2a3a'}`, borderRadius: 14, padding: '10px 12px', cursor: inGang && !relocating ? 'pointer' : 'default' }}
+          onClick={() => { if (!relocating) { sfx.tap(); onNavigate && onNavigate('traphouse') } }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#13131f', border: `0.5px solid ${moving ? GOLD + '66' : '#2a2a3a'}`, borderRadius: 14, padding: '10px 12px', cursor: !relocating ? 'pointer' : 'default' }}
         >
           <div style={{ width: 32, height: 32, borderRadius: 9, background: `${GOLD}1f`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <i className={`ti ${moving ? 'ti-arrows-move' : 'ti-home'}`} style={{ color: GOLD, fontSize: 16 }} />
@@ -594,7 +592,7 @@ export default function MapScreen({ onNavigate }) {
                 ? `Relocating to ${countyNameByFips[homeHouse.moving_to_fips] || 'destination'} County · ${fmtClock(moveRemaining)}`
                 : (homeFips ? `${countyNameByFips[homeFips] || 'Unknown'} County` : 'Unplaced')}
             </div>
-            {inGang && !moving && !relocating && (
+            {!moving && !relocating && (
               <div style={{ color: '#2ecc71', fontSize: 10, marginTop: 2 }}><i className="ti ti-plant-2" style={{ marginRight: 3 }} />Tap to grow &amp; sell</div>
             )}
           </div>
@@ -791,7 +789,7 @@ export default function MapScreen({ onNavigate }) {
           counties={mapData?.counties}
           onBlockTap={(gx, gy) => setBlockSel({ gx, gy })}
           onBack={() => setTurfView(null)}
-          trapHouse={inGang && homeCoords ? { lat: homeCoords[1], lng: homeCoords[0] } : null}
+          trapHouse={homeCoords ? { lat: homeCoords[1], lng: homeCoords[0] } : null}
           onTrapHouseTap={() => onNavigate && onNavigate('traphouse')}
         />
       )}

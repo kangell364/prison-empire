@@ -36,6 +36,10 @@ export default function App() {
   // Which tab the Cards screen opens on. Set to 'crew' when jumping straight to
   // the My Crew view (e.g. tapping a crew slot on the home screen).
   const [cardsTab, setCardsTab] = useState('player')
+  // Where the Trap House was opened from, so its "Out" button returns there.
+  // The trap house is the player's own (not gang-gated), reachable from Home,
+  // the Gang hub, or the map.
+  const [trapFrom, setTrapFrom] = useState('home')
   const [muted, setMutedState] = useState(isMuted())
   const [showNotifs, setShowNotifs] = useState(false)
   const unread = useUnreadCount()
@@ -75,6 +79,7 @@ export default function App() {
   // a caller can deep-link into the Cards screen's My Crew view.
   const navigateTo = (id, opts) => {
     if (id === 'cards') setCardsTab(opts?.tab || 'player')
+    if (id === 'traphouse') setTrapFrom(screen)   // remember origin for the Out button
     setScreen(id)
   }
 
@@ -87,7 +92,7 @@ export default function App() {
       case 'yard':     return <Yard />
       case 'property': return <Property />
       case 'gang':     return <Gang onBack={() => setScreen('home')} onNavigate={navigateTo} />
-      case 'traphouse': return <TrapHouse onBack={() => setScreen('gang')} />
+      case 'traphouse': return <TrapHouse onBack={() => setScreen(trapFrom)} />
       case 'nurse':    return <Nurse onBack={() => setScreen('home')} />
       case 'profile':  return <Profile onBack={() => setScreen('home')} />
       default:         return <Dashboard onNavigate={navigateTo} />

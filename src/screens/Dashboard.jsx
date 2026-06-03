@@ -164,6 +164,28 @@ export default function Dashboard({ onNavigate }) {
         </div>
       </div>
 
+      {/* Trap House — the player's OWN grow-and-sell operation. Personal to each
+          player and not gang-gated; tap the art to walk the rooms. */}
+      <div className="section">
+        <div className="section-label">Trap House</div>
+        <div
+          onClick={() => { sfx.tap?.(); onNavigate('traphouse') }}
+          className="card"
+          style={{ overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
+        >
+          <img src="/grow-room.webp" alt="Trap House"
+            style={{ display: 'block', width: '100%', height: 'auto' }} />
+          <div style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0,
+            padding: '20px 14px 11px',
+            background: 'linear-gradient(0deg, rgba(0,0,0,0.82) 10%, rgba(0,0,0,0) 100%)',
+          }}>
+            <div style={{ color: '#fff', fontSize: 15, fontWeight: 700, textShadow: '0 1px 4px #000' }}>Trap House</div>
+            <div style={{ color: '#9a8', fontSize: 11, textShadow: '0 1px 3px #000' }}>Your grow-and-sell operation · tap to enter</div>
+          </div>
+        </div>
+      </div>
+
       {/* City */}
       <div className="section">
         <div className="section-label">Your Turf</div>
