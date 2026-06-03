@@ -170,7 +170,7 @@ function ShopFront({ art }) {
         <div style={{ position: 'absolute', inset: 0, clipPath: 'inset(0 0 48% 0)', pointerEvents: 'none' }}>
           <div style={{
             position: 'absolute', left: '45%', bottom: '14%', transform: 'translateX(-50%)',
-            height: '54%', aspectRatio: '229 / 581',
+            height: '59%', aspectRatio: '229 / 581',
             filter: 'drop-shadow(0 6px 10px rgba(0,0,0,0.45))',
           }}>
             <img src="/thug-4-body.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain' }} />
