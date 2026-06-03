@@ -99,8 +99,9 @@ export default function Cards({ initialTab = 'collection' }) {
       {/* Pack Banner + open machine — shared with the Commissary Store view. */}
       <CommissaryPack />
 
-      {/* Filter chips — each one filters the collection grid below. */}
-      <div style={{ padding: '14px 16px 0', display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none' }}>
+      {/* Filter chips — each one filters the collection grid below. Wraps so
+          every type is visible at once instead of scrolling horizontally. */}
+      <div style={{ padding: '14px 16px 0', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {FILTERS.map(f => {
           const active = filter === f
           return (
@@ -108,7 +109,6 @@ export default function Cards({ initialTab = 'collection' }) {
               key={f}
               onClick={() => setFilter(f)}
               style={{
-                flexShrink: 0,
                 background: active ? '#c9a84c18' : '#13131f',
                 border: `0.5px solid ${active ? '#c9a84c44' : '#2a2a3a'}`,
                 borderRadius: 20,
