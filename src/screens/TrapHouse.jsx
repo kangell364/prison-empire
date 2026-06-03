@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { sfx } from '../sounds'
 import { PLANTS, plantCashValue, RARITY_COLORS } from '../data/gameData'
 import { getOwnedPlantTuples } from '../state/plantCardsStore'
@@ -40,6 +40,23 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   const [tableCards, setTableCards] = useState({})
   // Which table the "+ Add" slot was tapped for — opens the card picker.
   const [picking, setPicking] = useState(null)
+
+  // Skater-monkey journey. Idle = stationary in the packing room. Tapping him
+  // sends him through the building on a fixed TIMELINE (the view does NOT
+  // follow — you navigate rooms yourself to catch him passing through):
+  //   A: packing, roll off the right     B: grow room, roll right → off left
+  //   C: packing, roll right → off left  D: packing, roll in from left → home
+  // Phases advance on a timer (same rolling speed in every room) so he keeps
+  // moving whether or not you're watching that room; the Skater syncs to the
+  // elapsed time so switching in mid-phase shows him at his real position.
+  const [skate, setSkate] = useState({ phase: 'idle', start: 0 })
+  const startSkate = () => setSkate(s => (s.phase === 'idle' ? { phase: 'A', start: Date.now() } : s))
+  useEffect(() => {
+    if (skate.phase === 'idle') return
+    const next = skate.phase === 'A' ? 'B' : skate.phase === 'B' ? 'C' : skate.phase === 'C' ? 'D' : 'idle'
+    const t = setTimeout(() => setSkate({ phase: next, start: Date.now() }), SKATE_MS[skate.phase])
+    return () => clearTimeout(t)
+  }, [skate.phase])
 
   // Place a plant slot, charging the bank (no-op if you can't afford it).
   const placeSlot = (slot, cost) => {
@@ -104,8 +121,8 @@ export default function TrapHouse({ onBack, isOwner = true }) {
           display when the phone is turned sideways. Controls float on top. */}
       <div style={{ position: 'absolute', inset: 0 }}>
         {cur.key === 'shop' && <ShopFront art={cur.art} />}
-        {cur.key === 'pack' && <PackingRoom />}
-        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} onBud={countBud} tableCards={tableCards} onAdd={setPicking} />}
+        {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} />}
+        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} onBud={countBud} tableCards={tableCards} onAdd={setPicking} skatePhase={skate.phase} skateStart={skate.start} />}
       </div>
 
       {/* Arrows — step between rooms. Left = toward the front, right = deeper. */}
@@ -221,45 +238,64 @@ function ShopFront({ art }) {
 // ---- PACKING -----------------------------------------------------------
 // Raw product feeds the line on the left, runs through the machine, and drops
 // as packed units on the right. Real art now; the packing mechanic is next.
-function PackingRoom() {
-  // The monkey stands still in the center until tapped. A tap rolls him off the
-  // right edge once ('exit'); when that finishes he loops 'cross' — rolling in
-  // from the left and off the right, over and over.
-  const [rollPhase, setRollPhase] = useState('idle')   // 'idle' | 'exit' | 'cross'
-  const rolling = rollPhase !== 'idle'
-  const groupAnim =
-      rollPhase === 'exit'  ? 'rollExitRight 1.1s ease-in forwards'
-    : rollPhase === 'cross' ? 'rollCross 2.6s linear infinite'
-    : 'none'
+// Skater journey timing — same rolling SPEED everywhere (a full room cross is
+// twice the distance of center↔edge, so it takes twice as long). Phase durations
+// (ms) drive the parent timer; the seconds match each phase's CSS animation.
+const SKATE_MS = { A: 2600, B: 5200, C: 5200, D: 2600 }
+const SKATE_ANIM = {
+  A: { name: 'rollExitRight',   secs: 2.6 },
+  B: { name: 'rollRightToLeft', secs: 5.2 },
+  C: { name: 'rollRightToLeft', secs: 5.2 },
+  D: { name: 'rollEnterLeft',   secs: 2.6 },
+}
 
+function PackingRoom({ skatePhase = 'idle', skateStart = 0, onSkateClick }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the skater stays glued to the floor at any
           screen size / orientation. */}
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src="/packing-room.webp" alt="Packing Room" style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain' }} />
-        {/* Thug-life monkey on a skateboard — board + rider move as one group.
-            Stationary until tapped, then rolls (see rollPhase). */}
-        <div
-          style={{ position: 'absolute', inset: 0, pointerEvents: 'none', animation: groupAnim }}
-          onAnimationEnd={(e) => { if (e.animationName === 'rollExitRight') setRollPhase('cross') }}
-        >
-          {/* Skateboard under the feet — wheels spin only while rolling. */}
-          <div style={{ position: 'absolute', bottom: '5%', left: '50%', transform: 'translateX(-50%)', width: '16%' }}>
-            <Skateboard spinning={rolling} />
-          </div>
-          {/* Monkey standing on the deck — tap to send him rolling. */}
-          <img src="/thug-6.png" alt="Skater monkey"
-            onClick={() => { if (rollPhase === 'idle') { sfx.tap?.(); setRollPhase('exit') } }}
-            style={{
-              position: 'absolute', bottom: '8%', left: '50%', transform: 'translateX(-50%)',
-              height: '60%', width: 'auto', objectFit: 'contain',
-              filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))',
-              pointerEvents: rollPhase === 'idle' ? 'auto' : 'none',
-              cursor: 'pointer',
-            }} />
-        </div>
+        {/* Skater monkey lives in the packing room for every phase except B
+            (when he's rolling through the grow room). */}
+        {skatePhase !== 'B' && (
+          <Skater phase={skatePhase} start={skateStart} onClick={onSkateClick} />
+        )}
       </div>
+    </div>
+  )
+}
+
+// The skater monkey + his board, moving as one group. Stationary at center when
+// `phase` is 'idle'. Each non-idle phase plays a constant-speed roll:
+//   A: center → off right    B/C: in from right → off left    D: in from left → center
+// The animation is offset by a negative delay = time already elapsed in the
+// phase, so mounting mid-phase (you just switched into the room) shows him at
+// his true position on the path rather than restarting.
+function Skater({ phase = 'idle', start = 0, onClick }) {
+  const rolling = phase !== 'idle'
+  const anim = useMemo(() => {
+    const conf = SKATE_ANIM[phase]
+    if (!conf) return 'none'
+    const elapsed = Math.max(0, (Date.now() - start) / 1000)
+    return `${conf.name} ${conf.secs}s linear ${(-elapsed).toFixed(2)}s forwards`
+  }, [phase, start])
+  return (
+    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', animation: anim }}>
+      {/* Skateboard under the feet — wheels spin only while rolling. */}
+      <div style={{ position: 'absolute', bottom: '5%', left: '50%', transform: 'translateX(-50%)', width: '16%' }}>
+        <Skateboard spinning={rolling} />
+      </div>
+      {/* Monkey standing on the deck — tap (only when idle) to send him rolling. */}
+      <img src="/thug-6.png" alt="Skater monkey"
+        onClick={() => { if (phase === 'idle') { sfx.tap?.(); onClick && onClick() } }}
+        style={{
+          position: 'absolute', bottom: '8%', left: '50%', transform: 'translateX(-50%)',
+          height: '60%', width: 'auto', objectFit: 'contain',
+          filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))',
+          pointerEvents: phase === 'idle' ? 'auto' : 'none',
+          cursor: 'pointer',
+        }} />
     </div>
   )
 }
@@ -389,13 +425,15 @@ const BIN_PILE = [
 ]
 const BINS_FULL = false  // preview: show every bin heaped with buds
 
-function GrowRoom({ planted, bank, onPlace, budCounts = {}, onBud, tableCards = {}, onAdd }) {
+function GrowRoom({ planted, bank, onPlace, budCounts = {}, onBud, tableCards = {}, onAdd, skatePhase = 'idle', skateStart = 0 }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the plant overlays stay glued to the benches
           at any screen size / orientation. */}
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src="/grow-room.webp" alt="Grow Room" style={{ display: 'block', width: '100%', height: '100%' }} />
+        {/* The skater monkey passes through the grow room during phase B. */}
+        {skatePhase === 'B' && <Skater phase="B" start={skateStart} />}
         <BeltBud planted={planted} onBud={onBud} />
         {PLANT_SLOTS.filter(s => planted.includes(s.id)).map((s) => (
           <img key={s.id} src="/plant.webp" alt="" aria-hidden data-slot={s.id}
@@ -614,10 +652,10 @@ function Keyframes() {
         40%  { transform: scale(1.45); color: #fff; }
         100% { transform: scale(1); }
       }
-      /* Monkey rolls from the center off the right edge (once). */
-      @keyframes rollExitRight { from { transform: translateX(0); } to { transform: translateX(85%); } }
-      /* Then loops: in from the left, off the right. */
-      @keyframes rollCross { from { transform: translateX(-85%); } to { transform: translateX(85%); } }
+      /* Skater roll phases (group translateX; % of the room-box width). */
+      @keyframes rollExitRight   { from { transform: translateX(0);    } to { transform: translateX(85%);  } }
+      @keyframes rollRightToLeft { from { transform: translateX(85%);  } to { transform: translateX(-85%); } }
+      @keyframes rollEnterLeft   { from { transform: translateX(-85%); } to { transform: translateX(0);    } }
       @keyframes wheelSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     `}</style>
   )
