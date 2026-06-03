@@ -361,15 +361,21 @@ function GrowRoom({ planted, bank, onPlace, budCounts = {}, onBud, tableCards = 
             width: `${((x1 - x0) * 0.765).toFixed(1)}%`, padding: '5px 0', borderRadius: 7,
             fontWeight: 900, fontSize: 11, letterSpacing: 1, zIndex: 4,
           }
-          // Empty table → "+ Add" card slot (like adding a player card).
+          // Empty table → "+ Add" card slot (like adding a player card). Bigger
+          // and higher-contrast than the upgrade button so it's easy to spot:
+          // black fill, white text + border.
           if (!tableStarted(tbl, planted)) {
             return (
               <button key={tbl} onClick={() => onAdd(tbl)}
-                style={{ ...base, background: 'rgba(201,168,76,0.14)', color: GOLD,
-                  border: `1.5px dashed ${GOLD}`, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                style={{ ...base,
+                  width: `${((x1 - x0) * 0.95).toFixed(1)}%`, padding: '9px 0',
+                  fontSize: 14, letterSpacing: 1.5,
+                  background: '#0a0a0a', color: '#fff',
+                  border: '1.5px solid #fff', borderRadius: 9, cursor: 'pointer',
+                  boxShadow: '0 3px 10px rgba(0,0,0,0.6)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
                   animation: 'btnPulse 1.4s ease-in-out infinite' }}>
-                <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add
+                <i className="ti ti-plus" style={{ fontSize: 15 }} /> Add
               </button>
             )
           }
