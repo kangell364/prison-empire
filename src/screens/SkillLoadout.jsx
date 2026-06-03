@@ -183,7 +183,8 @@ function SlotTile({ slot, skill, onClick }) {
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: 6, marginBottom: 4 }}>
         <Avatar src={skill.avatar} emoji={skill.emoji} size={44} radius={8} style={{ background: '#1e1e2a' }} />
       </div>
-      <div style={{ color: '#fff', fontSize: 10, fontWeight: 500, textAlign: 'center', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{skill.name}</div>
+      <div style={{ color: '#fff', fontSize: 10, fontWeight: 500, textAlign: 'center', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{skill.name}</div>
+      <div style={{ textAlign: 'center', fontSize: 8, color: ringColor, fontWeight: 700, marginBottom: 2 }}>LVL {bestLevel(skill.id) || 1}</div>
       <div style={{ textAlign: 'center', fontSize: 9, color: RED, fontVariantNumeric: 'tabular-nums' }}>+{effDmg(skill.id)} DMG</div>
       <span style={{ position: 'absolute', bottom: 4, right: 6, color: ringColor, fontSize: 9, fontWeight: 700 }}>{slot}</span>
     </div>

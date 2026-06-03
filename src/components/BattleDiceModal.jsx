@@ -342,8 +342,8 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 14 }}>
-          <SlotGrid side="you" equipped={playerEquippedMap} learned={playerLearned} highlight={highlight} landed={landedSlot} color={BLUE} />
-          <SlotGrid side="opp" equipped={oppEquippedMap} learned={oppLearned} highlight={highlight} landed={landedSlot} color={ORANGE} />
+          <SlotGrid side="you" equipped={playerEquippedMap} learned={playerLearned} loadout={playerLoadout} highlight={highlight} landed={landedSlot} color={BLUE} />
+          <SlotGrid side="opp" equipped={oppEquippedMap} learned={oppLearned} loadout={oppLoadout} highlight={highlight} landed={landedSlot} color={ORANGE} />
         </div>
 
         {/* Duel (PvP) result button — sits directly under SKILLS and above the
@@ -473,9 +473,19 @@ function FighterBlock({ name, emoji, avatar, level, attack, defense, hp, maxHp, 
   )
 }
 
-function SlotGrid({ side, equipped, learned, highlight, landed, color }) {
+function SlotGrid({ side, equipped, learned, loadout = {}, highlight, landed, color }) {
   const slots = Array.from({ length: 11 }, (_, i) => i + 2)
-  const [popup, setPopup] = useState(null)   // { skill, level } when a skull is tapped
+  const [popup, setPopup] = useState(null)   // { skill, level, dmg } when a skull is tapped
+
+  // Effective per-fire DMG for a slot's skill, reflecting the equipped card's
+  // level + upgrades: player entries carry `bonus` (= level × perHit), boss
+  // entries carry `dmgUpgrade`. Falls back to the skill's base per-level DMG.
+  const perHitDmg = (slot, skill) => {
+    const e = loadout[slot]
+    if (e && e.bonus != null && e.level) return Math.round(e.bonus / e.level)
+    if (e) return skill.perLevelAttack + (e.dmgUpgrade || 0) * SKILL_DMG_PER_LEVEL
+    return skill.perLevelAttack
+  }
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ color, fontSize: 9, fontWeight: 700, letterSpacing: 1.5, textAlign: side === 'you' ? 'left' : 'right', marginBottom: 4 }}>SKILLS</div>
@@ -488,7 +498,7 @@ function SlotGrid({ side, equipped, learned, highlight, landed, color }) {
           const skill = skillId ? SKILLS.find(s => s.id === skillId) : null
           return (
             <div key={isLanded ? `landed-${landed}` : slot}
-              onClick={skill ? () => setPopup({ skill, level: learnedSkill?.level }) : undefined}
+              onClick={skill ? () => setPopup({ skill, level: learnedSkill?.level, dmg: perHitDmg(slot, skill) }) : undefined}
               style={{
                 aspectRatio: '1', background: isHl ? `${color}33` : '#0d0d15',
                 border: `${isHl ? 2 : 0.5}px solid ${isHl ? color : '#2a2a3a'}`, borderRadius: 6,
@@ -505,7 +515,7 @@ function SlotGrid({ side, equipped, learned, highlight, landed, color }) {
         })}
       </div>
       {popup && (
-        <SkillCardPopup skill={popup.skill} level={popup.level} onClose={() => setPopup(null)} />
+        <SkillCardPopup skill={popup.skill} level={popup.level} dmgPerLevel={popup.dmg} onClose={() => setPopup(null)} />
       )}
     </div>
   )
