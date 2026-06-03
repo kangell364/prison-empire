@@ -39,10 +39,10 @@ export const PLAYER = {
   traitPoints: 3,                   // unspent points (decoupled from level for v1)
   // PvP / skill state
   dailyKills: 0,
-  // Seeded for the demo so Battle Dice fires a skill when the roll hits slot 7.
+  // No skills learned/equipped — the old demo skill was removed (see SKILLS).
   // Real persistence comes with the Supabase pass.
-  learnedSkills:   { soup_cup: { level: 1 } },
-  equippedSkills:  { 7: 'soup_cup' },
+  learnedSkills:   {},
+  equippedSkills:  {},
   lastSkillUpgradeLevel: 0,         // skill upgrades are gated to 1 per player level
   // Trait values — the upgradable Stats. Card stats give the starting baseline;
   // additional points from level-ups and upgrades stack on top.
@@ -660,25 +660,14 @@ export function streetRep(p) {
 // Learn cost = baseLearnCost. Upgrade cost grows with level. You can upgrade
 // at most one skill per player level (gated by PLAYER.lastSkillUpgradeLevel).
 // New skill types unlock every 10 player levels.
-export const SKILLS = [
-  {
-    id: 'soup_cup',
-    name: 'Steaming Hot Cup of Soup',
-    shortName: 'Hot Soup',
-    emoji: '🍜',
-    description: 'Hurl a scalding cup of soup at your opponent\'s face. Deals additional attack damage and stuns briefly.',
-    category: 'Specialty',
-    minLevel: 1,
-    maxLevel: 100,
-    perLevelAttack: 35,                           // +35 attack damage per skill level
-    baseLearnCost:    { knowledge: 16, hustle: 2_400 },
-    upgradeCostFor: (currentLevel) => ({
-      knowledge: 16 + currentLevel * 4,
-      hustle:    2_400 * (currentLevel + 1),
-    }),
-  },
-  // Future skills (level 10, 20, ...) get added here as more tiers unlock.
-]
+//
+// Intentionally EMPTY — the original skills were removed so a fresh set can be
+// authored. Every consumer handles an empty list: players have no skills to
+// learn/equip, and bosses get empty loadouts (opponentSkillLoadout returns {}).
+// Add new skills here in the same shape as before:
+//   { id, name, shortName, emoji, description, category, minLevel, maxLevel,
+//     perLevelAttack, baseLearnCost: { knowledge, hustle }, upgradeCostFor }
+export const SKILLS = []
 
 // PvP reward multiplier. Killing someone N levels above you = N× reward.
 // Same level or lower = 1× (clamped). User-facing rule we surface in the UI.

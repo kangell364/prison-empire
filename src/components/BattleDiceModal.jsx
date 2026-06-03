@@ -23,7 +23,7 @@ function dmg(atk, def) {
 // loadout so fights feel consistent. Procedurally generated from id/name + power.
 // Exported so the detail card can preview a boss's loadout before the fight.
 export function opponentSkillLoadout(opp) {
-  if (!opp) return {}
+  if (!opp || !SKILLS.length) return {}   // no skills defined → empty loadout
   const seedStr = String(opp.id ?? opp.name ?? 'x')
   let s = 0
   for (let i = 0; i < seedStr.length; i++) s = (s * 31 + seedStr.charCodeAt(i)) >>> 0
