@@ -222,25 +222,42 @@ function ShopFront({ art }) {
 // Raw product feeds the line on the left, runs through the machine, and drops
 // as packed units on the right. Real art now; the packing mechanic is next.
 function PackingRoom() {
+  // The monkey stands still in the center until tapped. A tap rolls him off the
+  // right edge once ('exit'); when that finishes he loops 'cross' — rolling in
+  // from the left and off the right, over and over.
+  const [rollPhase, setRollPhase] = useState('idle')   // 'idle' | 'exit' | 'cross'
+  const rolling = rollPhase !== 'idle'
+  const groupAnim =
+      rollPhase === 'exit'  ? 'rollExitRight 1.1s ease-in forwards'
+    : rollPhase === 'cross' ? 'rollCross 2.6s linear infinite'
+    : 'none'
+
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the skater stays glued to the floor at any
           screen size / orientation. */}
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src="/packing-room.webp" alt="Packing Room" style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain' }} />
-        {/* Thug-life monkey riding a skateboard — the board + rider glide back
-            and forth across the floor as one group. */}
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', animation: 'skateGlide 6.5s ease-in-out infinite' }}>
-          {/* Skateboard under the feet */}
+        {/* Thug-life monkey on a skateboard — board + rider move as one group.
+            Stationary until tapped, then rolls (see rollPhase). */}
+        <div
+          style={{ position: 'absolute', inset: 0, pointerEvents: 'none', animation: groupAnim }}
+          onAnimationEnd={(e) => { if (e.animationName === 'rollExitRight') setRollPhase('cross') }}
+        >
+          {/* Skateboard under the feet — wheels spin only while rolling. */}
           <div style={{ position: 'absolute', bottom: '5%', left: '50%', transform: 'translateX(-50%)', width: '16%' }}>
-            <Skateboard />
+            <Skateboard spinning={rolling} />
           </div>
-          {/* Monkey standing on the deck */}
-          <img src="/thug-6.png" alt="" style={{
-            position: 'absolute', bottom: '8%', left: '50%', transform: 'translateX(-50%)',
-            height: '60%', width: 'auto', objectFit: 'contain',
-            filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))',
-          }} />
+          {/* Monkey standing on the deck — tap to send him rolling. */}
+          <img src="/thug-6.png" alt="Skater monkey"
+            onClick={() => { if (rollPhase === 'idle') { sfx.tap?.(); setRollPhase('exit') } }}
+            style={{
+              position: 'absolute', bottom: '8%', left: '50%', transform: 'translateX(-50%)',
+              height: '60%', width: 'auto', objectFit: 'contain',
+              filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))',
+              pointerEvents: rollPhase === 'idle' ? 'auto' : 'none',
+              cursor: 'pointer',
+            }} />
         </div>
       </div>
     </div>
@@ -249,7 +266,8 @@ function PackingRoom() {
 
 // A cartoon skateboard (side view) drawn to match the bold-outline art style:
 // a colored deck with kicked-up nose/tail on two trucks of cream wheels.
-function Skateboard() {
+// `spinning` toggles the wheel rotation (on while the monkey is rolling).
+function Skateboard({ spinning = false }) {
   return (
     <svg viewBox="0 0 200 64" style={{ display: 'block', width: '100%', height: 'auto',
       filter: 'drop-shadow(0 5px 6px rgba(0,0,0,0.5))' }}>
@@ -264,7 +282,7 @@ function Skateboard() {
       {/* Wheels — one per truck (side view). Each wheel group spins (outer ring
           is symmetric, so the hub + spokes are what make the rotation visible). */}
       {[54, 146].map((cx, i) => (
-        <g key={i} style={{ transformBox: 'fill-box', transformOrigin: 'center', animation: 'wheelSpin 0.5s linear infinite' }}>
+        <g key={i} style={{ transformBox: 'fill-box', transformOrigin: 'center', animation: spinning ? 'wheelSpin 0.5s linear infinite' : 'none' }}>
           <circle cx={cx} cy="50" r="11" fill="#f1e7c9" stroke="#140d06" strokeWidth="3.5" />
           {/* spokes (X) + hub */}
           <line x1={cx - 7} y1={50 - 7} x2={cx + 7} y2={50 + 7} stroke="#140d06" strokeWidth="1.6" />
@@ -596,11 +614,10 @@ function Keyframes() {
         40%  { transform: scale(1.45); color: #fff; }
         100% { transform: scale(1); }
       }
-      @keyframes skateGlide {
-        0%   { transform: translateX(-17%) rotate(-1.5deg); }
-        50%  { transform: translateX(17%)  rotate(1.5deg); }
-        100% { transform: translateX(-17%) rotate(-1.5deg); }
-      }
+      /* Monkey rolls from the center off the right edge (once). */
+      @keyframes rollExitRight { from { transform: translateX(0); } to { transform: translateX(85%); } }
+      /* Then loops: in from the left, off the right. */
+      @keyframes rollCross { from { transform: translateX(-85%); } to { transform: translateX(85%); } }
       @keyframes wheelSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     `}</style>
   )
