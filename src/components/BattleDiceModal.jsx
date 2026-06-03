@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { SKILLS } from '../data/gameData'
 import { getBattleSkillLoadout } from '../state/skillLoadoutStore'
 import { SKILL_DMG_PER_LEVEL } from '../state/skillUpgradesStore'
+import { SkillCardPopup } from './SkillCardPopup'
 import { sfx } from '../sounds'
 import { Avatar } from './Avatar'
 import { usePlayerCard } from '../state/profileStore'
@@ -474,6 +475,7 @@ function FighterBlock({ name, emoji, avatar, level, attack, defense, hp, maxHp, 
 
 function SlotGrid({ side, equipped, learned, highlight, landed, color }) {
   const slots = Array.from({ length: 11 }, (_, i) => i + 2)
+  const [popup, setPopup] = useState(null)   // { skill, level } when a skull is tapped
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ color, fontSize: 9, fontWeight: 700, letterSpacing: 1.5, textAlign: side === 'you' ? 'left' : 'right', marginBottom: 4 }}>SKILLS</div>
@@ -483,22 +485,28 @@ function SlotGrid({ side, equipped, learned, highlight, landed, color }) {
           const isLanded = landed === slot
           const skillId = equipped[slot]
           const learnedSkill = skillId ? learned[skillId] : null
-          const emoji = skillId ? (SKILLS.find(s => s.id === skillId)?.emoji || '') : ''
+          const skill = skillId ? SKILLS.find(s => s.id === skillId) : null
           return (
             <div key={isLanded ? `landed-${landed}` : slot}
+              onClick={skill ? () => setPopup({ skill, level: learnedSkill?.level }) : undefined}
               style={{
                 aspectRatio: '1', background: isHl ? `${color}33` : '#0d0d15',
                 border: `${isHl ? 2 : 0.5}px solid ${isHl ? color : '#2a2a3a'}`, borderRadius: 6,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
                 transition: 'border-color 0.12s, background 0.12s', boxShadow: isHl ? `0 0 8px ${color}66` : 'none',
                 animation: isLanded ? 'slotActivate 0.5s ease' : 'none', '--flash-color': color,
+                cursor: skill ? 'pointer' : 'default',
               }}>
-              {emoji && <span style={{ fontSize: 14, filter: learnedSkill ? 'none' : 'grayscale(1) brightness(0.5)' }}>{emoji}</span>}
+              {/* Dice view keeps the emoji (the "skull"); tap it to pop the card. */}
+              {skill && <span style={{ fontSize: 14, filter: learnedSkill ? 'none' : 'grayscale(1) brightness(0.5)' }}>{skill.emoji}</span>}
               <span style={{ position: 'absolute', bottom: 1, right: 2, color: isHl ? color : '#444', fontSize: 7, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{slot}</span>
             </div>
           )
         })}
       </div>
+      {popup && (
+        <SkillCardPopup skill={popup.skill} level={popup.level} onClose={() => setPopup(null)} />
+      )}
     </div>
   )
 }

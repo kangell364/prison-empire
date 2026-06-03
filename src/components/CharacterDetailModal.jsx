@@ -1,6 +1,7 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { RARITY_COLORS, SKILLS } from '../data/gameData'
 import { Avatar, KoOverlay, KO_FILTER } from './Avatar'
+import { SkillCardPopup } from './SkillCardPopup'
 import { useVitals, openNurse } from '../state/vitalsStore'
 
 const GOLD = '#c9a84c'
@@ -422,33 +423,53 @@ export function CharacterDetailModal({
 // skill shows its emoji + level; empty slots are dimmed with just the number.
 function SkillSlotGrid({ loadout = {}, accent = GOLD }) {
   const slots = Array.from({ length: 11 }, (_, i) => i + 2)   // 2..12
+  const [popup, setPopup] = useState(null)   // { skill, level } when a slot is tapped
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-      {slots.map(slot => {
-        const entry = loadout[slot]
-        const skill = entry ? SKILLS.find(s => s.id === entry.skillId) : null
-        return (
-          <div key={slot} style={{
-            aspectRatio: '1',
-            background: entry ? `${accent}14` : '#0d0d15',
-            border: `0.5px solid ${entry ? `${accent}66` : '#2a2a3a'}`,
-            borderRadius: 8,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            position: 'relative',
-          }}>
-            {skill && <span style={{ fontSize: 20, lineHeight: 1 }}>{skill.emoji}</span>}
-            {entry && (
-              <span style={{ position: 'absolute', top: 2, left: 4, color: accent, fontSize: 8, fontWeight: 700 }}>
-                L{entry.level}
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+        {slots.map(slot => {
+          const entry = loadout[slot]
+          const skill = entry ? SKILLS.find(s => s.id === entry.skillId) : null
+          return (
+            <div key={slot}
+              onClick={skill ? () => setPopup({ skill, entry }) : undefined}
+              style={{
+                aspectRatio: '1',
+                background: entry ? `${accent}14` : '#0d0d15',
+                border: `0.5px solid ${entry ? `${accent}66` : '#2a2a3a'}`,
+                borderRadius: 8, overflow: 'hidden',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                position: 'relative', cursor: skill ? 'pointer' : 'default',
+              }}>
+              {/* In the open view, the slot shows the actual skill card art
+                  (emoji fallback). Tap it to pop the full card. */}
+              {skill && skill.avatar ? (
+                <img src={skill.avatar} alt={skill.name}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : skill ? (
+                <span style={{ fontSize: 20, lineHeight: 1 }}>{skill.emoji}</span>
+              ) : null}
+              {entry && (
+                <span style={{ position: 'absolute', top: 2, left: 4, color: '#fff', fontSize: 8, fontWeight: 700, textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}>
+                  L{entry.level}
+                </span>
+              )}
+              <span style={{ position: 'absolute', bottom: 2, right: 4, color: skill ? '#fff' : (entry ? accent : '#444'), fontSize: 8, fontWeight: 700, fontVariantNumeric: 'tabular-nums', textShadow: skill ? '0 1px 2px rgba(0,0,0,0.9)' : 'none' }}>
+                {slot}
               </span>
-            )}
-            <span style={{ position: 'absolute', bottom: 2, right: 4, color: entry ? accent : '#444', fontSize: 8, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-              {slot}
-            </span>
-          </div>
-        )
-      })}
-    </div>
+            </div>
+          )
+        })}
+      </div>
+      {popup && (
+        <SkillCardPopup
+          skill={popup.skill}
+          level={popup.entry?.level}
+          dmgPerLevel={popup.skill.perLevelAttack + (popup.entry?.dmgUpgrade || 0) * 5}
+          onClose={() => setPopup(null)}
+        />
+      )}
+    </>
   )
 }
 
