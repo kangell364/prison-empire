@@ -350,22 +350,8 @@ export function CharacterDetailModal({
           </div>
         )}
 
-        {/* Skill loadout — the fighter's 12-slot skill board (slots 2–12, the
-            Battle-Dice sum range). Same slots that fire mid-fight, so you can
-            scout a boss's skills before committing stamina. Shows the empty
-            board even with no skills yet, so the slots are visible as a
-            placeholder. */}
-        {skillLoadout && (
-          <div style={{ padding: '16px 18px 0' }}>
-            <SectionLabel>Skills</SectionLabel>
-            <SkillSlotGrid loadout={skillLoadout} accent={accent} />
-            <div style={{ color: '#555', fontSize: 10, marginTop: 8, lineHeight: 1.5 }}>
-              A roll lands on a slot (the two dice sum, 2–12). If a skill sits there, it fires for bonus attack.
-            </div>
-          </div>
-        )}
-
-        {/* Actions */}
+        {/* Actions — rendered above the skill board so FIGHT sits directly
+            over the boss's Skills section. */}
         {actions.length > 0 && (
           <div style={{ padding: '16px 18px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
             {actions.map((a, i) => (
@@ -393,6 +379,21 @@ export function CharacterDetailModal({
                 {a.label}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Skill loadout — the fighter's 12-slot skill board (slots 2–12, the
+            Battle-Dice sum range). Same slots that fire mid-fight, so you can
+            scout a boss's skills before committing stamina. Shows the empty
+            board even with no skills yet, so the slots are visible as a
+            placeholder. */}
+        {skillLoadout && (
+          <div style={{ padding: '16px 18px 0' }}>
+            <SectionLabel>Skills</SectionLabel>
+            <SkillSlotGrid loadout={skillLoadout} accent={accent} />
+            <div style={{ color: '#555', fontSize: 10, marginTop: 8, lineHeight: 1.5 }}>
+              A roll lands on a slot (the two dice sum, 2–12). If a skill sits there, it fires for bonus attack.
+            </div>
           </div>
         )}
       </div>
