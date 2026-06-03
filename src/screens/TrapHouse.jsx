@@ -313,6 +313,9 @@ const TABLE_STEPS = {
 // First (P4) slot of a table — filled by the "+ Add" card pick.
 const firstSlot = (table) => TABLE_STEPS[table][0].slot
 const tableStarted = (table, planted) => planted.includes(firstSlot(table))
+// A table is complete once all four of its plant slots are placed. Table N's
+// box (the "+ Add" slot and beyond) only appears once Table N-1 is complete.
+const tableComplete = (table, planted) => TABLE_STEPS[table].every(s => planted.includes(s.slot))
 
 // The collection bins (yellow boxes) at the front of each table: [x0, x1, yTop]
 // as % of the room-art box. A pile of buds fills each one when it's full.
@@ -355,6 +358,7 @@ function GrowRoom({ planted, bank, onPlace, budCounts = {}, onBud, tableCards = 
             opens the Grow Card picker (places the card in the P4 spot). Once
             started, it steps through UPGRADE $X. A finished table shows nothing. */}
         {[1, 2, 3].map(tbl => {
+          if (tbl > 1 && !tableComplete(tbl - 1, planted)) return null   // unlock in order
           const [x0, x1] = BINS[tbl]
           const base = {
             position: 'absolute', left: `${(x0 + x1) / 2}%`, top: '84%', transform: 'translate(-50%, -50%)',
