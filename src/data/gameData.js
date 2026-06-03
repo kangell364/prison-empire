@@ -711,6 +711,7 @@ export const PLANTS = [
     maxLevel: 100,
     perLevelYield: 8,                 // +8 stash units per card level
     baseCashValue: 25,                // $ at Lvl 1; doubles every card level
+    starter: true,                    // granted to every player (seed + backfill)
   },
 ]
 

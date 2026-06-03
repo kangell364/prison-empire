@@ -16,6 +16,10 @@ import { useEffect, useState } from 'react'
 import { PLANTS } from '../data/gameData'
 
 const STORAGE_KEY       = 'pe_plant_cards_v1'
+// Tracks which STARTER plants have already been backfilled to this player, so
+// returning players (whose store predates a starter strain) get it once —
+// without re-granting forever if they later spend/merge all their copies.
+const BACKFILL_KEY      = 'pe_plant_cards_backfilled'
 const MERGE_COST        = 20
 export const PLANT_STACK_SIZE = 20
 
@@ -100,17 +104,61 @@ function persistLocal() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(state))) } catch {}
 }
 
+function ownsAny(m, plantId) {
+  for (const [k, v] of m.entries()) {
+    if (v > 0 && parseKey(k)[0] === plantId) return true
+  }
+  return false
+}
+
+// One-time backfill for EXISTING players. New players get every plant via the
+// fresh-store seed below; players whose store predates a new starter strain
+// (e.g. PURPLE HAZE was renamed/added after they first played) get it granted
+// here once. Guarded per-id by BACKFILL_KEY so spending all copies later does
+// not re-trigger it. Mutates `m` and persists when it grants anything.
+function backfillStarters(m) {
+  let done
+  try { done = new Set(JSON.parse(localStorage.getItem(BACKFILL_KEY) || '[]')) } catch { done = new Set() }
+  let changed = false
+  PLANTS.filter(p => p.starter).forEach(p => {
+    if (done.has(p.id)) return
+    if (!ownsAny(m, p.id)) {
+      const k = keyOf(p.id, 1)
+      m.set(k, (m.get(k) || 0) + SEED_COUNT)
+      changed = true
+    }
+    done.add(p.id)
+  })
+  try { localStorage.setItem(BACKFILL_KEY, JSON.stringify([...done])) } catch {}
+  if (changed) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(m))) } catch {}
+  }
+}
+
 function readLocalSeed() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const obj = JSON.parse(raw)
+      const validIds = new Set(PLANTS.map(p => p.id))
       const m = new Map()
-      for (const [k, v] of Object.entries(obj)) if (typeof v === 'number' && v > 0) m.set(k, v)
+      let pruned = false
+      for (const [k, v] of Object.entries(obj)) {
+        if (typeof v !== 'number' || v <= 0) continue
+        // Drop counts for plant ids no longer in the catalog (e.g. a renamed
+        // or retired strain) so they don't haunt the owned/locked totals.
+        if (!validIds.has(parseKey(k)[0])) { pruned = true; continue }
+        m.set(k, v)
+      }
+      backfillStarters(m)
+      if (pruned) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(m))) } catch {} }
       return m
     }
   } catch {}
+  // Fresh store — seed one of every plant. Mark all starters as backfilled so
+  // the existing-player path above never double-grants to a brand-new player.
   const m = new Map()
   PLANTS.forEach(p => m.set(keyOf(p.id, 1), SEED_COUNT))
+  try { localStorage.setItem(BACKFILL_KEY, JSON.stringify(PLANTS.filter(p => p.starter).map(p => p.id))) } catch {}
   return m
 }
