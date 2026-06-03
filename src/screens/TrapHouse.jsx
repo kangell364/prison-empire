@@ -169,8 +169,8 @@ function ShopFront({ art }) {
             top so his body is hidden; only his head/shoulders nod above it. */}
         <div style={{ position: 'absolute', inset: 0, clipPath: 'inset(0 0 50% 0)', pointerEvents: 'none' }}>
           <div style={{
-            position: 'absolute', left: '45%', bottom: '14%',
-            transform: 'translateX(-50%) translate(-0.25in, 0.0625in)',
+            position: 'absolute', left: '50%', bottom: '5%',
+            transform: 'translateX(-50%)',
             height: '59%', aspectRatio: '229 / 581',
             filter: 'drop-shadow(0 6px 10px rgba(0,0,0,0.45))',
           }}>
