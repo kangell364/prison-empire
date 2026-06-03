@@ -261,9 +261,16 @@ function Skateboard() {
       {/* Trucks */}
       <rect x="50" y="36" width="9" height="9" rx="1.5" fill="#8a857a" stroke="#140d06" strokeWidth="2.5" />
       <rect x="141" y="36" width="9" height="9" rx="1.5" fill="#8a857a" stroke="#140d06" strokeWidth="2.5" />
-      {/* Wheels — two per truck */}
-      {[46, 63, 137, 154].map((cx, i) => (
-        <circle key={i} cx={cx} cy="50" r="10.5" fill="#f1e7c9" stroke="#140d06" strokeWidth="3.5" />
+      {/* Wheels — one per truck (side view). Each wheel group spins (outer ring
+          is symmetric, so the hub + spokes are what make the rotation visible). */}
+      {[54, 146].map((cx, i) => (
+        <g key={i} style={{ transformBox: 'fill-box', transformOrigin: 'center', animation: 'wheelSpin 0.5s linear infinite' }}>
+          <circle cx={cx} cy="50" r="11" fill="#f1e7c9" stroke="#140d06" strokeWidth="3.5" />
+          {/* spokes (X) + hub */}
+          <line x1={cx - 7} y1={50 - 7} x2={cx + 7} y2={50 + 7} stroke="#140d06" strokeWidth="1.6" />
+          <line x1={cx - 7} y1={50 + 7} x2={cx + 7} y2={50 - 7} stroke="#140d06" strokeWidth="1.6" />
+          <circle cx={cx} cy="50" r="2.7" fill="#140d06" />
+        </g>
       ))}
     </svg>
   )
@@ -594,6 +601,7 @@ function Keyframes() {
         50%  { transform: translateX(17%)  rotate(1.5deg); }
         100% { transform: translateX(-17%) rotate(-1.5deg); }
       }
+      @keyframes wheelSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     `}</style>
   )
 }
