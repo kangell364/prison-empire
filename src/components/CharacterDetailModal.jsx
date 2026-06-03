@@ -432,17 +432,23 @@ function SkillSlotGrid({ loadout = {}, accent = GOLD }) {
             aspectRatio: '1',
             background: entry ? `${accent}14` : '#0d0d15',
             border: `0.5px solid ${entry ? `${accent}66` : '#2a2a3a'}`,
-            borderRadius: 8,
+            borderRadius: 8, overflow: 'hidden',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             position: 'relative',
           }}>
-            {skill && <span style={{ fontSize: 20, lineHeight: 1 }}>{skill.emoji}</span>}
+            {/* Show the skill card art filling the slot; fall back to its emoji. */}
+            {skill && skill.avatar ? (
+              <img src={skill.avatar} alt={skill.name}
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : skill ? (
+              <span style={{ fontSize: 20, lineHeight: 1 }}>{skill.emoji}</span>
+            ) : null}
             {entry && (
-              <span style={{ position: 'absolute', top: 2, left: 4, color: accent, fontSize: 8, fontWeight: 700 }}>
+              <span style={{ position: 'absolute', top: 2, left: 4, color: '#fff', fontSize: 8, fontWeight: 700, textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}>
                 L{entry.level}
               </span>
             )}
-            <span style={{ position: 'absolute', bottom: 2, right: 4, color: entry ? accent : '#444', fontSize: 8, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ position: 'absolute', bottom: 2, right: 4, color: entry ? '#fff' : '#444', fontSize: 8, fontWeight: 700, fontVariantNumeric: 'tabular-nums', textShadow: entry ? '0 1px 2px rgba(0,0,0,0.9)' : 'none' }}>
               {slot}
             </span>
           </div>
