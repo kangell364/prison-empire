@@ -175,7 +175,7 @@ function PackingRoom() {
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <img src="/packing-room.webp" alt="Packing Room" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
       {/* Thug-life character standing on the floor of the packing room. */}
-      <img src="/thug-life-1.png" alt="" style={{
+      <img src="/thug-4.png" alt="" style={{
         position: 'absolute', bottom: '4%', left: '50%', transform: 'translateX(-50%)',
         height: '62%', width: 'auto', objectFit: 'contain',
         filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))', pointerEvents: 'none',
