@@ -121,6 +121,10 @@ export default function SkillLoadout() {
             character={{ ...skill, bio: skill.description }}
             cardType="SKILL"
             cardLevel={cardLevel}
+            statTiles={[
+              { icon: 'ti-sword', label: 'DMG / LV', value: `+${effDmg(skillId)}`, color: RED },
+              { icon: 'ti-stack-2', label: 'Card Level', value: cardLevel, color: GOLD },
+            ]}
             upgrades={readSkillUpgrade(upgradeMap, skillId, cardLevel)}
             hustle={hustle}
             onUpgrade={onUpgrade(skillId, cardLevel)}

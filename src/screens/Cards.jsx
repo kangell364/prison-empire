@@ -258,12 +258,18 @@ export default function Cards({ initialTab = 'player' }) {
       {selectedSkill && (() => {
         const { skill, cardLevel } = selectedSkill
         const liveCount = skillCounts.get(`${skill.id}:${cardLevel}`) || 0
+        const dmgUp = readSkillUpgrade(skillUpgradeMap, skill.id, cardLevel).dmg || 0
+        const effDmg = skill.perLevelAttack + dmgUp * SKILL_DMG_PER_LEVEL
         return (
           <CharacterDetailModal
             character={{ ...skill, bio: skill.description }}
             cardType="SKILL"
             count={liveCount}
             cardLevel={cardLevel}
+            statTiles={[
+              { icon: 'ti-sword', label: 'DMG / LV', value: `+${effDmg}`, color: '#e74c3c' },
+              { icon: 'ti-stack-2', label: 'Card Level', value: cardLevel, color: '#c9a84c' },
+            ]}
             upgrades={readSkillUpgrade(skillUpgradeMap, skill.id, cardLevel)}
             hustle={hustle}
             onUpgrade={handleSkillUpgrade(skill.id, cardLevel)}

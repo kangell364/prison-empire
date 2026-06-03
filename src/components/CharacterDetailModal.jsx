@@ -44,6 +44,10 @@ export function CharacterDetailModal({
   // (2–12). When supplied, the modal previews the fighter's 12-slot skill
   // board (used for bosses so you can scout their loadout before the fight).
   skillLoadout,
+  // Optional headline stat tiles — [{ icon, label, value, color }]. Rendered
+  // under the bio. Used by skill cards to show DMG so the open view matches
+  // the card face.
+  statTiles,
 }) {
   // KO the player's own portrait when knocked out (this modal opens for the
   // player from Home / leaderboards, and for opponents — only `isYou` greys out).
@@ -211,6 +215,19 @@ export function CharacterDetailModal({
               lineHeight: 1.55,
               fontStyle: 'italic',
             }}>{c.bio}</div>
+          </div>
+        )}
+
+        {/* Headline stat tiles (e.g. a skill card's DMG) — kept in sync with
+            the card face so the open view shows the same numbers. */}
+        {statTiles && statTiles.length > 0 && (
+          <div style={{ padding: '16px 18px 0' }}>
+            <SectionLabel>Stats</SectionLabel>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${statTiles.length}, 1fr)`, gap: 8 }}>
+              {statTiles.map((t, i) => (
+                <StatTile key={i} icon={t.icon} label={t.label} value={t.value} color={t.color} />
+              ))}
+            </div>
           </div>
         )}
 
