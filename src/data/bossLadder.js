@@ -103,6 +103,17 @@ function flavor(tab, level, slot) {
   return { name: `${pick(YARD_TAGS, h)} ${pick(YARD_NAMES, h >> 5)}`, emoji: pick(TABS.yard.emojis, h >> 11), bio: pick(BIOS.yard, h >> 17) }
 }
 
+// ---- hand-authored boss skill loadouts ------------------------------
+// Per-boss skill cards, keyed by boss id (`${tab}-${level}-${slot}`). Shape:
+//   { [diceSlot 2..12]: { skillId, level, dmgUpgrade } }
+// These are INDEPENDENT of the player's skill cards/levels/upgrades — a boss
+// owning a SKULL CRUSHER at level N is its own copy. Bosses NOT listed here
+// fight with no skills (empty loadout). Combat reads this via
+// opponentSkillLoadout(); damage = level × (perLevelAttack + dmgUpgrade × 5).
+export const BOSS_SKILL_LOADOUTS = {
+  'guards-1-1': { 9: { skillId: 'skull_crusher', level: 1, dmgUpgrade: 0 } },
+}
+
 // ---- the generator --------------------------------------------------
 
 // Build one boss. `id` is stable: `${tab}-${level}-${slot}`.
@@ -150,6 +161,9 @@ export function generateBoss(tab, level, slot) {
     milestone,
     cardDrop: milestone,            // milestone bosses drop a card
     final: false,
+    // Hand-authored skill loadout (independent of the player). Defaults to an
+    // empty object so non-authored bosses fight with no skills.
+    skills: BOSS_SKILL_LOADOUTS[`${tab}-${level}-${slot}`] || {},
   }
 }
 

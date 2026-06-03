@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { SKILLS } from '../data/gameData'
 import { getBattleSkillLoadout } from '../state/skillLoadoutStore'
+import { SKILL_DMG_PER_LEVEL } from '../state/skillUpgradesStore'
 import { sfx } from '../sounds'
 import { Avatar } from './Avatar'
 import { usePlayerCard } from '../state/profileStore'
@@ -24,7 +25,11 @@ function dmg(atk, def) {
 // loadout so fights feel consistent. Procedurally generated from id/name + power.
 // Exported so the detail card can preview a boss's loadout before the fight.
 export function opponentSkillLoadout(opp) {
-  if (!opp || !SKILLS.length) return {}   // no skills defined → empty loadout
+  if (!opp) return {}
+  // Hand-authored loadout (bosses carry `skills`, even if empty) wins over the
+  // procedural one — and an empty object means "no skills", not "roll some".
+  if (opp.skills) return opp.skills
+  if (!SKILLS.length) return {}   // no skills defined → empty loadout
   const seedStr = String(opp.id ?? opp.name ?? 'x')
   let s = 0
   for (let i = 0; i < seedStr.length; i++) s = (s * 31 + seedStr.charCodeAt(i)) >>> 0
@@ -183,7 +188,11 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
     const oSlot      = oppLoadout[slot]
     const oSkillDef  = oSlot ? SKILLS.find(s => s.id === oSlot.skillId) : null
     const oSkillFires = !!oSkillDef
-    const oSkillBonus = oSkillFires ? oSlot.level * oSkillDef.perLevelAttack : 0
+    // Include any authored DMG upgrades so a boss's "+N DMG" actually counts —
+    // matches the player's effective-damage formula.
+    const oSkillBonus = oSkillFires
+      ? oSlot.level * (oSkillDef.perLevelAttack + (oSlot.dmgUpgrade || 0) * SKILL_DMG_PER_LEVEL)
+      : 0
 
     const playerAttack  = stats.playerBaseAttack + pSkillBonus
     const oppAttack     = stats.oppBaseAttack + oSkillBonus
