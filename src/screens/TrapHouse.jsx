@@ -167,7 +167,7 @@ function ShopFront({ art }) {
         <img src={art} alt="Shop Front" style={{ display: 'block', width: '100%', height: '100%' }} />
         {/* Nodding clerk standing BEHIND the counter — clipped at the counter
             top so his body is hidden; only his head/shoulders nod above it. */}
-        <div style={{ position: 'absolute', inset: 0, clipPath: 'inset(0 0 48% 0)', pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', inset: 0, clipPath: 'inset(0 0 50% 0)', pointerEvents: 'none' }}>
           <div style={{
             position: 'absolute', left: '45%', bottom: '14%', transform: 'translateX(-50%)',
             height: '59%', aspectRatio: '229 / 581',
