@@ -712,6 +712,7 @@ export const PLANTS = [
     perLevelYield: 8,                 // +8 stash units per card level
     baseCashValue: 25,                // $ at Lvl 1; doubles every card level
     starter: true,                    // granted to every player (seed + backfill)
+    jarColor: '#8e44ad',              // colour of this strain's packed jar (Trap House packing room)
   },
 ]
 
