@@ -374,6 +374,15 @@ body {
   35%  { transform: scale(1.18); box-shadow: 0 0 16px var(--flash-color, #c9a84c); }
   100% { transform: scale(1);    box-shadow: 0 0 6px var(--flash-color, #c9a84c66); }
 }
+/* "Yes" head nod — pivots at the neck (transform-origin set inline). Two dips
+   then a rest. */
+@keyframes thugNod {
+  0%, 18%   { transform: rotate(0deg)  translateY(0); }
+  32%       { transform: rotate(10deg) translateY(1.5%); }
+  46%       { transform: rotate(0deg)  translateY(0); }
+  60%       { transform: rotate(10deg) translateY(1.5%); }
+  74%, 100% { transform: rotate(0deg)  translateY(0); }
+}
 
 /* Pack opening — uses --rarity custom property for color */
 @keyframes packIdle {

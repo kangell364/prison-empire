@@ -174,12 +174,19 @@ function PackingRoom() {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <img src="/packing-room.webp" alt="Packing Room" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
-      {/* Thug-life character standing on the floor of the packing room. */}
-      <img src="/thug-4.png" alt="" style={{
+      {/* Thug-life character standing on the floor — head split onto its own
+          layer so it can nod "yes" (pivot at the neck, ~30% down). */}
+      <div style={{
         position: 'absolute', bottom: '4%', left: '50%', transform: 'translateX(-50%)',
-        height: '62%', width: 'auto', objectFit: 'contain',
-        filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))', pointerEvents: 'none',
-      }} />
+        height: '62%', aspectRatio: '229 / 581', pointerEvents: 'none',
+        filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))',
+      }}>
+        <img src="/thug-4-body.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain' }} />
+        <img src="/thug-4-head.png" alt="" style={{
+          position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain',
+          transformOrigin: '50% 30%', animation: 'thugNod 2.6s ease-in-out infinite',
+        }} />
+      </div>
     </div>
   )
 }
