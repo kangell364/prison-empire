@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { CARDS_COLLECTION, RARITY_COLORS, SKILLS } from '../data/gameData'
+import { CARDS_COLLECTION, RARITY_COLORS, SKILLS, PLANTS } from '../data/gameData'
 import { useCardCounts, mergeCard, getOwnedTuples, STACK_SIZE } from '../state/cardsStore'
 import {
   baseAtk, baseDef, useCrew,
@@ -17,6 +17,13 @@ import {
   useSkillUpgrades, readSkillUpgrade, getSkillUpgrade, upgradeSkillStat, carrySkillUpgrades,
   SKILL_DMG_PER_LEVEL, SKILL_UPGRADE_COST, MAX_SKILL_UPGRADE_LEVEL,
 } from '../state/skillUpgradesStore'
+import {
+  usePlantCardCounts, getOwnedPlantTuples, mergePlantCard, PLANT_STACK_SIZE,
+} from '../state/plantCardsStore'
+import {
+  usePlantUpgrades, readPlantUpgrade, getPlantUpgrade, upgradePlantStat, carryPlantUpgrades,
+  PLANT_YIELD_PER_LEVEL, PLANT_UPGRADE_COST, MAX_PLANT_UPGRADE_LEVEL,
+} from '../state/plantUpgradesStore'
 import { sfx } from '../sounds'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
@@ -53,6 +60,8 @@ export default function Cards({ initialTab = 'player' }) {
   const [mergeReveal, setMergeReveal]     = useState(null)   // { card, toLevel } during merge animation
   const [selectedSkill, setSelectedSkill] = useState(null)   // { skill, cardLevel } skill detail
   const [skillMergeReveal, setSkillMergeReveal] = useState(null)
+  const [selectedPlant, setSelectedPlant] = useState(null)   // { plant, cardLevel } grow-card detail
+  const [plantMergeReveal, setPlantMergeReveal] = useState(null)
   // Active filter chip for the collection grid. 'All' / 'Owned' / one of
   // the rarity labels. 'All' shows owned + locked; 'Owned' shows only
   // tiles you have at least one of; rarity filters show every card of
@@ -65,6 +74,8 @@ export default function Cards({ initialTab = 'player' }) {
   const hustle = useHustle()
   const skillCounts     = useSkillCardCounts()
   const skillUpgradeMap = useSkillUpgrades()
+  const plantCounts     = usePlantCardCounts()
+  const plantUpgradeMap = usePlantUpgrades()
 
   // Spend Hustle to bump a skill card's DMG upgrade level (same flow as the
   // player-card ATK/DEF upgrades).
@@ -72,6 +83,15 @@ export default function Cards({ initialTab = 'player' }) {
     const cur = getSkillUpgrade(skillId, cardLevel).dmg || 0
     if (cur >= MAX_SKILL_UPGRADE_LEVEL) return
     if (spendHustle(SKILL_UPGRADE_COST(cur))) { upgradeSkillStat(skillId, cardLevel); sfx.buy() }
+    else sfx.deny?.()
+  }
+
+  // Spend Hustle to bump a plant card's YIELD upgrade level (same flow as the
+  // skill-card DMG upgrade).
+  const handlePlantUpgrade = (plantId, cardLevel) => () => {
+    const cur = getPlantUpgrade(plantId, cardLevel).yield || 0
+    if (cur >= MAX_PLANT_UPGRADE_LEVEL) return
+    if (spendHustle(PLANT_UPGRADE_COST(cur))) { upgradePlantStat(plantId, cardLevel); sfx.buy() }
     else sfx.deny?.()
   }
   // "Owned" for pack-pool purposes = has at least one Level 1 copy.
@@ -210,6 +230,19 @@ export default function Cards({ initialTab = 'player' }) {
         </>
       )}
 
+      {/* GROW CARDS — Plants. Same rarity filters, stacking + merge as the
+          player and skill cards; the upgradable stat is YIELD. */}
+      {tab === 'grow' && (
+        <>
+          <FilterChips filter={filter} setFilter={setFilter} />
+          <PlantCollection
+            filter={filter}
+            upgradeMap={plantUpgradeMap}
+            onTapPlant={(plant, cardLevel) => setSelectedPlant({ plant, cardLevel })}
+          />
+        </>
+      )}
+
       {/* Card Detail — universal modal so it's consistent with all other
           character cards (no bottom-sheet gap, big cinematic hero). */}
       {selectedCard && (() => {
@@ -294,6 +327,52 @@ export default function Cards({ initialTab = 'player' }) {
           card={skillMergeReveal.card}
           toLevel={skillMergeReveal.toLevel}
           onDone={() => setSkillMergeReveal(null)}
+        />
+      )}
+
+      {/* Plant (grow) card detail — same modal, upgrades the YIELD stat and
+          merges duplicates to the next level exactly like the skill cards. */}
+      {selectedPlant && (() => {
+        const { plant, cardLevel } = selectedPlant
+        const liveCount = plantCounts.get(`${plant.id}:${cardLevel}`) || 0
+        const yieldUp = readPlantUpgrade(plantUpgradeMap, plant.id, cardLevel).yield || 0
+        const effYield = plant.perLevelYield + yieldUp * PLANT_YIELD_PER_LEVEL
+        return (
+          <CharacterDetailModal
+            character={{ ...plant, bio: plant.description }}
+            cardType="GROW"
+            count={liveCount}
+            cardLevel={cardLevel}
+            heroBg={PLANT_FACE_BG}
+            heroFit="contain"
+            statTiles={[
+              { icon: 'ti-plant-2', label: 'YIELD / LV', value: `+${effYield}`, color: '#3fb950' },
+              { icon: 'ti-stack-2', label: 'Card Level', value: cardLevel, color: '#c9a84c' },
+            ]}
+            upgrades={readPlantUpgrade(plantUpgradeMap, plant.id, cardLevel)}
+            hustle={hustle}
+            onUpgrade={handlePlantUpgrade(plant.id, cardLevel)}
+            upgradeRows={[{ label: 'YIELD', color: '#3fb950', stat: 'yield', perLevel: PLANT_YIELD_PER_LEVEL }]}
+            maxUpgradeLevel={MAX_PLANT_UPGRADE_LEVEL}
+            costForLevel={PLANT_UPGRADE_COST}
+            canMerge={liveCount >= PLANT_STACK_SIZE}
+            onMerge={() => {
+              mergePlantCard(plant.id, cardLevel)
+              carryPlantUpgrades(plant.id, cardLevel, cardLevel + 1)
+              setSelectedPlant(null)
+              setPlantMergeReveal({ card: plant, toLevel: cardLevel + 1 })
+            }}
+            onClose={() => setSelectedPlant(null)}
+          />
+        )
+      })()}
+
+      {/* Plant merge consume → Level-up reveal (reuses the player reveal). */}
+      {plantMergeReveal && (
+        <MergeRevealModal
+          card={plantMergeReveal.card}
+          toLevel={plantMergeReveal.toLevel}
+          onDone={() => setPlantMergeReveal(null)}
         />
       )}
 
@@ -604,39 +683,50 @@ function LockedTile({ card }) {
 }
 
 function TabSwitcher({ tab, onTab }) {
-  const TABS = [
-    { id: 'player',  label: 'Player Cards', icon: 'ti-user' },
-    { id: 'skill',   label: 'Skill Cards',  icon: 'ti-cards' },
-    { id: 'crew',    label: 'My Crew',      icon: 'ti-users' },
-    { id: 'loadout', label: 'Skills',       icon: 'ti-bolt' },
+  // Top row — the three card COLLECTIONS, equal width. Bottom row — the two
+  // loadout views (Crew + Skills). Kept in separate grids so the collections
+  // share one 3-up row regardless of how many loadout tabs there are.
+  const COLLECTION_TABS = [
+    { id: 'player', label: 'Player Cards', icon: 'ti-user' },
+    { id: 'skill',  label: 'Skill Cards',  icon: 'ti-cards' },
+    { id: 'grow',   label: 'Grow Cards',   icon: 'ti-plant-2' },
   ]
+  const LOADOUT_TABS = [
+    { id: 'crew',    label: 'My Crew', icon: 'ti-users' },
+    { id: 'loadout', label: 'Skills',  icon: 'ti-bolt' },
+  ]
+
+  const TabButton = (t) => {
+    const active = tab === t.id
+    return (
+      <button
+        key={t.id}
+        onClick={() => onTab(t.id)}
+        className="btn"
+        style={{
+          padding: '10px 8px',
+          background: active ? '#c9a84c18' : '#13131f',
+          border: `0.5px solid ${active ? '#c9a84c66' : '#2a2a3a'}`,
+          color: active ? '#c9a84c' : '#888',
+          borderRadius: 12,
+          fontSize: 12, fontWeight: 500,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+        }}
+      >
+        <i className={`ti ${t.icon}`} aria-hidden="true" />
+        {t.label}
+      </button>
+    )
+  }
+
   return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6,
-      padding: '14px 16px 0',
-    }}>
-      {TABS.map(t => {
-        const active = tab === t.id
-        return (
-          <button
-            key={t.id}
-            onClick={() => onTab(t.id)}
-            className="btn"
-            style={{
-              padding: '10px 8px',
-              background: active ? '#c9a84c18' : '#13131f',
-              border: `0.5px solid ${active ? '#c9a84c66' : '#2a2a3a'}`,
-              color: active ? '#c9a84c' : '#888',
-              borderRadius: 12,
-              fontSize: 12, fontWeight: 500,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-            }}
-          >
-            <i className={`ti ${t.icon}`} aria-hidden="true" />
-            {t.label}
-          </button>
-        )
-      })}
+    <div style={{ padding: '14px 16px 0', display: 'grid', gap: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+        {COLLECTION_TABS.map(TabButton)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        {LOADOUT_TABS.map(TabButton)}
+      </div>
     </div>
   )
 }
@@ -828,6 +918,173 @@ function LockedSkillTile({ skill }) {
       </div>
       <div style={{ color: '#555', fontSize: 12, fontWeight: 600, textAlign: 'center', marginBottom: 2 }}>{skill.name}</div>
       <div style={{ color: rarityColor, fontSize: 10, textAlign: 'center', textTransform: 'capitalize', marginBottom: 10 }}>{skill.category}</div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------
+// Grow Cards tab — Plants. Stacks + merges + upgrades exactly like the skill
+// cards, but the card art (the Trap House plant cutout) sits over a yellow
+// card face and the upgradable stat is YIELD.
+// ---------------------------------------------------------------------
+
+// Yellow card face the plant cutout is placed over (see PlantTile / hero).
+const PLANT_FACE_BG = '#F2C233'
+
+// The Plants grid — same rarity filters as the other tabs, over the PLANTS
+// catalog, reading the plant-cards store for owned (id, level) tuples.
+function PlantCollection({ filter, upgradeMap, onTapPlant }) {
+  const owned = getOwnedPlantTuples()                 // [{ id, level, count }]
+  const ownedKey = new Set(owned.map(t => `${t.id}:${t.level}`))
+  const ownedIds = new Set(owned.map(t => t.id))
+  const label = filter === 'All'   ? `Plants (${ownedIds.size}/${PLANTS.length})`
+              : filter === 'Owned' ? `Owned (${ownedIds.size})`
+              : filter
+
+  const tiles = []
+  owned.forEach(t => {
+    const plant = PLANTS.find(p => p.id === t.id)
+    if (!plant) return
+    if (!matchesFilter(plant, filter, /* owned */ true)) return
+    tiles.push(
+      <PlantTile
+        key={`${t.id}:${t.level}`}
+        plant={plant}
+        cardLevel={t.level}
+        count={t.count}
+        yieldUpgrade={readPlantUpgrade(upgradeMap, t.id, t.level).yield || 0}
+        onTap={() => onTapPlant(plant, t.level)}
+      />
+    )
+  })
+  PLANTS.forEach(plant => {
+    if (ownedKey.has(`${plant.id}:1`)) return
+    if (!matchesFilter(plant, filter, /* owned */ false)) return
+    tiles.push(<LockedPlantTile key={`locked:${plant.id}`} plant={plant} />)
+  })
+
+  return (
+    <div className="section" style={{ marginTop: 14 }}>
+      <div className="section-label">{label}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {tiles.length === 0 ? (
+          <div style={{
+            gridColumn: '1 / -1',
+            background: '#13131f', border: '0.5px solid #1e1e2a',
+            borderRadius: 12, padding: 20, textAlign: 'center',
+            color: '#555', fontSize: 12,
+          }}>
+            {PLANTS.length === 0 ? 'No grow cards yet.' : `No ${filter.toLowerCase()} grow cards.`}
+          </div>
+        ) : tiles}
+      </div>
+    </div>
+  )
+}
+
+// Plant card tile — same chrome + stacking visuals as the SkillTile, but the
+// plant cutout sits on a yellow card face, and the stat tiles show YIELD + LVL.
+function PlantTile({ plant, cardLevel, count, yieldUpgrade = 0, onTap }) {
+  const rarityColor = RARITY_COLORS[plant.rarity] || '#c9a84c'
+  const effYield    = plant.perLevelYield + yieldUpgrade * PLANT_YIELD_PER_LEVEL
+  const fullStacks  = Math.floor(count / PLANT_STACK_SIZE)
+  const remainder   = count % PLANT_STACK_SIZE
+  const stackLabel  = fullStacks > 0
+    ? `${fullStacks} STACK${fullStacks > 1 ? 'S' : ''}${remainder > 0 ? ` +${remainder}` : ''}`
+    : null
+  const mergeReady  = count >= PLANT_STACK_SIZE
+
+  return (
+    <div onClick={onTap} style={{
+      background: '#13131f',
+      border: `0.5px solid ${rarityColor}44`,
+      borderRadius: 16,
+      padding: '22px 14px 14px',
+      position: 'relative', overflow: 'hidden', cursor: 'pointer',
+    }}>
+      {/* Rarity top bar */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: rarityColor }} />
+
+      {/* Type label (top-left) */}
+      <div style={{ position: 'absolute', top: 6, left: 8, color: '#888', fontSize: 8, fontWeight: 700, letterSpacing: 1.5 }}>GROW</div>
+
+      {/* CARDS:N badge (top-right) — merge-ready gets a dot */}
+      <div style={{
+        position: 'absolute', top: 6, right: 8,
+        color: rarityColor, fontSize: 9, fontWeight: 700, letterSpacing: 1,
+        background: `${rarityColor}18`, border: `0.5px solid ${rarityColor}44`,
+        borderRadius: 4, padding: '2px 5px', fontVariantNumeric: 'tabular-nums',
+      }}>{mergeReady ? '● ' : ''}CARDS:{count}</div>
+
+      {/* Art — the plant cutout placed over a yellow card face (objectFit
+          'contain' so the whole plant shows), on offset stack-back layers. */}
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 8px' }}>
+        <div style={{ position: 'relative', width: 84, height: 84 }}>
+          {Array.from({ length: Math.min(fullStacks, 3) }).map((_, i) => {
+            const off = (i + 1) * 3
+            return (
+              <div key={i} aria-hidden="true" style={{
+                position: 'absolute', top: 0, left: 0, zIndex: 0,
+                width: 84, height: 84, borderRadius: 10,
+                background: '#181826', border: `0.5px solid ${rarityColor}55`,
+                transform: `translate(${-off}px, ${-off}px)`,
+              }} />
+            )
+          })}
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <Avatar src={plant.avatar} emoji={plant.emoji} size={84} radius={10} fit="contain"
+              style={{ background: PLANT_FACE_BG, border: `1px solid ${rarityColor}55` }} />
+          </div>
+        </div>
+      </div>
+
+      {stackLabel && (
+        <div style={{ textAlign: 'center', marginBottom: 4, color: rarityColor, fontSize: 9, fontWeight: 800, letterSpacing: 1 }}>{stackLabel}</div>
+      )}
+
+      {/* Name + card level */}
+      <div style={{ color: '#fff', fontSize: 12, fontWeight: 600, textAlign: 'center', marginBottom: 2 }}>
+        {plant.name}{cardLevel >= 1 && <span style={{ color: rarityColor, marginLeft: 4 }}>· LVL {cardLevel}</span>}
+      </div>
+
+      {/* Category */}
+      <div style={{ color: rarityColor, fontSize: 10, textAlign: 'center', textTransform: 'capitalize', marginBottom: 10 }}>
+        {plant.category}
+      </div>
+
+      {/* Stat tiles — YIELD (reflects upgrades) + LVL */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        <div style={{ background: '#1e1e2a', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+          <div style={{ color: '#555', fontSize: 8, letterSpacing: 1, fontWeight: 700 }}>YIELD</div>
+          <div style={{ color: '#3fb950', fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+            +{effYield}<span style={{ fontSize: 8, color: '#777', fontWeight: 600 }}>/lv</span>
+          </div>
+        </div>
+        <div style={{ background: '#1e1e2a', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+          <div style={{ color: '#555', fontSize: 8, letterSpacing: 1, fontWeight: 700 }}>LVL</div>
+          <div style={{ color: '#c9a84c', fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{cardLevel}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Locked plant tile — a catalog plant the player owns zero of.
+function LockedPlantTile({ plant }) {
+  const rarityColor = RARITY_COLORS[plant.rarity] || '#c9a84c'
+  return (
+    <div style={{
+      background: '#13131f', border: '0.5px solid #1e1e2a', borderRadius: 16,
+      padding: '22px 14px 14px', opacity: 0.4, position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: rarityColor }} />
+      <div style={{ position: 'absolute', top: 6, left: 8, color: '#555', fontSize: 8, fontWeight: 700, letterSpacing: 1.5 }}>GROW</div>
+      <div style={{ position: 'absolute', top: 6, right: 8, color: '#555', fontSize: 9, fontWeight: 700, letterSpacing: 1, background: '#1e1e2a', border: '0.5px solid #2a2a3a', borderRadius: 4, padding: '2px 5px' }}>CARDS:0</div>
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 6px' }}>
+        <Avatar emoji="🔒" size={56} radius={8} style={{ background: '#1e1e2a' }} />
+      </div>
+      <div style={{ color: '#555', fontSize: 12, fontWeight: 600, textAlign: 'center', marginBottom: 2 }}>{plant.name}</div>
+      <div style={{ color: rarityColor, fontSize: 10, textAlign: 'center', textTransform: 'capitalize', marginBottom: 10 }}>{plant.category}</div>
     </div>
   )
 }

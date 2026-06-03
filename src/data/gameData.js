@@ -689,6 +689,29 @@ export const SKILLS = [
   },
 ]
 
+// PLANTS — grow cards for the Trap House. Same collectible shape as SKILLS
+// (stack to merge, upgrade one stat), but the upgradable stat is YIELD: the
+// product (stash units) a plant produces per harvest. Higher rarity = bigger
+// base yield; merging raises the card level; upgrades add perLevelYield on top.
+// Add new strains here in the same shape:
+//   { id, name, shortName, emoji, avatar, rarity, description, category,
+//     minLevel, maxLevel, perLevelYield }
+export const PLANTS = [
+  {
+    id: 'plant_og_kush',
+    name: 'OG KUSH',
+    shortName: 'OG Kush',
+    emoji: '🌿',
+    avatar: '/plant.webp',                // same plant cutout used in the Trap House grow room
+    rarity: 'rare',
+    description: 'Dense, sticky, and worth every cell-block favor. A reliable money strain for the grow room.',
+    category: 'Strain',
+    minLevel: 1,
+    maxLevel: 100,
+    perLevelYield: 8,                 // +8 stash units per card level
+  },
+]
+
 // PvP reward multiplier. Killing someone N levels above you = N× reward.
 // Same level or lower = 1× (clamped). User-facing rule we surface in the UI.
 export function pvpRewardMultiplier(yourLevel, opponentLevel) {

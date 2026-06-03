@@ -11,7 +11,7 @@ import React from 'react'
 // onto the outer container. Set `ko` to render the knocked-out treatment
 // (greyed out + a red "KO" stamp) — used for the player's own avatar
 // everywhere it shows while they're knocked out.
-export function Avatar({ src, emoji, size = 40, radius = 8, style = {}, ko = false }) {
+export function Avatar({ src, emoji, size = 40, radius = 8, style = {}, ko = false, fit = 'cover' }) {
   return (
     <div style={{
       width: size, height: size,
@@ -27,7 +27,7 @@ export function Avatar({ src, emoji, size = 40, radius = 8, style = {}, ko = fal
         <img
           src={src}
           alt={emoji || ''}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: ko ? KO_FILTER : 'none' }}
+          style={{ width: '100%', height: '100%', objectFit: fit, display: 'block', filter: ko ? KO_FILTER : 'none' }}
         />
       ) : (
         <span style={{ fontSize: Math.round(size * 0.62), lineHeight: 1, filter: ko ? KO_FILTER : 'none' }}>{emoji}</span>

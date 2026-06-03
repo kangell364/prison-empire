@@ -49,6 +49,11 @@ export function CharacterDetailModal({
   // under the bio. Used by skill cards to show DMG so the open view matches
   // the card face.
   statTiles,
+  // Optional hero-image treatment. `heroBg` paints a solid card face behind
+  // the portrait (grow cards use yellow); `heroFit` overrides the image
+  // objectFit (e.g. 'contain' for a cutout so the whole subject shows).
+  heroBg,
+  heroFit = 'cover',
 }) {
   // KO the player's own portrait when knocked out (this modal opens for the
   // player from Home / leaderboards, and for opponents — only `isYou` greys out).
@@ -106,6 +111,7 @@ export function CharacterDetailModal({
           height: 280,
           overflow: 'hidden',
           flexShrink: 0,
+          background: heroBg || undefined,
         }}>
           {c.avatar ? (
             <img
@@ -113,7 +119,7 @@ export function CharacterDetailModal({
               alt={c.name}
               style={{
                 width: '100%', height: '100%',
-                objectFit: 'cover', objectPosition: 'center top',
+                objectFit: heroFit, objectPosition: 'center top',
                 display: 'block', filter: koHero ? KO_FILTER : 'none',
               }}
             />
