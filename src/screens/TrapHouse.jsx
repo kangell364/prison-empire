@@ -163,6 +163,12 @@ function ShopFront({ art }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <img src={art} alt="Shop Front" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
+      {/* Thug-life character standing in the storefront. */}
+      <img src="/thug-6.png" alt="" style={{
+        position: 'absolute', bottom: '5%', left: '50%', transform: 'translateX(-50%)',
+        height: '60%', width: 'auto', objectFit: 'contain',
+        filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))', pointerEvents: 'none',
+      }} />
     </div>
   )
 }
