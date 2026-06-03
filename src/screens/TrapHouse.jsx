@@ -301,7 +301,8 @@ function PackingRoom({ skatePhase = 'idle', skateStart = 0, onSkateClick, packCo
         <img src="/packing-room.webp" alt="Packing Room" style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain' }} />
 
         {/* Packed-product counter on the right box — the skater deposits his
-            grow-room haul here as he rolls past. */}
+            grow-room haul here as he rolls past. Hidden until the first deposit. */}
+        {packCount > 0 && (
         <div style={{
           position: 'absolute', left: `${(px0 + px1) / 2}%`, top: `${pyTop}%`,
           transform: 'translate(-50%, -135%)', zIndex: 4, pointerEvents: 'none',
@@ -324,6 +325,7 @@ function PackingRoom({ skatePhase = 'idle', skateStart = 0, onSkateClick, packCo
             }}>{packCount.toLocaleString()}</span>
           </div>
         </div>
+        )}
 
         {/* Skater monkey lives in the packing room for every phase except B
             (when he's rolling through the grow room). */}
