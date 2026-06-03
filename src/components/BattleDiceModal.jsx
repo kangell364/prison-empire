@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { PLAYER, SKILLS } from '../data/gameData'
+import { SKILLS } from '../data/gameData'
+import { getBattleSkillLoadout } from '../state/skillLoadoutStore'
 import { sfx } from '../sounds'
 import { Avatar } from './Avatar'
 import { usePlayerCard } from '../state/profileStore'
@@ -89,6 +90,18 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
     const m = {}; Object.entries(oppLoadout).forEach(([slot, { skillId }]) => { m[slot] = skillId }); return m
   }, [oppLoadout])
 
+  // Player's equipped skill cards (from the Skills loadout), resolved to their
+  // per-fire bonus. Read once when the fight opens. Same shape as oppLoadout:
+  // { [slot]: { skillId, level, bonus } } + derived equipped/learned maps for
+  // the slot grid display.
+  const playerLoadout = useMemo(() => getBattleSkillLoadout(), [])
+  const playerLearned = useMemo(() => {
+    const m = {}; Object.values(playerLoadout).forEach(({ skillId, level }) => { m[skillId] = { level } }); return m
+  }, [playerLoadout])
+  const playerEquippedMap = useMemo(() => {
+    const m = {}; Object.entries(playerLoadout).forEach(([slot, { skillId }]) => { m[slot] = skillId }); return m
+  }, [playerLoadout])
+
   // Per-fight base stats. Player atk/def come from the progression curve;
   // opponent uses explicit atk/def when provided (bosses), else power-derived.
   const stats = useMemo(() => ({
@@ -162,11 +175,10 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
   useEffect(() => () => { if (tickRef.current) clearInterval(tickRef.current) }, [])
 
   const resolve = (slot) => {
-    const pEquippedId = PLAYER.equippedSkills[slot]
-    const pSkillDef   = pEquippedId ? SKILLS.find(s => s.id === pEquippedId) : null
-    const pLearned    = pSkillDef ? PLAYER.learnedSkills[pSkillDef.id] : null
-    const pSkillFires = !!(pSkillDef && pLearned && pLearned.level > 0)
-    const pSkillBonus = pSkillFires ? pLearned.level * pSkillDef.perLevelAttack : 0
+    const pSlot       = playerLoadout[slot]
+    const pSkillDef   = pSlot ? SKILLS.find(s => s.id === pSlot.skillId) : null
+    const pSkillFires = !!(pSkillDef && pSlot.bonus > 0)
+    const pSkillBonus = pSkillFires ? pSlot.bonus : 0
 
     const oSlot      = oppLoadout[slot]
     const oSkillDef  = oSlot ? SKILLS.find(s => s.id === oSlot.skillId) : null
@@ -320,7 +332,7 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 14 }}>
-          <SlotGrid side="you" equipped={PLAYER.equippedSkills} learned={PLAYER.learnedSkills} highlight={highlight} landed={landedSlot} color={BLUE} />
+          <SlotGrid side="you" equipped={playerEquippedMap} learned={playerLearned} highlight={highlight} landed={landedSlot} color={BLUE} />
           <SlotGrid side="opp" equipped={oppEquippedMap} learned={oppLearned} highlight={highlight} landed={landedSlot} color={ORANGE} />
         </div>
 

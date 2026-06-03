@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { CARDS_COLLECTION, RARITY_COLORS, SKILLS, PLAYER } from '../data/gameData'
+import { CARDS_COLLECTION, RARITY_COLORS, SKILLS } from '../data/gameData'
 import { useCardCounts, mergeCard, getOwnedTuples, STACK_SIZE } from '../state/cardsStore'
 import {
   baseAtk, baseDef, useCrew,
@@ -10,10 +10,18 @@ import {
   HUSTLE_COST_PER_LEVEL, MAX_UPGRADE_LEVEL,
 } from '../state/upgradesStore'
 import { useHustle, spendHustle } from '../state/playerStore'
+import {
+  useSkillCardCounts, getOwnedSkillTuples, mergeSkillCard, SKILL_STACK_SIZE,
+} from '../state/skillCardsStore'
+import {
+  useSkillUpgrades, readSkillUpgrade, getSkillUpgrade, upgradeSkillStat, carrySkillUpgrades,
+  SKILL_DMG_PER_LEVEL, SKILL_UPGRADE_COST, MAX_SKILL_UPGRADE_LEVEL,
+} from '../state/skillUpgradesStore'
 import { sfx } from '../sounds'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import Crew from './Crew'
+import SkillLoadout from './SkillLoadout'
 import { CommissaryPack } from '../components/CommissaryPack'
 
 // Collection filter chips. 'All' shows everything (owned + locked).
@@ -43,6 +51,8 @@ export default function Cards({ initialTab = 'player' }) {
   const [tab, setTab] = useState(initialTab === 'collection' ? 'player' : initialTab)
   const [selectedCard, setSelectedCard]   = useState(null)
   const [mergeReveal, setMergeReveal]     = useState(null)   // { card, toLevel } during merge animation
+  const [selectedSkill, setSelectedSkill] = useState(null)   // { skill, cardLevel } skill detail
+  const [skillMergeReveal, setSkillMergeReveal] = useState(null)
   // Active filter chip for the collection grid. 'All' / 'Owned' / one of
   // the rarity labels. 'All' shows owned + locked; 'Owned' shows only
   // tiles you have at least one of; rarity filters show every card of
@@ -53,6 +63,17 @@ export default function Cards({ initialTab = 'player' }) {
   const crew   = useCrew()
   const upgradesMap = useUpgrades()
   const hustle = useHustle()
+  const skillCounts     = useSkillCardCounts()
+  const skillUpgradeMap = useSkillUpgrades()
+
+  // Spend Hustle to bump a skill card's DMG upgrade level (same flow as the
+  // player-card ATK/DEF upgrades).
+  const handleSkillUpgrade = (skillId, cardLevel) => () => {
+    const cur = getSkillUpgrade(skillId, cardLevel).dmg || 0
+    if (cur >= MAX_SKILL_UPGRADE_LEVEL) return
+    if (spendHustle(SKILL_UPGRADE_COST(cur))) { upgradeSkillStat(skillId, cardLevel); sfx.buy() }
+    else sfx.deny?.()
+  }
   // "Owned" for pack-pool purposes = has at least one Level 1 copy.
   const ownedSet = useMemo(() => {
     const s = new Set()
@@ -90,6 +111,17 @@ export default function Cards({ initialTab = 'player' }) {
       <div className="scroll-area animate-in">
         <TabSwitcher tab={tab} onTab={setTab} />
         <Crew />
+      </div>
+    )
+  }
+
+  // Skills loadout — the skill-card equivalent of My Crew: equip skill cards
+  // into the 11 Battle-Dice slots.
+  if (tab === 'loadout') {
+    return (
+      <div className="scroll-area animate-in">
+        <TabSwitcher tab={tab} onTab={setTab} />
+        <SkillLoadout />
       </div>
     )
   }
@@ -166,11 +198,15 @@ export default function Cards({ initialTab = 'player' }) {
         </>
       )}
 
-      {/* SKILL CARDS — same rarity filters over the skill catalog. */}
+      {/* SKILL CARDS — same rarity filters, stacking + merge as player cards. */}
       {tab === 'skill' && (
         <>
           <FilterChips filter={filter} setFilter={setFilter} />
-          <SkillCollection filter={filter} />
+          <SkillCollection
+            filter={filter}
+            upgradeMap={skillUpgradeMap}
+            onTapSkill={(skill, cardLevel) => setSelectedSkill({ skill, cardLevel })}
+          />
         </>
       )}
 
@@ -214,6 +250,44 @@ export default function Cards({ initialTab = 'player' }) {
           card={mergeReveal.card}
           toLevel={mergeReveal.toLevel}
           onDone={() => setMergeReveal(null)}
+        />
+      )}
+
+      {/* Skill card detail — same modal, upgrades the DMG stat and merges
+          duplicates to the next level exactly like the player cards. */}
+      {selectedSkill && (() => {
+        const { skill, cardLevel } = selectedSkill
+        const liveCount = skillCounts.get(`${skill.id}:${cardLevel}`) || 0
+        return (
+          <CharacterDetailModal
+            character={{ ...skill, bio: skill.description }}
+            cardType="SKILL"
+            count={liveCount}
+            cardLevel={cardLevel}
+            upgrades={readSkillUpgrade(skillUpgradeMap, skill.id, cardLevel)}
+            hustle={hustle}
+            onUpgrade={handleSkillUpgrade(skill.id, cardLevel)}
+            upgradeRows={[{ label: 'DAMAGE', color: '#e74c3c', stat: 'dmg', perLevel: SKILL_DMG_PER_LEVEL }]}
+            maxUpgradeLevel={MAX_SKILL_UPGRADE_LEVEL}
+            costForLevel={SKILL_UPGRADE_COST}
+            canMerge={liveCount >= SKILL_STACK_SIZE}
+            onMerge={() => {
+              mergeSkillCard(skill.id, cardLevel)
+              carrySkillUpgrades(skill.id, cardLevel, cardLevel + 1)
+              setSelectedSkill(null)
+              setSkillMergeReveal({ card: skill, toLevel: cardLevel + 1 })
+            }}
+            onClose={() => setSelectedSkill(null)}
+          />
+        )
+      })()}
+
+      {/* Skill merge consume → Level-up reveal (reuses the player reveal). */}
+      {skillMergeReveal && (
+        <MergeRevealModal
+          card={skillMergeReveal.card}
+          toLevel={skillMergeReveal.toLevel}
+          onDone={() => setSkillMergeReveal(null)}
         />
       )}
 
@@ -525,13 +599,14 @@ function LockedTile({ card }) {
 
 function TabSwitcher({ tab, onTab }) {
   const TABS = [
-    { id: 'player', label: 'Player Cards', icon: 'ti-user' },
-    { id: 'skill',  label: 'Skill Cards',  icon: 'ti-bolt' },
-    { id: 'crew',   label: 'My Crew',      icon: 'ti-users' },
+    { id: 'player',  label: 'Player Cards', icon: 'ti-user' },
+    { id: 'skill',   label: 'Skill Cards',  icon: 'ti-cards' },
+    { id: 'crew',    label: 'My Crew',      icon: 'ti-users' },
+    { id: 'loadout', label: 'Skills',       icon: 'ti-bolt' },
   ]
   return (
     <div style={{
-      display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6,
+      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6,
       padding: '14px 16px 0',
     }}>
       {TABS.map(t => {
@@ -588,27 +663,48 @@ function FilterChips({ filter, setFilter }) {
 }
 
 // ---------------------------------------------------------------------
-// Skill Cards tab
+// Skill Cards tab — stacks + merges + upgrades exactly like player cards.
 // ---------------------------------------------------------------------
 
-// Has the player learned this skill? Mirrors the Training tab, which reads
-// PLAYER.learnedSkills (real persistence arrives with the Supabase pass).
-const isSkillLearned = (skill) => !!PLAYER.learnedSkills[skill.id]
-
 // The Skill Cards grid — same rarity filters as Player Cards, over the SKILLS
-// catalog. 'Owned' = learned. Empty catalog shows a placeholder.
-function SkillCollection({ filter }) {
-  const ownedCount = SKILLS.filter(isSkillLearned).length
-  const label = filter === 'All'   ? `Skill Cards (${ownedCount}/${SKILLS.length})`
-              : filter === 'Owned' ? `Learned (${ownedCount})`
+// catalog, reading the skill-cards store for owned (id, level) tuples. Owned
+// tiles show stack counts + open the upgrade/merge modal; unowned catalog
+// skills render as locked placeholders.
+function SkillCollection({ filter, upgradeMap, onTapSkill }) {
+  const owned = getOwnedSkillTuples()                 // [{ id, level, count }]
+  const ownedKey = new Set(owned.map(t => `${t.id}:${t.level}`))
+  const ownedIds = new Set(owned.map(t => t.id))
+  const label = filter === 'All'   ? `Skill Cards (${ownedIds.size}/${SKILLS.length})`
+              : filter === 'Owned' ? `Owned (${ownedIds.size})`
               : filter
-  const shown = SKILLS.filter(s => matchesFilter(s, filter, isSkillLearned(s)))
+
+  const tiles = []
+  owned.forEach(t => {
+    const skill = SKILLS.find(s => s.id === t.id)
+    if (!skill) return
+    if (!matchesFilter(skill, filter, /* owned */ true)) return
+    tiles.push(
+      <SkillTile
+        key={`${t.id}:${t.level}`}
+        skill={skill}
+        cardLevel={t.level}
+        count={t.count}
+        dmgUpgrade={readSkillUpgrade(upgradeMap, t.id, t.level).dmg || 0}
+        onTap={() => onTapSkill(skill, t.level)}
+      />
+    )
+  })
+  SKILLS.forEach(skill => {
+    if (ownedKey.has(`${skill.id}:1`)) return
+    if (!matchesFilter(skill, filter, /* owned */ false)) return
+    tiles.push(<LockedSkillTile key={`locked:${skill.id}`} skill={skill} />)
+  })
 
   return (
     <div className="section" style={{ marginTop: 14 }}>
       <div className="section-label">{label}</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        {shown.length === 0 ? (
+        {tiles.length === 0 ? (
           <div style={{
             gridColumn: '1 / -1',
             background: '#13131f', border: '0.5px solid #1e1e2a',
@@ -617,27 +713,31 @@ function SkillCollection({ filter }) {
           }}>
             {SKILLS.length === 0 ? 'No skill cards yet.' : `No ${filter.toLowerCase()} skill cards.`}
           </div>
-        ) : shown.map(skill => (
-          <SkillTile key={skill.id} skill={skill} owned={isSkillLearned(skill)} learnedLevel={PLAYER.learnedSkills[skill.id]?.level || 0} />
-        ))}
+        ) : tiles}
       </div>
     </div>
   )
 }
 
-// Skill card tile — the stat-tile layout (SKILL badge, art, name, DMG + LVL
-// boxes), matching the player Collection tiles so every card type reads alike.
-function SkillTile({ skill, owned, learnedLevel = 0 }) {
+// Skill card tile — same chrome + stacking visuals as the player CollectionTile
+// (CARDS:N badge, stack-back layers, merge-ready dot), with DMG + LVL stat tiles.
+function SkillTile({ skill, cardLevel, count, dmgUpgrade = 0, onTap }) {
   const rarityColor = RARITY_COLORS[skill.rarity] || '#c9a84c'
+  const effDmg      = skill.perLevelAttack + dmgUpgrade * SKILL_DMG_PER_LEVEL
+  const fullStacks  = Math.floor(count / SKILL_STACK_SIZE)
+  const remainder   = count % SKILL_STACK_SIZE
+  const stackLabel  = fullStacks > 0
+    ? `${fullStacks} STACK${fullStacks > 1 ? 'S' : ''}${remainder > 0 ? ` +${remainder}` : ''}`
+    : null
+  const mergeReady  = count >= SKILL_STACK_SIZE
+
   return (
-    <div style={{
+    <div onClick={onTap} style={{
       background: '#13131f',
       border: `0.5px solid ${rarityColor}44`,
       borderRadius: 16,
       padding: '22px 14px 14px',
-      position: 'relative',
-      overflow: 'hidden',
-      opacity: owned ? 1 : 0.55,
+      position: 'relative', overflow: 'hidden', cursor: 'pointer',
     }}>
       {/* Rarity top bar */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: rarityColor }} />
@@ -645,40 +745,83 @@ function SkillTile({ skill, owned, learnedLevel = 0 }) {
       {/* Type label (top-left) */}
       <div style={{ position: 'absolute', top: 6, left: 8, color: '#888', fontSize: 8, fontWeight: 700, letterSpacing: 1.5 }}>SKILL</div>
 
-      {/* Owned-level / rarity badge (top-right) */}
-      <div style={{ position: 'absolute', top: 6, right: 8, color: rarityColor, fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'capitalize' }}>
-        {owned ? `LV ${learnedLevel}` : skill.rarity}
+      {/* CARDS:N badge (top-right) — merge-ready gets a dot */}
+      <div style={{
+        position: 'absolute', top: 6, right: 8,
+        color: rarityColor, fontSize: 9, fontWeight: 700, letterSpacing: 1,
+        background: `${rarityColor}18`, border: `0.5px solid ${rarityColor}44`,
+        borderRadius: 4, padding: '2px 5px', fontVariantNumeric: 'tabular-nums',
+      }}>{mergeReady ? '● ' : ''}CARDS:{count}</div>
+
+      {/* Art — 1.5× the player-tile size, on offset stack-back layers (one per
+          full stack). */}
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 8px' }}>
+        <div style={{ position: 'relative', width: 84, height: 84 }}>
+          {Array.from({ length: Math.min(fullStacks, 3) }).map((_, i) => {
+            const off = (i + 1) * 3
+            return (
+              <div key={i} aria-hidden="true" style={{
+                position: 'absolute', top: 0, left: 0, zIndex: 0,
+                width: 84, height: 84, borderRadius: 10,
+                background: '#181826', border: `0.5px solid ${rarityColor}55`,
+                transform: `translate(${-off}px, ${-off}px)`,
+              }} />
+            )
+          })}
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <Avatar src={skill.avatar} emoji={skill.emoji} size={84} radius={10}
+              style={{ background: '#1e1e2a', border: `1px solid ${rarityColor}55` }} />
+          </div>
+        </div>
       </div>
 
-      {/* Art */}
-      <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 6px' }}>
-        <Avatar src={skill.avatar} emoji={skill.emoji} size={56} radius={8}
-          style={{ background: '#1e1e2a', border: `1px solid ${rarityColor}55` }} />
-      </div>
+      {stackLabel && (
+        <div style={{ textAlign: 'center', marginBottom: 4, color: rarityColor, fontSize: 9, fontWeight: 800, letterSpacing: 1 }}>{stackLabel}</div>
+      )}
 
-      {/* Name */}
-      <div style={{ color: '#fff', fontSize: 12, fontWeight: 600, textAlign: 'center', marginBottom: 2 }}>{skill.name}</div>
+      {/* Name + card level */}
+      <div style={{ color: '#fff', fontSize: 12, fontWeight: 600, textAlign: 'center', marginBottom: 2 }}>
+        {skill.name}{cardLevel >= 1 && <span style={{ color: rarityColor, marginLeft: 4 }}>· LVL {cardLevel}</span>}
+      </div>
 
       {/* Category */}
       <div style={{ color: rarityColor, fontSize: 10, textAlign: 'center', textTransform: 'capitalize', marginBottom: 10 }}>
         {skill.category}
       </div>
 
-      {/* Stat tiles — DMG + LVL, same two-box layout as player cards */}
+      {/* Stat tiles — DMG (reflects upgrades) + LVL */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
         <div style={{ background: '#1e1e2a', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
           <div style={{ color: '#555', fontSize: 8, letterSpacing: 1, fontWeight: 700 }}>DMG</div>
           <div style={{ color: '#e74c3c', fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-            +{skill.perLevelAttack}<span style={{ fontSize: 8, color: '#777', fontWeight: 600 }}>/lv</span>
+            +{effDmg}<span style={{ fontSize: 8, color: '#777', fontWeight: 600 }}>/lv</span>
           </div>
         </div>
         <div style={{ background: '#1e1e2a', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
           <div style={{ color: '#555', fontSize: 8, letterSpacing: 1, fontWeight: 700 }}>LVL</div>
-          <div style={{ color: '#c9a84c', fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-            {learnedLevel}<span style={{ fontSize: 8, color: '#777', fontWeight: 600 }}>/{skill.maxLevel}</span>
-          </div>
+          <div style={{ color: '#c9a84c', fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{cardLevel}</div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Locked skill tile — a catalog skill the player owns zero of.
+function LockedSkillTile({ skill }) {
+  const rarityColor = RARITY_COLORS[skill.rarity] || '#c9a84c'
+  return (
+    <div style={{
+      background: '#13131f', border: '0.5px solid #1e1e2a', borderRadius: 16,
+      padding: '22px 14px 14px', opacity: 0.4, position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: rarityColor }} />
+      <div style={{ position: 'absolute', top: 6, left: 8, color: '#555', fontSize: 8, fontWeight: 700, letterSpacing: 1.5 }}>SKILL</div>
+      <div style={{ position: 'absolute', top: 6, right: 8, color: '#555', fontSize: 9, fontWeight: 700, letterSpacing: 1, background: '#1e1e2a', border: '0.5px solid #2a2a3a', borderRadius: 4, padding: '2px 5px' }}>CARDS:0</div>
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 6px' }}>
+        <Avatar emoji="🔒" size={56} radius={8} style={{ background: '#1e1e2a' }} />
+      </div>
+      <div style={{ color: '#555', fontSize: 12, fontWeight: 600, textAlign: 'center', marginBottom: 2 }}>{skill.name}</div>
+      <div style={{ color: rarityColor, fontSize: 10, textAlign: 'center', textTransform: 'capitalize', marginBottom: 10 }}>{skill.category}</div>
     </div>
   )
 }

@@ -31,6 +31,10 @@ export function CharacterDetailModal({
   defPerLevel = 10,
   maxUpgradeLevel = 20,
   costForLevel,
+  // Optional custom upgrade rows — [{ label, color, stat, perLevel }]. When
+  // omitted, the panel defaults to the ATK + DEF rows (player cards). Skill
+  // cards pass a single DMG row. `upgrades` is keyed by each row's `stat`.
+  upgradeRows,
   // Merge props — when canMerge is true and onMerge is supplied, a MERGE
   // CARDS button renders below the upgrade rows. Consumes a full stack to
   // mint one of the same card at the next level.
@@ -245,28 +249,23 @@ export function CharacterDetailModal({
           <div style={{ padding: '16px 18px 0' }}>
             <SectionLabel>Upgrade</SectionLabel>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <UpgradeRow
-                label="ATTACK"
-                color={RED}
-                stat="atk"
-                level={upgrades.atk || 0}
-                perLevel={atkPerLevel}
-                maxLevel={maxUpgradeLevel}
-                cost={costForLevel(upgrades.atk || 0)}
-                hustle={hustle}
-                onUpgrade={onUpgrade}
-              />
-              <UpgradeRow
-                label="DEFENSE"
-                color={BLUE}
-                stat="def"
-                level={upgrades.def || 0}
-                perLevel={defPerLevel}
-                maxLevel={maxUpgradeLevel}
-                cost={costForLevel(upgrades.def || 0)}
-                hustle={hustle}
-                onUpgrade={onUpgrade}
-              />
+              {(upgradeRows || [
+                { label: 'ATTACK',  color: RED,  stat: 'atk', perLevel: atkPerLevel },
+                { label: 'DEFENSE', color: BLUE, stat: 'def', perLevel: defPerLevel },
+              ]).map(row => (
+                <UpgradeRow
+                  key={row.stat}
+                  label={row.label}
+                  color={row.color}
+                  stat={row.stat}
+                  level={upgrades[row.stat] || 0}
+                  perLevel={row.perLevel}
+                  maxLevel={maxUpgradeLevel}
+                  cost={costForLevel(upgrades[row.stat] || 0)}
+                  hustle={hustle}
+                  onUpgrade={onUpgrade}
+                />
+              ))}
             </div>
           </div>
         )}
