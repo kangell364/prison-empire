@@ -28,47 +28,30 @@ function loadSaved() {
 }
 
 // ---- Idle production model -------------------------------------------
-// The line runs on wall-clock TIME, not the animations: each planted plant
-// generates buds into its table's grow box, and the monkey auto-hauls every box
-// into packing once per round trip. This is what lets the counters keep climbing
-// while the app is closed — on load we fast-forward by the elapsed time (capped
-// at 8h). The bud + monkey animations are cosmetic ambiance; these numbers are
-// the single source of truth.
+// GENERATION runs on wall-clock TIME: each planted plant pours buds into its
+// table's grow box, even while the app is closed (on load we fast-forward by the
+// elapsed time, capped at 8h). HAULING is NOT automatic — the skater monkey only
+// moves buds to packing when the player taps him (he empties each grow counter as
+// he passes it, then deposits the haul into the right packing box). The packing
+// machine then turns every 5 raw buds into one jar. So grow boxes are the single
+// source of truth for generation; the monkey + machine move product downstream.
 const OFFLINE_CAP_MS = 8 * 60 * 60 * 1000   // credit at most 8h of time away
-const HAUL_CYCLE_MS  = 15600                 // monkey round trip (A+B+C+D, see SKATE_MS)
 const BUD_PER_PLANT_SECS = 25.6              // one bud per plant every ~25.6s (matches BUD_SECS)
+const MACHINE_MS = 2000                      // machine pops one jar per strain every 2s
 const plantsOnTable = (table, planted) => planted.filter(id => id.startsWith(`T${table}-`)).length
 
-// Advance the model to `now`: pour generation into each grow box, then move every
-// whole haul-cycle's worth into packing (kept separate per strain). Returns the
-// next { budCounts, packCounts, lastTick, lastHaul }. Runs both live (~1/s) and
-// once on mount for the offline catch-up — identical math, so no double counting.
-function advanceProduction({ planted, tableCards, budCounts, packCounts, lastTick, lastHaul }, now) {
-  // Clamp the gap so time away is credited at most OFFLINE_CAP_MS.
-  if (now - lastTick > OFFLINE_CAP_MS) { lastTick = now - OFFLINE_CAP_MS; lastHaul = now - OFFLINE_CAP_MS }
-  const bc = { ...budCounts }, pc = { ...packCounts }
+// Advance generation to `now`: pour each plant's output into its grow box. Returns
+// the next { budCounts, lastTick }. Runs live (~1/s) and once on mount for the
+// offline catch-up — identical math, so no double counting.
+function advanceProduction({ planted, budCounts, lastTick }, now) {
+  if (now - lastTick > OFFLINE_CAP_MS) lastTick = now - OFFLINE_CAP_MS   // cap time away
+  const bc = { ...budCounts }
   const dtSec = Math.max(0, (now - lastTick) / 1000)
   for (const t of [1, 2, 3]) {
     const plants = plantsOnTable(t, planted)
     if (plants) bc[t] = (bc[t] || 0) + (plants / BUD_PER_PLANT_SECS) * dtSec
   }
-  // Each whole haul cycle since the last haul empties all boxes into packing,
-  // leaving only the product generated since the most recent cycle boundary.
-  const hauls = Math.floor((now - lastHaul) / HAUL_CYCLE_MS)
-  if (hauls > 0) {
-    const boundary = lastHaul + hauls * HAUL_CYCLE_MS
-    const sinceSec = Math.max(0, (now - boundary) / 1000)
-    for (const t of [1, 2, 3]) {
-      const plants = plantsOnTable(t, planted)
-      if (!plants) continue
-      const strain = tableCards[t]
-      const partial = (plants / BUD_PER_PLANT_SECS) * sinceSec   // generated since last haul → stays in box
-      const moved = (bc[t] || 0) - partial
-      if (strain && moved > 0) { pc[strain] = (pc[strain] || 0) + moved; bc[t] = partial }
-    }
-    lastHaul = boundary
-  }
-  return { budCounts: bc, packCounts: pc, lastTick: now, lastHaul }
+  return { budCounts: bc, lastTick: now }
 }
 
 function isLandscape() {
@@ -104,47 +87,53 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   // The card LEVEL each planted strain is at, keyed by plant id. Drives a jar's
   // cash value in the packing room (value = plantCashValue(card, level) × JAR_FILL).
   const [cardLevels, setCardLevels] = useState(() => saved.cardLevels || {})
-  // Packing right-box totals, kept SEPARATE per plant card (keyed by plant id),
-  // so the box shows one running counter per strain.
+  // RIGHT packing box — raw buds the monkey has deposited, per strain (keyed by
+  // plant id). Climbs on deposit, drops by JAR_FILL each time the machine pops a jar.
   const [packCounts, setPackCounts] = useState(() => saved.packCounts || {})
+  // LEFT packing box — finished jars per strain. The box's $ value is jars ×
+  // (card cash value × JAR_FILL); see PackingRoom.
+  const [jarCounts, setJarCounts] = useState(() => saved.jarCounts || {})
   // Which table the "+ Add" slot was tapped for — opens the card picker.
   const [picking, setPicking] = useState(null)
 
-  // Skater-monkey journey — now purely cosmetic and AUTO-LOOPING (the line runs
-  // itself). He rolls through the building on a fixed timeline; the view does NOT
+  // Skater-monkey journey — purely COSMETIC (production runs on its own wall-clock
+  // via advanceProduction(), not on his trips). He sits idle at his spot in the
+  // packing room until the player taps him; a tap sends him on ONE round trip,
+  // then he returns to idle and waits to be tapped again. The view does NOT
   // follow, so you navigate rooms to catch him passing through:
   //   A: packing, roll off the right     B: grow room, roll right → off left
-  //   C: packing, roll right → off left  D: packing, roll in from left → home → A…
+  //   C: packing, roll right → off left  D: packing, roll in from left → home → idle
   // Phases advance on a timer (same rolling speed everywhere); the Skater syncs to
-  // elapsed time so switching in mid-phase shows him at his real position. The
-  // actual bud/packing counts come from advanceProduction(), not from his trips.
-  const [skate, setSkate] = useState({ phase: 'A', start: Date.now() })
+  // elapsed time so switching in mid-phase shows him at his real position.
+  const [skate, setSkate] = useState({ phase: 'idle', start: 0 })
+  const startSkate = () => setSkate(s => (s.phase === 'idle' ? { phase: 'A', start: Date.now() } : s))
   useEffect(() => {
-    const next = skate.phase === 'A' ? 'B' : skate.phase === 'B' ? 'C' : skate.phase === 'C' ? 'D' : 'A'
+    if (skate.phase === 'idle') return
+    const next = skate.phase === 'A' ? 'B' : skate.phase === 'B' ? 'C' : skate.phase === 'C' ? 'D' : 'idle'
     const t = setTimeout(() => setSkate({ phase: next, start: Date.now() }), SKATE_MS[skate.phase])
     return () => clearTimeout(t)
   }, [skate.phase])
 
-  // Live refs for the production ticker (so the interval reads current values
-  // without re-subscribing). lastTick/lastHaul advance the wall-clock model.
-  const modelRef = useRef({ planted, tableCards, budCounts, packCounts })
-  useEffect(() => { modelRef.current = { planted, tableCards, budCounts, packCounts } }, [planted, tableCards, budCounts, packCounts])
+  // Live refs so the timers/intervals read current values without re-subscribing.
+  const plantedRef = useRef(planted)
+  useEffect(() => { plantedRef.current = planted }, [planted])
+  const budCountsRef = useRef(budCounts)
+  useEffect(() => { budCountsRef.current = budCounts }, [budCounts])
+  const tableCardsRef = useRef(tableCards)
+  useEffect(() => { tableCardsRef.current = tableCards }, [tableCards])
   const lastTickRef = useRef(typeof saved.lastTick === 'number' ? saved.lastTick : Date.now())
-  const lastHaulRef = useRef(typeof saved.lastHaul === 'number' ? saved.lastHaul : lastTickRef.current)
 
-  // Offline catch-up on mount + a 1s live ticker. Both call the same advance fn,
-  // so production continues seamlessly whether or not the app was open.
+  // GENERATION: offline catch-up on mount + a 1s live ticker. Both call the same
+  // advance fn, so grow boxes keep filling whether or not the app was open.
   useEffect(() => {
     const tick = () => {
       const now = Date.now()
       const next = advanceProduction(
-        { ...modelRef.current, lastTick: lastTickRef.current, lastHaul: lastHaulRef.current },
+        { planted: plantedRef.current, budCounts: budCountsRef.current, lastTick: lastTickRef.current },
         now,
       )
       lastTickRef.current = next.lastTick
-      lastHaulRef.current = next.lastHaul
       setBudCounts(next.budCounts)
-      setPackCounts(next.packCounts)
     }
     tick()                                   // immediate catch-up for time away
     const id = setInterval(tick, 1000)       // then advance live
@@ -155,18 +144,81 @@ export default function TrapHouse({ onBack, isOwner = true }) {
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
   }, [])
 
+  // HAULING: the skater's trip carries each grow box's buds to the right packing
+  // box. carryRef holds the current trip's haul, banked per strain.
+  //   phase A: new trip — empty his hands
+  //   phase B: as he rolls right→left through the grow room he passes each box;
+  //            at the moment he reaches it, that box's counter empties into carry
+  //   phase C: rolling past the right packing box, he deposits the whole haul
+  const carryRef = useRef({})
+  useEffect(() => {
+    if (skate.phase === 'A') { carryRef.current = {}; return }      // new trip — empty hands
+    if (skate.phase === 'B') {
+      const timers = [3, 2, 1].map(tbl => {                         // right → left
+        const [x0, x1] = BINS[tbl]
+        return setTimeout(() => {
+          const id = tableCardsRef.current[tbl]
+          const n = budCountsRef.current[tbl] || 0
+          if (id && n) carryRef.current[id] = (carryRef.current[id] || 0) + n
+          setBudCounts(c => ({ ...c, [tbl]: 0 }))                   // empty the grow counter on pass
+        }, passTimeMs((x0 + x1) / 2, SKATE_MS.B))
+      })
+      return () => timers.forEach(clearTimeout)
+    }
+    if (skate.phase === 'C') {
+      const [x0, x1] = PACK_RIGHT_BIN
+      const t = setTimeout(() => {
+        const haul = carryRef.current
+        carryRef.current = {}
+        setPackCounts(pc => {
+          const next = { ...pc }
+          for (const id in haul) next[id] = (next[id] || 0) + haul[id]
+          return next
+        })
+      }, passTimeMs((x0 + x1) / 2, SKATE_MS.C))
+      return () => clearTimeout(t)
+    }
+  }, [skate.phase])
+
+  // MACHINE: turns raw buds into jars. Every tick, each strain holding ≥ JAR_FILL
+  // raw buds in the right box pops ONE jar — the right counter drops by JAR_FILL
+  // and a jar count is banked (the belt-jar animation + left $ counter follow it
+  // in PackingRoom). One jar per strain per tick so they come out one at a time.
+  // The two setters are kept separate (no nested setState) — decide which strains
+  // pop from a ref, then update each counter with its own pure updater.
+  const packCountsRef = useRef(packCounts)
+  useEffect(() => { packCountsRef.current = packCounts }, [packCounts])
+  useEffect(() => {
+    const id = setInterval(() => {
+      const pc = packCountsRef.current
+      const popped = []
+      for (const strain in pc) { if ((pc[strain] || 0) >= JAR_FILL) popped.push(strain) }
+      if (!popped.length) return
+      setPackCounts(prev => {
+        const next = { ...prev }
+        popped.forEach(s => { if ((next[s] || 0) >= JAR_FILL) next[s] -= JAR_FILL })
+        return next
+      })
+      setJarCounts(prev => {
+        const nj = { ...prev }
+        popped.forEach(s => { nj[s] = (nj[s] || 0) + 1 })
+        return nj
+      })
+    }, MACHINE_MS)
+    return () => clearInterval(id)
+  }, [])
+
   // Persist the operating state on every change so a reload resumes the line:
-  // plants, bank, per-box bud counts, table cards, packed totals, and the model
-  // clocks (lastTick/lastHaul) that drive offline catch-up. budCounts changes
-  // every tick, so this also keeps the clocks fresh ~once per second.
+  // plants, bank, grow-box buds, table cards/levels, right-box raw buds, left-box
+  // jars, and the generation clock. budCounts changes ~1/s so the clock stays fresh.
   useEffect(() => {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
-        planted, bank, budCounts, tableCards, cardLevels, packCounts,
-        lastTick: lastTickRef.current, lastHaul: lastHaulRef.current,
+        planted, bank, budCounts, tableCards, cardLevels, packCounts, jarCounts,
+        lastTick: lastTickRef.current,
       }))
     } catch {}
-  }, [planted, bank, budCounts, tableCards, cardLevels, packCounts])
+  }, [planted, bank, budCounts, tableCards, cardLevels, packCounts, jarCounts])
 
   // Place a plant slot, charging the bank (no-op if you can't afford it).
   const placeSlot = (slot, cost) => {
@@ -235,7 +287,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
           chrome (top bar, arrows) that floats over everything. */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
         {cur.key === 'shop' && <ShopFront art={cur.art} />}
-        {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} packCounts={packCounts} tableCards={tableCards} cardLevels={cardLevels} />}
+        {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} packCounts={packCounts} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} />}
         {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} tableCards={tableCards} onAdd={setPicking} skatePhase={skate.phase} skateStart={skate.start} />}
       </div>
 
@@ -363,6 +415,13 @@ const SKATE_ANIM = {
   C: { name: 'rollRightToLeft', secs: 5.2 },
   D: { name: 'rollEnterLeft',   secs: 2.6 },
 }
+// The group translateX runs from +ROLL_EDGE% to −ROLL_EDGE% across a room (must
+// match the 85% in the roll keyframes). The monkey's on-screen center is therefore
+// (50 + ROLL_EDGE)% at a right→left phase start, sweeping to (50 − ROLL_EDGE)%.
+const ROLL_EDGE = 85
+// Milliseconds into a right→left phase at which the monkey's center passes a given
+// on-screen x (% of the room box). Used to time grow-box collection + the deposit.
+const passTimeMs = (centerPct, durMs) => Math.round((50 + ROLL_EDGE - centerPct) * durMs / (2 * ROLL_EDGE))
 // Packing room's two collection boxes: [x0, x1, yTop] as % of the room box (read
 // off packing-room.webp). The RIGHT box banks the raw packed buds the line makes;
 // every JAR_FILL buds mints one finished jar that rides the conveyor belt down
@@ -405,24 +464,24 @@ function Jar({ color = '#8e44ad' }) {
   )
 }
 
-function PackingRoom({ skatePhase = 'idle', skateStart = 0, packCounts = {}, tableCards = {}, cardLevels = {} }) {
+function PackingRoom({ skatePhase = 'idle', skateStart = 0, onSkateClick, packCounts = {}, jarCounts = {}, tableCards = {}, cardLevels = {} }) {
   const [rx0, rx1, ryTop] = PACK_RIGHT_BIN
   const [lx0, lx1, lyTop] = PACK_LEFT_BIN
   // Strains currently planted on a table — BOTH box counters are tied to these,
   // so a counter appears the moment a plant is placed and vanishes if it's removed.
   const placedIds = [...new Set(Object.values(tableCards))].filter(id => PLANTS.find(p => p.id === id))
   const strainOf = (id) => PLANTS.find(p => p.id === id)
-  const packedOf = (id) => Math.floor(packCounts[id] || 0)               // raw buds → right box
-  const jarsOf   = (id) => Math.floor((packCounts[id] || 0) / JAR_FILL)  // finished jars → left box
+  const packedOf = (id) => Math.floor(packCounts[id] || 0)   // raw buds in the right box
+  const jarsOf   = (id) => Math.floor(jarCounts[id] || 0)    // finished jars in the left box
   // Each jar is worth the card's current cash value × JAR_FILL (e.g. a $25 Lvl-1
   // card → $125/jar); the left box shows the running $ value of all banked jars.
   const jarValueOf = (id) => plantCashValue(strainOf(id), cardLevels[id] || 1) * JAR_FILL
   const valueOf    = (id) => jarsOf(id) * jarValueOf(id)
 
-  // Spawn a jar travelling down the belt each time a strain's jar total ticks up.
-  // The baseline is seeded on mount so re-entering the room doesn't replay every
-  // jar already made; the left counter reads jarsOf() directly, so the animation
-  // is purely the cosmetic delivery of that increment.
+  // Spawn a jar travelling down the belt each time the machine pops one (a strain's
+  // jar total ticks up). The baseline is seeded on mount so re-entering the room
+  // doesn't replay every jar already made; the left counter reads jarCounts
+  // directly, so the animation is purely the cosmetic delivery of that increment.
   const [jars, setJars] = useState([])
   const prevJarsRef = useRef(null)
   const jarKeyRef = useRef(0)
@@ -433,13 +492,13 @@ function PackingRoom({ skatePhase = 'idle', skateStart = 0, packCounts = {}, tab
     const spawned = []
     for (const id of placedIds) {
       if ((cur[id] || 0) > (prevJarsRef.current[id] || 0)) {
-        // One delivery animation even if several jars mint at once (offline catch-up).
+        // One delivery animation even if several jars pop at once.
         spawned.push({ key: ++jarKeyRef.current, color: strainOf(id)?.jarColor || '#8e44ad' })
       }
     }
     prevJarsRef.current = cur
     if (spawned.length) { sfx.tap?.(); setJars(j => [...j, ...spawned]) }
-  }, [packCounts, tableCards])  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [jarCounts, tableCards])  // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -491,7 +550,7 @@ function PackingRoom({ skatePhase = 'idle', skateStart = 0, packCounts = {}, tab
         {/* Skater monkey lives in the packing room for every phase except B
             (when he's rolling through the grow room). */}
         {skatePhase !== 'B' && (
-          <Skater phase={skatePhase} start={skateStart} />
+          <Skater phase={skatePhase} start={skateStart} onClick={onSkateClick} />
         )}
       </div>
     </div>
@@ -505,8 +564,9 @@ function PackingRoom({ skatePhase = 'idle', skateStart = 0, packCounts = {}, tab
 // phase, so mounting mid-phase (you just switched into the room) shows him at
 // his true position on the path rather than restarting. SKATER_Z keeps the whole
 // monkey ABOVE every room layer — the art, the counters, the jars, and the bins —
-// in every room, so no part of him is ever painted behind the scenery.
-function Skater({ phase = 'idle', start = 0 }) {
+// in every room, so no part of him is ever painted behind the scenery. Stationary
+// at center when `phase` is 'idle'; tap him then (only then) to start a trip.
+function Skater({ phase = 'idle', start = 0, onClick }) {
   const rolling = phase !== 'idle'
   const anim = useMemo(() => {
     const conf = SKATE_ANIM[phase]
@@ -520,12 +580,15 @@ function Skater({ phase = 'idle', start = 0 }) {
       <div style={{ position: 'absolute', bottom: '5%', left: '50%', transform: 'translateX(-50%)', width: '16%' }}>
         <Skateboard spinning={rolling} />
       </div>
-      {/* Monkey standing on the deck. */}
+      {/* Monkey standing on the deck — tap (only when idle) to send him rolling. */}
       <img src="/thug-6.png" alt="Skater monkey"
+        onClick={() => { if (phase === 'idle') { sfx.tap?.(); onClick && onClick() } }}
         style={{
           position: 'absolute', bottom: '8%', left: '50%', transform: 'translateX(-50%)',
           height: '60%', width: 'auto', objectFit: 'contain',
           filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))',
+          pointerEvents: phase === 'idle' ? 'auto' : 'none',
+          cursor: phase === 'idle' ? 'pointer' : 'default',
         }} />
     </div>
   )
