@@ -224,15 +224,48 @@ function ShopFront({ art }) {
 function PackingRoom() {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <img src="/packing-room.webp" alt="Packing Room" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
-      {/* Thug-life character standing on the packing-room floor (swapped in
-          from the front room). */}
-      <img src="/thug-6.png" alt="" style={{
-        position: 'absolute', bottom: '4%', left: '50%', transform: 'translateX(-50%)',
-        height: '62%', width: 'auto', objectFit: 'contain',
-        filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))', pointerEvents: 'none',
-      }} />
+      {/* Aspect-locked room box so the skater stays glued to the floor at any
+          screen size / orientation. */}
+      <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
+        <img src="/packing-room.webp" alt="Packing Room" style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain' }} />
+        {/* Thug-life monkey riding a skateboard — the board + rider glide back
+            and forth across the floor as one group. */}
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', animation: 'skateGlide 6.5s ease-in-out infinite' }}>
+          {/* Skateboard under the feet */}
+          <div style={{ position: 'absolute', bottom: '5%', left: '50%', transform: 'translateX(-50%)', width: '16%' }}>
+            <Skateboard />
+          </div>
+          {/* Monkey standing on the deck */}
+          <img src="/thug-6.png" alt="" style={{
+            position: 'absolute', bottom: '8%', left: '50%', transform: 'translateX(-50%)',
+            height: '60%', width: 'auto', objectFit: 'contain',
+            filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))',
+          }} />
+        </div>
+      </div>
     </div>
+  )
+}
+
+// A cartoon skateboard (side view) drawn to match the bold-outline art style:
+// a colored deck with kicked-up nose/tail on two trucks of cream wheels.
+function Skateboard() {
+  return (
+    <svg viewBox="0 0 200 64" style={{ display: 'block', width: '100%', height: 'auto',
+      filter: 'drop-shadow(0 5px 6px rgba(0,0,0,0.5))' }}>
+      {/* Deck — slightly upturned ends */}
+      <path d="M10 30 Q10 20 26 21 L174 21 Q190 20 190 30 Q190 39 174 38 L26 38 Q10 39 10 30 Z"
+        fill="#c0392b" stroke="#140d06" strokeWidth="4" strokeLinejoin="round" />
+      {/* Top griptape highlight */}
+      <rect x="28" y="23.5" width="144" height="4.5" rx="2.25" fill="#7c1f17" opacity="0.7" />
+      {/* Trucks */}
+      <rect x="50" y="36" width="9" height="9" rx="1.5" fill="#8a857a" stroke="#140d06" strokeWidth="2.5" />
+      <rect x="141" y="36" width="9" height="9" rx="1.5" fill="#8a857a" stroke="#140d06" strokeWidth="2.5" />
+      {/* Wheels — two per truck */}
+      {[46, 63, 137, 154].map((cx, i) => (
+        <circle key={i} cx={cx} cy="50" r="10.5" fill="#f1e7c9" stroke="#140d06" strokeWidth="3.5" />
+      ))}
+    </svg>
   )
 }
 
@@ -555,6 +588,11 @@ function Keyframes() {
         0%   { transform: scale(1); }
         40%  { transform: scale(1.45); color: #fff; }
         100% { transform: scale(1); }
+      }
+      @keyframes skateGlide {
+        0%   { transform: translateX(-17%) rotate(-1.5deg); }
+        50%  { transform: translateX(17%)  rotate(1.5deg); }
+        100% { transform: translateX(-17%) rotate(-1.5deg); }
       }
     `}</style>
   )
