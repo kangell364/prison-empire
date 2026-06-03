@@ -3,6 +3,7 @@ import { SKILLS } from '../data/gameData'
 import { getBattleSkillLoadout } from '../state/skillLoadoutStore'
 import { SKILL_DMG_PER_LEVEL } from '../state/skillUpgradesStore'
 import { SkillCardPopup } from './SkillCardPopup'
+import { CharacterDetailModal } from './CharacterDetailModal'
 import { sfx } from '../sounds'
 import { Avatar } from './Avatar'
 import { usePlayerCard } from '../state/profileStore'
@@ -85,6 +86,7 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
   const [highlight, setHighlight] = useState(null)
   const [log, setLog]         = useState([])
   const [outcome, setOutcome] = useState(null)      // win | lose | wornout | draw
+  const [cardView, setCardView] = useState(null)    // { character, skillLoadout } — tapped portrait
   const tickRef = useRef(null)
   const logSeqRef = useRef(0)                        // stable per-line ids (newest log on top)
 
@@ -322,6 +324,7 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
           <FighterBlock name={me.name} emoji={me.emoji} avatar={me.avatar} level={combat.level}
             attack={stats.playerBaseAttack} defense={stats.playerBaseDefense}
             hp={playerHp} maxHp={maxPlayerHp} color={BLUE} hit={playerHit}
+            onClick={() => setCardView({ character: { ...me, isYou: true }, skillLoadout: playerLoadout })}
             outcome={outcome === 'win' ? 'winner' : (outcome === 'lose' || outcome === 'wornout') ? 'loser' : null} />
 
           <div style={{ background: '#0d0d15', border: `1.5px solid ${phase === 'rolling' ? GOLD : '#2a2a3a'}`, borderRadius: 14, padding: 10, flexShrink: 0, transition: 'border-color 0.2s' }}>
@@ -338,6 +341,7 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
           <FighterBlock name={opponent.name} emoji={opponent.emoji} avatar={opponent.avatar} level={opponent.level}
             attack={stats.oppBaseAttack} defense={stats.oppBaseDefense}
             hp={oppHp} maxHp={maxOppHp} color={RED} hit={oppHit}
+            onClick={() => setCardView({ character: opponent, skillLoadout: oppLoadout })}
             outcome={outcome === 'win' ? 'loser' : (outcome === 'lose' || outcome === 'wornout') ? 'winner' : null} />
         </div>
 
@@ -439,11 +443,21 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
         )}
 
       </div>
+
+      {/* Tapping a fighter's portrait opens its full card (boss shows its skill
+          board). Renders above the dice modal (same z, later in the tree). */}
+      {cardView && (
+        <CharacterDetailModal
+          character={cardView.character}
+          skillLoadout={cardView.skillLoadout}
+          onClose={() => setCardView(null)}
+        />
+      )}
     </div>
   )
 }
 
-function FighterBlock({ name, emoji, avatar, level, attack, defense, hp, maxHp, color, hit, outcome }) {
+function FighterBlock({ name, emoji, avatar, level, attack, defense, hp, maxHp, color, hit, outcome, onClick }) {
   const pct = maxHp > 0 ? Math.max(0, Math.min(100, (hp / maxHp) * 100)) : 0
   const hpColor = pct > 60 ? GREEN : pct > 25 ? ORANGE : RED
   const dead = hp <= 0   // out of HP → show the KO stamp, even in a mutual KO
@@ -451,7 +465,8 @@ function FighterBlock({ name, emoji, avatar, level, attack, defense, hp, maxHp, 
   return (
     <div style={{ flex: 1, minWidth: 0, textAlign: 'center', opacity: dead ? 0.45 : 1, transition: 'opacity 0.4s', animation: outerAnim, borderRadius: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
-        <div key={hit ? hit.key : 'avatar'} style={{ animation: hit && hit.key > 0 ? 'hitShake 0.32s ease' : 'none' }}>
+        <div key={hit ? hit.key : 'avatar'} onClick={onClick}
+          style={{ animation: hit && hit.key > 0 ? 'hitShake 0.32s ease' : 'none', cursor: onClick ? 'pointer' : 'default' }}>
           <Avatar src={avatar} emoji={emoji} size={84} radius={12} ko={dead} />
         </div>
         {hit && hit.key > 0 && (
