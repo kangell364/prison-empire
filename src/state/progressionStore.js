@@ -181,3 +181,16 @@ function applyDefeat(boss) {
 export function resetProgression() {
   commit(JSON.parse(JSON.stringify(DEFAULTS)))
 }
+
+// DEV: reset a single tab (guards/yard/kitchen) back to wave 1 / slot 1 —
+// clears its defeated list and any persisted boss HP for that tab. Player
+// level/XP and the other tabs are left untouched.
+export function resetTab(tab) {
+  const bossHp = { ...state.bossHp }
+  for (const id of Object.keys(bossHp)) if (id.startsWith(`${tab}-`)) delete bossHp[id]
+  commit({
+    waves:    { ...state.waves,    [tab]: 1 },
+    defeated: { ...state.defeated, [tab]: [] },
+    bossHp,
+  })
+}

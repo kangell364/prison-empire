@@ -3,7 +3,7 @@ import { TABS, TAB_ORDER, SLOTS_PER_WAVE, generateWave, xpForLevel } from '../da
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { BattleDiceModal } from '../components/BattleDiceModal'
-import { useProgress, recordHit, resetProgression } from '../state/progressionStore'
+import { useProgress, recordHit, resetProgression, resetTab } from '../state/progressionStore'
 import { useVitals, spendStamina, spendHealth, restoreHealthTo } from '../state/vitalsStore'
 import { bumpForBoss } from '../state/bountyStore'
 
@@ -81,63 +81,41 @@ export default function Battle() {
           <span style={{ color: clearedCt === SLOTS_PER_WAVE ? GREEN : '#888' }}>{clearedCt}/{SLOTS_PER_WAVE} cleared</span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {bosses.map(boss => {
             const isDead = defeated.includes(boss.slot)
             const hp     = remainingHp(boss)
             const hpPct  = Math.max(0, Math.min(100, Math.round((hp / boss.hp) * 100)))
             const worn   = hp < boss.hp
             return (
-              <div key={boss.id} onClick={() => setDetail(boss)} className="card card-pad" style={{
-                display: 'flex', alignItems: 'center', gap: 14,
-                borderColor: boss.boss ? `${GOLD}44` : '#2a2a3a',
-                background: boss.boss ? '#1a1510' : '#13131f',
-                opacity: isDead ? 0.4 : 1, filter: isDead ? 'grayscale(1)' : 'none',
-                cursor: 'pointer',
-              }}>
-                <div style={{ position: 'relative' }}>
-                  <Avatar src={boss.avatar} emoji={boss.emoji} size={44} radius={10} />
-                  <span style={{ position: 'absolute', top: -6, left: -6, background: '#0d0d15', border: '0.5px solid #2a2a3a', color: '#888', fontSize: 8, fontWeight: 700, padding: '1px 4px', borderRadius: 5 }}>#{boss.slot}</span>
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                    <div style={{ color: boss.boss ? GOLD : '#fff', fontSize: 14, fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{boss.name}</div>
-                    {boss.boss && !isDead && <span style={{ background: GOLD, color: '#0a0a0f', fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>BOSS</span>}
-                    {isDead && <span style={{ color: GREEN, fontSize: 9, fontWeight: 700, letterSpacing: 1 }}>DEFEATED</span>}
-                  </div>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <span style={{ color: '#e74c3c', fontSize: 11 }}>ATK {boss.atk}</span>
-                    <span style={{ color: '#4a9eff', fontSize: 11 }}>DEF {boss.def}</span>
-                    <span style={{ color: GOLD, fontSize: 11 }}>+{boss.xp} XP</span>
-                  </div>
-                  {!isDead && (
-                    <div style={{ marginTop: 5 }}>
-                      <div style={{ height: 4, background: '#1e1e2a', borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${hpPct}%`, background: hpPct > 50 ? GREEN : hpPct > 20 ? '#f39c12' : '#e74c3c', borderRadius: 2, transition: 'width 0.4s' }} />
-                      </div>
-                      <div style={{ color: '#666', fontSize: 9, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
-                        HP {hp.toLocaleString()} / {boss.hp.toLocaleString()}{worn ? '  · worn down' : ''}
-                        {boss.cardDrop ? <span style={{ color: PURPLE, marginLeft: 6 }}><i className="ti ti-cards" style={{ fontSize: 9 }} /> card</span> : null}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                {!isDead && (
-                  <button className="btn btn-gold" style={{ padding: '8px 14px', fontSize: 12 }}
-                    onClick={(e) => { e.stopPropagation(); startFight(boss) }} disabled={stamina < STAMINA_COST}>
-                    Fight
-                  </button>
-                )}
-              </div>
+              <BossTile
+                key={boss.id}
+                boss={boss}
+                isDead={isDead}
+                hp={hp}
+                hpPct={hpPct}
+                worn={worn}
+                canFight={stamina >= STAMINA_COST}
+                onTap={() => setDetail(boss)}
+                onFight={() => startFight(boss)}
+              />
             )
           })}
         </div>
 
-        {/* DEV: reset campaign progress for testing. */}
-        <button onClick={() => { if (window.confirm('Reset ALL campaign progress (level, XP, boss HP)?')) resetProgression() }}
-          style={{ marginTop: 16, width: '100%', background: 'transparent', color: '#444', border: '0.5px dashed #2a2a3a', borderRadius: 8, padding: 8, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>
-          RESET CAMPAIGN (DEV)
-        </button>
+        {/* DEV: reset progress for testing. */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          {/* Reset just the current tab (wave 1 / slot 1), keeping level + other tabs. */}
+          <button onClick={() => { if (window.confirm(`Reset ${TABS[area].label} back to wave 1? (level + other tabs kept)`)) resetTab(area) }}
+            style={{ flex: 1, background: 'transparent', color: '#444', border: '0.5px dashed #2a2a3a', borderRadius: 8, padding: 8, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>
+            RESET {TABS[area].label.toUpperCase()}
+          </button>
+          {/* Full wipe: level, XP, all tabs. */}
+          <button onClick={() => { if (window.confirm('Reset ALL campaign progress (level, XP, boss HP)?')) resetProgression() }}
+            style={{ flex: 1, background: 'transparent', color: '#444', border: '0.5px dashed #2a2a3a', borderRadius: 8, padding: 8, fontSize: 10, letterSpacing: 1, cursor: 'pointer' }}>
+            RESET ALL (DEV)
+          </button>
+        </div>
       </div>
 
       {/* Attrition battle */}
@@ -166,6 +144,90 @@ export default function Battle() {
             { label: 'NOT ENOUGH STAMINA', icon: 'ti-bolt-off', onClick: () => {}, kind: 'secondary' },
           ]}
         />
+      )}
+    </div>
+  )
+}
+
+// Boss tile — styled to match the player Collection cards (vertical card with a
+// top accent bar, centered art, name, and ATK/DEF stat boxes) so the PvE roster
+// reads as the same kind of "card" as the player's own crew. Layers on the
+// boss-specific bits: slot #, BOSS/DEFEATED badge, persistent HP bar (bosses
+// never heal), reward line, and the Fight action.
+function BossTile({ boss, isDead, hp, hpPct, worn, canFight, onTap, onFight }) {
+  const accent = boss.boss ? GOLD : '#3a3a4a'
+  return (
+    <div onClick={onTap} style={{
+      background: boss.boss ? '#1a1510' : '#13131f',
+      border: `0.5px solid ${boss.boss ? `${GOLD}44` : '#2a2a3a'}`,
+      borderRadius: 16, padding: '22px 12px 12px',
+      cursor: 'pointer', position: 'relative', overflow: 'hidden',
+      opacity: isDead ? 0.4 : 1, filter: isDead ? 'grayscale(1)' : 'none',
+    }}>
+      {/* Top accent bar — gold for milestone bosses, like the rarity bar on player cards */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: accent }} />
+
+      {/* Slot # (top-left), where the PLAYER type label sits on player cards */}
+      <div style={{ position: 'absolute', top: 6, left: 8, color: '#888', fontSize: 8, fontWeight: 700, letterSpacing: 1.5 }}>
+        #{boss.slot}
+      </div>
+
+      {/* Badge (top-right): DEFEATED once cleared, else BOSS for milestones */}
+      {isDead ? (
+        <div style={{ position: 'absolute', top: 6, right: 8, color: GREEN, fontSize: 9, fontWeight: 700, letterSpacing: 1 }}>DEFEATED</div>
+      ) : boss.boss ? (
+        <div style={{ position: 'absolute', top: 6, right: 8, background: GOLD, color: '#0a0a0f', fontSize: 8, fontWeight: 700, letterSpacing: 1, borderRadius: 4, padding: '2px 5px' }}>BOSS</div>
+      ) : null}
+
+      {/* Art */}
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 6px' }}>
+        <Avatar src={boss.avatar} emoji={boss.emoji} size={56} radius={8} />
+      </div>
+
+      {/* Name */}
+      <div style={{ color: boss.boss ? GOLD : '#fff', fontSize: 12, fontWeight: 500, textAlign: 'center', marginBottom: 2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+        {boss.name}
+      </div>
+
+      {/* Level subtitle (where rarity sits on player cards) */}
+      <div style={{ color: '#666', fontSize: 10, textAlign: 'center', marginBottom: 10 }}>Lv {boss.level}</div>
+
+      {/* Combat stats — ATK + DEF, same two-box layout as the player cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        <div style={{ background: '#1e1e2a', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+          <div style={{ color: '#555', fontSize: 8, letterSpacing: 1, fontWeight: 700 }}>ATK</div>
+          <div style={{ color: '#e74c3c', fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{boss.atk}</div>
+        </div>
+        <div style={{ background: '#1e1e2a', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+          <div style={{ color: '#555', fontSize: 8, letterSpacing: 1, fontWeight: 700 }}>DEF</div>
+          <div style={{ color: '#4a9eff', fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{boss.def}</div>
+        </div>
+      </div>
+
+      {/* Persistent HP bar — how worn down the boss is across visits */}
+      {!isDead && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ height: 4, background: '#1e1e2a', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${hpPct}%`, background: hpPct > 50 ? GREEN : hpPct > 20 ? '#f39c12' : '#e74c3c', borderRadius: 2, transition: 'width 0.4s' }} />
+          </div>
+          <div style={{ color: '#666', fontSize: 9, marginTop: 3, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+            HP {hp.toLocaleString()} / {boss.hp.toLocaleString()}{worn ? ' · worn' : ''}
+          </div>
+        </div>
+      )}
+
+      {/* Reward line: XP + card drop for milestone bosses */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 8 }}>
+        <span style={{ color: GOLD, fontSize: 10, fontWeight: 600 }}>+{boss.xp} XP</span>
+        {boss.cardDrop ? <span style={{ color: PURPLE, fontSize: 10 }}><i className="ti ti-cards" style={{ fontSize: 10 }} /> card</span> : null}
+      </div>
+
+      {/* Fight action */}
+      {!isDead && (
+        <button className="btn btn-gold" style={{ width: '100%', marginTop: 10, padding: '8px 0', fontSize: 12 }}
+          onClick={(e) => { e.stopPropagation(); onFight() }} disabled={!canFight}>
+          Fight
+        </button>
       )}
     </div>
   )

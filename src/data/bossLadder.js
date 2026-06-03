@@ -116,6 +116,22 @@ export function generateBoss(tab, level, slot) {
     look = { name: 'CO Johnson', emoji: '👮', bio: 'Bent, mean, built. Runs the Intake Block with his fists and a forgotten badge. Boss of the block.', avatar: '/co-johnson.jpg' }
   }
 
+  // Pin custom card art on the first Guards bosses (wave 1). Art is optimized
+  // to the player-card pipeline — ~720px-wide JPG (see scripts/optimize-art.py),
+  // so a boss tile loads as light as a player card (~60 KB, not multi-MB).
+  if (tab === 'guards' && level === 1 && slot === 1) {
+    look = { ...look, avatar: '/guard-boss-1.jpg' }
+  }
+  if (tab === 'guards' && level === 1 && slot === 2) {
+    look = { ...look, avatar: '/guard-boss-2.jpg' }
+  }
+  if (tab === 'guards' && level === 1 && slot === 3) {
+    look = { ...look, avatar: '/guard-boss-3.jpg' }
+  }
+  if (tab === 'guards' && level === 1 && slot === 4) {
+    look = { ...look, avatar: '/guard-boss-4.jpg' }
+  }
+
   return {
     id: `${tab}-${level}-${slot}`,
     tab, level, slot,
