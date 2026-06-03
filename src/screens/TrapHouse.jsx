@@ -21,7 +21,7 @@ const SKATER_Z = 50   // the monkey — always above PROP_Z, in every room
 
 // The room screen's operating state (plants, bank, bud + packed counts) is kept
 // in this one localStorage blob so the whole line resumes across reloads.
-const SAVE_KEY = 'pe_traphouse_room_v1'
+const SAVE_KEY = 'pe_traphouse_room_v2'
 function loadSaved() {
   try { const raw = localStorage.getItem(SAVE_KEY); if (raw) return JSON.parse(raw) || {} } catch {}
   return {}
@@ -82,6 +82,19 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   // Running tally of buds delivered into each table's bin. One bud "drops" each
   // time its path animation completes a loop; the counter on the box reflects it.
   const [budCounts, setBudCounts] = useState(() => saved.budCounts || { 1: 0, 2: 0, 3: 0 })
+  // What the grow-box counter SHOWS — an integer that steps up the instant a bud's
+  // belt animation drops it into the box (onBudLand), so the number ticks in time
+  // with the visible drop instead of on the steady wall-clock. budCounts above is
+  // still the source of truth (offline accrual + what the monkey actually hauls);
+  // this only governs the on-screen tally. Seeded from the saved float so an
+  // offline-accrued pile shows immediately, then re-synced on big catch-ups below.
+  const [shownBuds, setShownBuds] = useState(() => {
+    const bc = saved.budCounts || {}
+    return { 1: Math.floor(bc[1] || 0), 2: Math.floor(bc[2] || 0), 3: Math.floor(bc[3] || 0) }
+  })
+  // One bud's belt animation just completed a loop (it landed in table `t`'s box):
+  // step that box's visible tally up by one. Only planted buds report (see BeltBud).
+  const onBudLand = (t) => setShownBuds(s => ({ ...s, [t]: (s[t] || 0) + 1 }))
   // Which Grow Card is planted on each table (the card the player added).
   const [tableCards, setTableCards] = useState(() => saved.tableCards || {})
   // The card LEVEL each planted strain is at, keyed by plant id. Drives a jar's
@@ -128,11 +141,23 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   useEffect(() => {
     const tick = () => {
       const now = Date.now()
+      const prev = budCountsRef.current
       const next = advanceProduction(
-        { planted: plantedRef.current, budCounts: budCountsRef.current, lastTick: lastTickRef.current },
+        { planted: plantedRef.current, budCounts: prev, lastTick: lastTickRef.current },
         now,
       )
       lastTickRef.current = next.lastTick
+      // Normal live ticks add < 1 bud/sec, so the bud-drop animation drives the
+      // shown tally. But a big jump means the app was closed/backgrounded (the
+      // catch-up) — the animations didn't run, so snap the shown tally up to match.
+      setShownBuds(s => {
+        const ns = { ...s }
+        for (const t of [1, 2, 3]) {
+          const grew = Math.floor(next.budCounts[t] || 0) - Math.floor(prev[t] || 0)
+          if (grew >= 2) ns[t] = Math.floor(next.budCounts[t] || 0)
+        }
+        return ns
+      })
       setBudCounts(next.budCounts)
     }
     tick()                                   // immediate catch-up for time away
@@ -161,6 +186,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
           const n = budCountsRef.current[tbl] || 0
           if (id && n) carryRef.current[id] = (carryRef.current[id] || 0) + n
           setBudCounts(c => ({ ...c, [tbl]: 0 }))                   // empty the grow counter on pass
+          setShownBuds(s => ({ ...s, [tbl]: 0 }))                   // and zero its visible tally
         }, passTimeMs((x0 + x1) / 2, SKATE_MS.B))
       })
       return () => timers.forEach(clearTimeout)
@@ -286,9 +312,9 @@ export default function TrapHouse({ onBack, isOwner = true }) {
           z-index keeps him above the room art/counters but still under the UI
           chrome (top bar, arrows) that floats over everything. */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-        {cur.key === 'shop' && <ShopFront art={cur.art} />}
+        {cur.key === 'shop' && <ShopFront art={cur.art} jarCounts={jarCounts} tableCards={tableCards} />}
         {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} packCounts={packCounts} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} />}
-        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} tableCards={tableCards} onAdd={setPicking} skatePhase={skate.phase} skateStart={skate.start} />}
+        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} shownBuds={shownBuds} onBudLand={onBudLand} tableCards={tableCards} onAdd={setPicking} skatePhase={skate.phase} skateStart={skate.start} />}
       </div>
 
       {/* Arrows — step between rooms. Left = toward the front, right = deeper. */}
@@ -373,17 +399,49 @@ function RoomArrow({ side, label, onClick }) {
 }
 
 // ---- SHOP FRONT --------------------------------------------------------
-// The customer-facing storefront. Real art, fit fully into the screen. Stocking
-// shelves + customer sales is the next mechanic; for now the room is the anchor.
-function ShopFront({ art }) {
+// The customer-facing storefront and the LAST stop in the grow → pack → shelf
+// flow: the finished jars the packing line banks (jarCounts) are stocked on the
+// back shelves here, each tinted to its strain's jarColor (Purple Haze = purple).
+// Slots are read off shop-front.webp — three shelf rows × three bays × three jars
+// — and fill front-to-back (top row, left→right) as production banks jars.
+const SHELF_ROWS = [31.6, 39.8, 48.0]                      // jar-bottom baseline, % of room box
+const SHELF_BAYS = [[38.2, 48.0], [49.9, 59.9], [62.4, 72.3]]
+const SHELF_FRAC = [0.18, 0.5, 0.82]                       // jar centers within a bay
+const SHELF_JAR_W = 2.9                                    // jar width, % of room box
+const SHELF_SLOTS = SHELF_ROWS.flatMap(y =>               // all slot centers, in stock order
+  SHELF_BAYS.flatMap(([b0, b1]) => SHELF_FRAC.map(f => ({ x: b0 + (b1 - b0) * f, y }))))
+
+function ShopFront({ art, jarCounts = {}, tableCards = {} }) {
+  // One tinted jar per banked unit, in the order strains were planted, capped at
+  // the shelf's slot count so the stock never overflows the cabinet.
+  const placedIds = [...new Set(Object.values(tableCards))].filter(id => PLANTS.find(p => p.id === id))
+  const stock = []
+  for (const id of placedIds) {
+    const color = PLANTS.find(p => p.id === id)?.jarColor || '#8e44ad'
+    const n = Math.floor(jarCounts[id] || 0)
+    for (let i = 0; i < n && stock.length < SHELF_SLOTS.length; i++) stock.push(color)
+    if (stock.length >= SHELF_SLOTS.length) break
+  }
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the clerk lines up with the counter at any size. */}
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src={art} alt="Shop Front" style={{ display: 'block', width: '100%', height: '100%' }} />
+        {/* Finished jars stocked on the back shelves (grow → pack → shelf). */}
+        {stock.map((color, i) => (
+          <div key={i} style={{
+            position: 'absolute', left: `${SHELF_SLOTS[i].x}%`, top: `${SHELF_SLOTS[i].y}%`,
+            width: `${SHELF_JAR_W}%`, transform: 'translate(-50%, -100%)',
+            zIndex: PROP_Z, pointerEvents: 'none',
+            filter: 'drop-shadow(0 3px 4px rgba(0,0,0,0.45))',
+          }}>
+            <Jar color={color} />
+          </div>
+        ))}
         {/* Nodding clerk standing BEHIND the counter — clipped at the counter
-            top so his body is hidden; only his head/shoulders nod above it. */}
-        <div style={{ position: 'absolute', inset: 0, clipPath: 'inset(0 0 50% 0)', pointerEvents: 'none' }}>
+            top so his body is hidden; only his head/shoulders nod above it.
+            Sits above the shelved jars (he's in front of the cabinet). */}
+        <div style={{ position: 'absolute', inset: 0, clipPath: 'inset(0 0 50% 0)', zIndex: PROP_Z + 1, pointerEvents: 'none' }}>
           <div style={{
             position: 'absolute', left: '50%', bottom: '5%',
             transform: 'translateX(-50%)',
@@ -719,7 +777,7 @@ const BIN_PILE = [
 ]
 const BINS_FULL = false  // preview: show every bin heaped with buds
 
-function GrowRoom({ planted, bank, onPlace, budCounts = {}, tableCards = {}, onAdd, skatePhase = 'idle', skateStart = 0 }) {
+function GrowRoom({ planted, bank, onPlace, shownBuds = {}, onBudLand, tableCards = {}, onAdd, skatePhase = 'idle', skateStart = 0 }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the plant overlays stay glued to the benches
@@ -728,7 +786,7 @@ function GrowRoom({ planted, bank, onPlace, budCounts = {}, tableCards = {}, onA
         <img src="/grow-room.webp" alt="Grow Room" style={{ display: 'block', width: '100%', height: '100%' }} />
         {/* The skater monkey passes through the grow room during phase B. */}
         {skatePhase === 'B' && <Skater phase="B" start={skateStart} />}
-        <BeltBud planted={planted} />
+        <BeltBud planted={planted} onBudLand={onBudLand} />
         {PLANT_SLOTS.filter(s => planted.includes(s.id)).map((s) => (
           <img key={s.id} src="/plant.webp" alt="" aria-hidden data-slot={s.id}
             style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: `${plantW(s.y)}%`,
@@ -793,7 +851,7 @@ function GrowRoom({ planted, bank, onPlace, budCounts = {}, tableCards = {}, onA
         {[1, 2, 3].map(tbl => {
           if (!planted.some(id => id.startsWith(`T${tbl}-`))) return null
           const [x0, x1, yTop] = BINS[tbl]
-          const n = Math.floor(budCounts[tbl] || 0)   // model runs fractional; show whole buds
+          const n = shownBuds[tbl] || 0   // steps up in time with the bud-drop animation
           const strain = PLANTS.find(p => p.id === tableCards[tbl])
           return (
             <div key={`cnt${tbl}`} style={{
@@ -901,7 +959,7 @@ function PlantPicker({ table, onPick, onClose }) {
 // bud elements are mounted up front (hidden until their plant is placed) so the
 // animations stay phase-locked — the buds stay evenly spaced no matter when you
 // buy each plant.
-function BeltBud({ planted }) {
+function BeltBud({ planted, onBudLand }) {
   const kf = Object.entries(BUD_PATHS).map(([t, pts]) => {
     const frames = pts.map((p, i) => {
       const pct = BUD_PCTS[i]
@@ -918,16 +976,22 @@ function BeltBud({ planted }) {
   return (
     <>
       <style>{kf}</style>
-      {PLANT_SLOTS.filter(s => BUD_PATHS[s.table]).map(s => (
+      {PLANT_SLOTS.filter(s => BUD_PATHS[s.table]).map(s => {
+        const isPlanted = planted.includes(s.id)
+        return (
         <img key={s.id} src="/bud.webp" alt="" aria-hidden data-bud={s.id}
-          // Cosmetic only — the bud counts come from the wall-clock model now, so
-          // these flowing buds are ambiance. All buds stay mounted (for phase-lock)
-          // even when hidden, so the lanes stay evenly spaced as you add plants.
+          // Each loop ends as the bud drops into its box; report that landing so the
+          // box's visible tally ticks up in time with the drop. Only planted buds
+          // report (hidden, unplanted buds still animate but must not count).
+          onAnimationIteration={isPlanted && onBudLand ? () => onBudLand(s.table) : undefined}
+          // All buds stay mounted (for phase-lock) even when hidden, so the lanes
+          // stay evenly spaced as you add plants.
           style={{ position: 'absolute', width: `${BUD_W}%`,
-            visibility: planted.includes(s.id) ? 'visible' : 'hidden',
+            visibility: isPlanted ? 'visible' : 'hidden',
             // lane = plant number (1-4) → one of four evenly-spaced phases
             animation: `bud${s.table} ${BUD_SECS}s linear ${(-(s.plant - 1) * BUD_SECS / 4).toFixed(2)}s infinite`,
             pointerEvents: 'none' }} />
+      )})}
       ))}
     </>
   )
