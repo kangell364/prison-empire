@@ -352,9 +352,10 @@ export function CharacterDetailModal({
 
         {/* Skill loadout — the fighter's 12-slot skill board (slots 2–12, the
             Battle-Dice sum range). Same slots that fire mid-fight, so you can
-            scout a boss's skills before committing stamina. Hidden while the
-            loadout is empty (e.g. no skills defined yet). */}
-        {skillLoadout && Object.keys(skillLoadout).length > 0 && (
+            scout a boss's skills before committing stamina. Shows the empty
+            board even with no skills yet, so the slots are visible as a
+            placeholder. */}
+        {skillLoadout && (
           <div style={{ padding: '16px 18px 0' }}>
             <SectionLabel>Skills</SectionLabel>
             <SkillSlotGrid loadout={skillLoadout} accent={accent} />
