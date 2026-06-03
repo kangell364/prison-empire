@@ -21,7 +21,8 @@ function dmg(atk, def) {
 
 // Deterministic per-opponent skill loadout — same opponent always gets the same
 // loadout so fights feel consistent. Procedurally generated from id/name + power.
-function opponentSkillLoadout(opp) {
+// Exported so the detail card can preview a boss's loadout before the fight.
+export function opponentSkillLoadout(opp) {
   if (!opp) return {}
   const seedStr = String(opp.id ?? opp.name ?? 'x')
   let s = 0

@@ -1,5 +1,5 @@
 import React from 'react'
-import { RARITY_COLORS } from '../data/gameData'
+import { RARITY_COLORS, SKILLS } from '../data/gameData'
 import { Avatar, KoOverlay, KO_FILTER } from './Avatar'
 import { useVitals, openNurse } from '../state/vitalsStore'
 
@@ -36,6 +36,10 @@ export function CharacterDetailModal({
   // mint one of the same card at the next level.
   canMerge = false,
   onMerge,
+  // Skill loadout — { [slot]: { skillId, level } } keyed by Battle-Dice slot
+  // (2–12). When supplied, the modal previews the fighter's 12-slot skill
+  // board (used for bosses so you can scout their loadout before the fight).
+  skillLoadout,
 }) {
   // KO the player's own portrait when knocked out (this modal opens for the
   // player from Home / leaderboards, and for opponents — only `isYou` greys out).
@@ -346,6 +350,19 @@ export function CharacterDetailModal({
           </div>
         )}
 
+        {/* Skill loadout — the fighter's 12-slot skill board (slots 2–12, the
+            Battle-Dice sum range). Same slots that fire mid-fight, so you can
+            scout a boss's skills before committing stamina. */}
+        {skillLoadout && (
+          <div style={{ padding: '16px 18px 0' }}>
+            <SectionLabel>Skills</SectionLabel>
+            <SkillSlotGrid loadout={skillLoadout} accent={accent} />
+            <div style={{ color: '#555', fontSize: 10, marginTop: 8, lineHeight: 1.5 }}>
+              A roll lands on a slot (the two dice sum, 2–12). If a skill sits there, it fires for bonus attack.
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         {actions.length > 0 && (
           <div style={{ padding: '16px 18px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -377,6 +394,41 @@ export function CharacterDetailModal({
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// Read-only skill board for the detail card — 11 cells for Battle-Dice slots
+// 2–12, in the same 4-wide grid as the in-fight SlotGrid. A slot holding a
+// skill shows its emoji + level; empty slots are dimmed with just the number.
+function SkillSlotGrid({ loadout = {}, accent = GOLD }) {
+  const slots = Array.from({ length: 11 }, (_, i) => i + 2)   // 2..12
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+      {slots.map(slot => {
+        const entry = loadout[slot]
+        const skill = entry ? SKILLS.find(s => s.id === entry.skillId) : null
+        return (
+          <div key={slot} style={{
+            aspectRatio: '1',
+            background: entry ? `${accent}14` : '#0d0d15',
+            border: `0.5px solid ${entry ? `${accent}66` : '#2a2a3a'}`,
+            borderRadius: 8,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            position: 'relative',
+          }}>
+            {skill && <span style={{ fontSize: 20, lineHeight: 1 }}>{skill.emoji}</span>}
+            {entry && (
+              <span style={{ position: 'absolute', top: 2, left: 4, color: accent, fontSize: 8, fontWeight: 700 }}>
+                L{entry.level}
+              </span>
+            )}
+            <span style={{ position: 'absolute', bottom: 2, right: 4, color: entry ? accent : '#444', fontSize: 8, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+              {slot}
+            </span>
+          </div>
+        )
+      })}
     </div>
   )
 }

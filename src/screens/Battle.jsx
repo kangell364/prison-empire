@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { TABS, TAB_ORDER, SLOTS_PER_WAVE, generateWave, xpForLevel } from '../data/bossLadder'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
-import { BattleDiceModal } from '../components/BattleDiceModal'
+import { BattleDiceModal, opponentSkillLoadout } from '../components/BattleDiceModal'
 import { useProgress, recordHit, resetProgression, resetTab } from '../state/progressionStore'
 import { useVitals, spendStamina, spendHealth, restoreHealthTo } from '../state/vitalsStore'
 import { bumpForBoss } from '../state/bountyStore'
@@ -137,6 +137,7 @@ export default function Battle() {
       {detail && (
         <CharacterDetailModal
           character={detail}
+          skillLoadout={opponentSkillLoadout(detail)}
           onClose={() => setDetail(null)}
           actions={stamina >= STAMINA_COST ? [
             { label: `FIGHT — ${STAMINA_COST} STAMINA`, icon: 'ti-sword', onClick: () => { startFight(detail); setDetail(null) } },
