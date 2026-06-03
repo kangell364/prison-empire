@@ -288,6 +288,13 @@ function GrowRoom({ planted, bank, onPlace }) {
           at any screen size / orientation. */}
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src="/grow-room.webp" alt="Grow Room" style={{ display: 'block', width: '100%', height: '100%' }} />
+        {/* Thug-life character standing on the grow-room floor (off to the
+            side so he doesn't cover the benches). */}
+        <img src="/thug-5.png" alt="" style={{
+          position: 'absolute', left: '13%', bottom: '4%', transform: 'translateX(-50%)',
+          height: '52%', width: 'auto', objectFit: 'contain',
+          filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))', pointerEvents: 'none', zIndex: 5,
+        }} />
         <BeltBud planted={planted} />
         {PLANT_SLOTS.filter(s => planted.includes(s.id)).map((s) => (
           <img key={s.id} src="/plant.webp" alt="" aria-hidden data-slot={s.id}
