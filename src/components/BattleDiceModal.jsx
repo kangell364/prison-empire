@@ -483,26 +483,18 @@ function SlotGrid({ side, equipped, learned, highlight, landed, color }) {
           const isLanded = landed === slot
           const skillId = equipped[slot]
           const learnedSkill = skillId ? learned[skillId] : null
-          const skill = skillId ? SKILLS.find(s => s.id === skillId) : null
-          const dim = skill && !learnedSkill   // equipped but inactive → greyed
+          const emoji = skillId ? (SKILLS.find(s => s.id === skillId)?.emoji || '') : ''
           return (
             <div key={isLanded ? `landed-${landed}` : slot}
               style={{
                 aspectRatio: '1', background: isHl ? `${color}33` : '#0d0d15',
                 border: `${isHl ? 2 : 0.5}px solid ${isHl ? color : '#2a2a3a'}`, borderRadius: 6,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
-                overflow: 'hidden',
                 transition: 'border-color 0.12s, background 0.12s', boxShadow: isHl ? `0 0 8px ${color}66` : 'none',
                 animation: isLanded ? 'slotActivate 0.5s ease' : 'none', '--flash-color': color,
               }}>
-              {/* Show the skill's card art filling the slot; fall back to emoji. */}
-              {skill && skill.avatar ? (
-                <img src={skill.avatar} alt={skill.name}
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: dim ? 'grayscale(1) brightness(0.5)' : 'none' }} />
-              ) : skill ? (
-                <span style={{ fontSize: 14, filter: dim ? 'grayscale(1) brightness(0.5)' : 'none' }}>{skill.emoji}</span>
-              ) : null}
-              <span style={{ position: 'absolute', bottom: 1, right: 2, color: skill ? '#fff' : (isHl ? color : '#444'), fontSize: 7, fontWeight: 700, fontVariantNumeric: 'tabular-nums', textShadow: skill ? '0 1px 2px rgba(0,0,0,0.9)' : 'none' }}>{slot}</span>
+              {emoji && <span style={{ fontSize: 14, filter: learnedSkill ? 'none' : 'grayscale(1) brightness(0.5)' }}>{emoji}</span>}
+              <span style={{ position: 'absolute', bottom: 1, right: 2, color: isHl ? color : '#444', fontSize: 7, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{slot}</span>
             </div>
           )
         })}
