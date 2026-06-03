@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { CARDS_COLLECTION, RARITY_COLORS, SKILLS, PLANTS } from '../data/gameData'
+import { CARDS_COLLECTION, RARITY_COLORS, SKILLS, PLANTS, plantCashValue } from '../data/gameData'
 import { useCardCounts, mergeCard, getOwnedTuples, STACK_SIZE } from '../state/cardsStore'
 import {
   baseAtk, baseDef, useCrew,
@@ -337,15 +337,15 @@ export default function Cards({ initialTab = 'player' }) {
         const liveCount = plantCounts.get(`${plant.id}:${cardLevel}`) || 0
         const yieldUp = readPlantUpgrade(plantUpgradeMap, plant.id, cardLevel).yield || 0
         const effYield = plant.perLevelYield + yieldUp * PLANT_YIELD_PER_LEVEL
+        const cash = plantCashValue(plant, cardLevel)
         return (
           <CharacterDetailModal
             character={{ ...plant, bio: plant.description }}
             cardType="GROW"
             count={liveCount}
             cardLevel={cardLevel}
-            heroBg={PLANT_FACE_BG}
-            heroFit="contain"
             statTiles={[
+              { icon: 'ti-cash', label: 'CASH VALUE', value: `$${cash.toLocaleString()}`, color: '#3fb950' },
               { icon: 'ti-plant-2', label: 'YIELD / LV', value: `+${effYield}`, color: '#3fb950' },
               { icon: 'ti-stack-2', label: 'Card Level', value: cardLevel, color: '#c9a84c' },
             ]}
@@ -924,12 +924,9 @@ function LockedSkillTile({ skill }) {
 
 // ---------------------------------------------------------------------
 // Grow Cards tab — Plants. Stacks + merges + upgrades exactly like the skill
-// cards, but the card art (the Trap House plant cutout) sits over a yellow
-// card face and the upgradable stat is YIELD.
+// cards; each card shows a CASH VALUE (doubles per level) and the upgradable
+// stat is YIELD.
 // ---------------------------------------------------------------------
-
-// Yellow card face the plant cutout is placed over (see PlantTile / hero).
-const PLANT_FACE_BG = '#F2C233'
 
 // The Plants grid — same rarity filters as the other tabs, over the PLANTS
 // catalog, reading the plant-cards store for owned (id, level) tuples.
@@ -982,11 +979,12 @@ function PlantCollection({ filter, upgradeMap, onTapPlant }) {
   )
 }
 
-// Plant card tile — same chrome + stacking visuals as the SkillTile, but the
-// plant cutout sits on a yellow card face, and the stat tiles show YIELD + LVL.
+// Plant card tile — same chrome + stacking visuals as the SkillTile, with the
+// full-bleed strain art, a CASH VALUE bar, and YIELD + LVL stat tiles.
 function PlantTile({ plant, cardLevel, count, yieldUpgrade = 0, onTap }) {
   const rarityColor = RARITY_COLORS[plant.rarity] || '#c9a84c'
   const effYield    = plant.perLevelYield + yieldUpgrade * PLANT_YIELD_PER_LEVEL
+  const cash        = plantCashValue(plant, cardLevel)   // $25 at Lvl 1, doubles each level
   const fullStacks  = Math.floor(count / PLANT_STACK_SIZE)
   const remainder   = count % PLANT_STACK_SIZE
   const stackLabel  = fullStacks > 0
@@ -1016,8 +1014,8 @@ function PlantTile({ plant, cardLevel, count, yieldUpgrade = 0, onTap }) {
         borderRadius: 4, padding: '2px 5px', fontVariantNumeric: 'tabular-nums',
       }}>{mergeReady ? '● ' : ''}CARDS:{count}</div>
 
-      {/* Art — the plant cutout placed over a yellow card face (objectFit
-          'contain' so the whole plant shows), on offset stack-back layers. */}
+      {/* Art — the full-bleed strain card art (cover-cropped square), on
+          offset stack-back layers (one per full stack). */}
       <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 8px' }}>
         <div style={{ position: 'relative', width: 84, height: 84 }}>
           {Array.from({ length: Math.min(fullStacks, 3) }).map((_, i) => {
@@ -1032,8 +1030,8 @@ function PlantTile({ plant, cardLevel, count, yieldUpgrade = 0, onTap }) {
             )
           })}
           <div style={{ position: 'relative', zIndex: 1 }}>
-            <Avatar src={plant.avatar} emoji={plant.emoji} size={84} radius={10} fit="contain"
-              style={{ background: PLANT_FACE_BG, border: `1px solid ${rarityColor}55` }} />
+            <Avatar src={plant.avatar} emoji={plant.emoji} size={84} radius={10}
+              style={{ background: '#1e1e2a', border: `1px solid ${rarityColor}55` }} />
           </div>
         </div>
       </div>
@@ -1048,8 +1046,20 @@ function PlantTile({ plant, cardLevel, count, yieldUpgrade = 0, onTap }) {
       </div>
 
       {/* Category */}
-      <div style={{ color: rarityColor, fontSize: 10, textAlign: 'center', textTransform: 'capitalize', marginBottom: 10 }}>
+      <div style={{ color: rarityColor, fontSize: 10, textAlign: 'center', textTransform: 'capitalize', marginBottom: 8 }}>
         {plant.category}
+      </div>
+
+      {/* Cash value — the headline number; doubles every card level. */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+        background: '#0f1f12', border: '0.5px solid #2f7d3a',
+        borderRadius: 8, padding: '5px 8px', marginBottom: 8,
+      }}>
+        <span style={{ color: '#7a8f7d', fontSize: 8, letterSpacing: 1, fontWeight: 700 }}>CASH VALUE</span>
+        <span style={{ color: '#3fb950', fontSize: 15, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+          ${cash.toLocaleString()}
+        </span>
       </div>
 
       {/* Stat tiles — YIELD (reflects upgrades) + LVL */}

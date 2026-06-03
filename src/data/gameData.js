@@ -693,24 +693,32 @@ export const SKILLS = [
 // (stack to merge, upgrade one stat), but the upgradable stat is YIELD: the
 // product (stash units) a plant produces per harvest. Higher rarity = bigger
 // base yield; merging raises the card level; upgrades add perLevelYield on top.
-// Add new strains here in the same shape:
+// `baseCashValue` is the card's worth at Lvl 1 — it DOUBLES every card level
+// (see plantCashValue). Add new strains here in the same shape:
 //   { id, name, shortName, emoji, avatar, rarity, description, category,
-//     minLevel, maxLevel, perLevelYield }
+//     minLevel, maxLevel, perLevelYield, baseCashValue }
 export const PLANTS = [
   {
-    id: 'plant_og_kush',
-    name: 'OG KUSH',
-    shortName: 'OG Kush',
+    id: 'plant_purple_haze',
+    name: 'PURPLE HAZE',
+    shortName: 'Purple Haze',
     emoji: '🌿',
-    avatar: '/plant.webp',                // same plant cutout used in the Trap House grow room
+    avatar: '/plant-purple-haze.webp',
     rarity: 'rare',
-    description: 'Dense, sticky, and worth every cell-block favor. A reliable money strain for the grow room.',
+    description: 'Deep purple buds with a psychedelic kick. Premium shelf product — the strain that built the empire.',
     category: 'Strain',
     minLevel: 1,
     maxLevel: 100,
     perLevelYield: 8,                 // +8 stash units per card level
+    baseCashValue: 25,                // $ at Lvl 1; doubles every card level
   },
 ]
+
+// Cash value of a plant card at a given card level — starts at baseCashValue
+// and DOUBLES each level (Lvl 1 = $25, Lvl 2 = $50, Lvl 3 = $100, …).
+export function plantCashValue(plant, level = 1) {
+  return (plant?.baseCashValue || 0) * Math.pow(2, Math.max(0, level - 1))
+}
 
 // PvP reward multiplier. Killing someone N levels above you = N× reward.
 // Same level or lower = 1× (clamped). User-facing rule we surface in the UI.
