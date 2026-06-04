@@ -40,6 +40,22 @@ const BUD_PER_PLANT_SECS = 25.6              // one bud per plant every ~25.6s (
 const MACHINE_MS = 2000                      // machine pops one jar per strain every 2s
 const plantsOnTable = (table, planted) => planted.filter(id => id.startsWith(`T${table}-`)).length
 
+// ---- Sales economy ---------------------------------------------------
+// REPUTATION (0–100) is one shop-wide number. Good sales raise it, gouging and empty
+// shelves lower it; it drives how fast customers arrive. Deltas use diminishing
+// returns (see adjustRep) so rep settles at an equilibrium set by your sale mix.
+const REP_START = 50
+const REP_DELTA = { cheap: 0.5, happy: 0.7, grumble: -0.5, refuse: -0.8, nostock: -1.4 }
+// Customer arrival, customers/min, scaled by reputation (dead shop ~3/min → hot ~20/min).
+// Used by BOTH the visible queue's spawn timer and the idle (offline) accrual so the
+// money you earn watching ≈ the money you earn away.
+const demandPerMin = (rep) => 3 + (Math.max(0, Math.min(100, rep)) / 100) * 17
+const SALES_OFFLINE_CAP_MS = 2 * 60 * 60 * 1000   // bank at most ~2h of idle sales on return
+// Basket: most buy 1 jar, some 2–3.
+const rollBasket = () => 1 + (Math.random() < 0.3 ? 1 : 0) + (Math.random() < 0.1 ? 1 : 0)
+// Offline accept probability from price/street ratio (mirrors the live tolerance roll).
+const acceptProb = (ratio) => Math.max(0, Math.min(0.95, 0.95 - (ratio - 1) * 2))
+
 // Advance generation to `now`: pour each plant's output into its grow box. Returns
 // the next { budCounts, lastTick }. Runs live (~1/s) and once on mount for the
 // offline catch-up — identical math, so no double counting.
@@ -79,6 +95,11 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   const [saved] = useState(loadSaved)
   const [planted, setPlanted] = useState(() => Array.isArray(saved.planted) ? saved.planted : [])  // placed plant slots (each brings its bud + path)
   const [bank, setBank] = useState(() => typeof saved.bank === 'number' ? saved.bank : 200000)      // this store's bank balance ($) — full bank for testing
+  // Shop reputation (0–100) — drives the customer arrival rate.
+  const [rep, setRep] = useState(() => typeof saved.rep === 'number' ? saved.rep : REP_START)
+  // Per-strain popularity multiplier (a rotating "hot strain" sits above 1) — weights
+  // which strain customers reach for and how much shelf space it front-faces.
+  const [popularity, setPopularity] = useState(() => saved.popularity || {})
   // Running tally of buds delivered into each table's bin. One bud "drops" each
   // time its path animation completes a loop; the counter on the box reflects it.
   // The ONE source of truth for the grow-box tally — a wall-clock accumulator that
@@ -149,35 +170,46 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   const jarCountsRef = useRef(jarCounts); jarCountsRef.current = jarCounts
   const cardLevelsRef = useRef(cardLevels); cardLevelsRef.current = cardLevels
   const pricesRef = useRef(prices); pricesRef.current = prices
+  const popRef = useRef(popularity); popRef.current = popularity
+  const repRef = useRef(rep)   // synchronous source of truth (adjustRep is the only writer)
+  // Nudge reputation with diminishing returns (gains slow near 100, losses near 0).
+  const adjustRep = useCallback((delta) => {
+    const r = repRef.current
+    const next = Math.max(0, Math.min(100, delta >= 0 ? r + delta * (1 - r / 100) : r + delta * (r / 100)))
+    repRef.current = next
+    setRep(next)
+  }, [])
   // Edit a strain's sell price (the MENU board calls this). Clamped to a $1 floor.
   const setStrainPrice = useCallback((id, price) => {
     setPrices(p => ({ ...p, [id]: Math.max(1, Math.round(price)) }))
   }, [])
-  // A customer (with a personal price `tolerance`, 1.0 = pays street price) tries to
-  // buy a jar of the best-stocked strain at its set price. Returns { value, reaction,
-  // color }; reaction ∈ cheap | happy | grumble | refuse | nostock. Only 'refuse' and
-  // 'nostock' are no-sales. price defaults to the strain's street price when unset.
+  // A customer (with a personal price `tolerance`, 1.0 = pays street price) buys a
+  // basket of 1–3 jars of an in-stock strain (weighted by stock × popularity) at its
+  // set price. Applies the reputation delta for the reaction. Returns { value, reaction,
+  // color, qty }; reaction ∈ cheap | happy | grumble | refuse | nostock.
   const sellJar = useCallback((tolerance = 1.2) => {
     const jc = jarCountsRef.current
-    // Pick a random in-stock strain, weighted by how many jars it has, so every
-    // planted strain sells and every price the player set is live.
     const inStock = Object.keys(jc).filter(id => Math.floor(jc[id] || 0) >= 1)
-    if (!inStock.length) return { value: 0, reaction: 'nostock', color: null }
-    let roll = Math.random() * inStock.reduce((s, id) => s + Math.floor(jc[id] || 0), 0)
+    if (!inStock.length) { adjustRep(REP_DELTA.nostock); return { value: 0, reaction: 'nostock', color: null } }
+    const wOf = (id) => Math.floor(jc[id] || 0) * (popRef.current[id] || 1)
+    let roll = Math.random() * inStock.reduce((s, id) => s + wOf(id), 0)
     let best = inStock[0]
-    for (const id of inStock) { roll -= Math.floor(jc[id] || 0); if (roll <= 0) { best = id; break } }
+    for (const id of inStock) { roll -= wOf(id); if (roll <= 0) { best = id; break } }
     const strain = PLANTS.find(p => p.id === best)
     if (!strain) return { value: 0, reaction: 'nostock', color: null }
     const street = plantCashValue(strain, cardLevelsRef.current[best] || 1) * JAR_FILL
     const price = pricesRef.current[best] != null ? pricesRef.current[best] : street
-    if (price > street * tolerance) return { value: 0, reaction: 'refuse', color: strain.jarColor }  // too pricey for them
-    jarCountsRef.current = { ...jc, [best]: (jc[best] || 0) - 1 }   // sync so a quick next sale sees it
-    setJarCounts(j => ({ ...j, [best]: Math.max(0, (j[best] || 0) - 1) }))
-    setBank(b => b + price)
+    if (price > street * tolerance) { adjustRep(REP_DELTA.refuse); return { value: 0, reaction: 'refuse', color: strain.jarColor } }
+    const qty = Math.min(rollBasket(), Math.floor(jc[best] || 0))
+    jarCountsRef.current = { ...jc, [best]: Math.floor(jc[best] || 0) - qty }   // sync
+    setJarCounts(j => ({ ...j, [best]: Math.max(0, Math.floor(j[best] || 0) - qty) }))
+    const value = price * qty
+    setBank(b => b + value)
     const ratio = price / street
     const reaction = ratio <= 0.95 ? 'cheap' : ratio <= 1.05 ? 'happy' : 'grumble'
-    return { value: price, reaction, color: strain.jarColor }
-  }, [])
+    adjustRep(REP_DELTA[reaction])
+    return { value, reaction, color: strain.jarColor, qty }
+  }, [adjustRep])
 
   // GENERATION: advance the wall-clock accumulator to `now`. Runs on mount (offline
   // catch-up), on a 1s live ticker, when the app returns to the foreground, AND the
@@ -267,17 +299,82 @@ export default function TrapHouse({ onBack, isOwner = true }) {
     return () => clearInterval(id)
   }, [])
 
+  // IDLE SALES: the bank keeps earning while you're NOT watching the shop (other rooms
+  // or away/closed), at the same demand rate the visible queue uses — so watching and
+  // idling pay about the same. Each "customer" buys a basket of an in-stock strain if
+  // they accept the price; empty shelf = lost sale + a rep ding. Capped at ~2h on
+  // return. When you ARE on the shop screen the visible queue does the selling, so the
+  // idle clock is just reset (no double counting). Offline jars only deplete existing
+  // stock (hauling is manual, so no new jars are packed while away).
+  const roomRef = useRef(room)
+  useEffect(() => { roomRef.current = room }, [room])
+  const idleTsRef = useRef(typeof saved.lastSaleTs === 'number' ? saved.lastSaleTs : Date.now())
+  const accrueIdleSales = useCallback(() => {
+    const now = Date.now()
+    let elapsed = Math.min(now - idleTsRef.current, SALES_OFFLINE_CAP_MS)
+    idleTsRef.current = now
+    if (elapsed <= 0) return
+    let nCust = Math.min(2000, Math.floor((elapsed / 1000) * (demandPerMin(repRef.current) / 60)))
+    if (nCust <= 0) return
+    const jc = { ...jarCountsRef.current }
+    let bankGain = 0, repAccum = 0
+    for (let i = 0; i < nCust; i++) {
+      const inStock = Object.keys(jc).filter(id => Math.floor(jc[id] || 0) >= 1)
+      if (!inStock.length) { repAccum += REP_DELTA.nostock; continue }
+      const wOf = (id) => Math.floor(jc[id] || 0) * (popRef.current[id] || 1)
+      let roll = Math.random() * inStock.reduce((s, id) => s + wOf(id), 0); let best = inStock[0]
+      for (const id of inStock) { roll -= wOf(id); if (roll <= 0) { best = id; break } }
+      const strain = PLANTS.find(p => p.id === best); if (!strain) continue
+      const street = plantCashValue(strain, cardLevelsRef.current[best] || 1) * JAR_FILL
+      const price = pricesRef.current[best] != null ? pricesRef.current[best] : street
+      if (Math.random() < acceptProb(price / street)) {
+        const qty = Math.min(rollBasket(), Math.floor(jc[best] || 0))
+        jc[best] = Math.floor(jc[best] || 0) - qty
+        bankGain += price * qty
+        repAccum += price <= street * 1.05 ? REP_DELTA.happy : REP_DELTA.grumble
+      } else { repAccum += REP_DELTA.refuse }
+    }
+    if (bankGain > 0) setBank(b => b + bankGain)
+    jarCountsRef.current = jc; setJarCounts(jc)
+    if (repAccum) adjustRep(Math.max(-8, Math.min(8, repAccum * 0.15)))   // dampen the aggregate swing
+  }, [adjustRep])
+  useEffect(() => {
+    accrueIdleSales()                                   // mount: credit the time away
+    const id = setInterval(() => {
+      if (roomRef.current === 0) { idleTsRef.current = Date.now(); return }  // on the shop screen → live queue sells
+      accrueIdleSales()
+    }, 3000)
+    const onVis = () => { if (!document.hidden) accrueIdleSales() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
+  }, [accrueIdleSales])
+
+  // HOT STRAIN: every few minutes a random planted strain trends (popularity 1.6×),
+  // so it sells faster and front-faces more shelf space. Recomputed on mount + timer.
+  useEffect(() => {
+    const pickHot = () => {
+      const ids = [...new Set(Object.values(tableCardsRef.current))].filter(id => PLANTS.find(p => p.id === id))
+      if (!ids.length) { setPopularity({}); return }
+      const hot = ids[Math.floor(Math.random() * ids.length)]
+      const pop = {}; ids.forEach(id => { pop[id] = id === hot ? 1.6 : 1 })
+      setPopularity(pop)
+    }
+    pickHot()
+    const id = setInterval(pickHot, 3 * 60 * 1000)
+    return () => clearInterval(id)
+  }, [])
+
   // Persist the operating state on every change so a reload resumes the line:
   // plants, bank, grow-box buds, table cards/levels, right-box raw buds, left-box
-  // jars, and the generation clock. budCounts changes ~1/s so the clock stays fresh.
+  // jars, the generation clock, prices, reputation, popularity, and the sales clock.
   useEffect(() => {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
-        planted, bank, budCounts, tableCards, cardLevels, packCounts, jarCounts, prices,
-        lastTick: lastTickRef.current,
+        planted, bank, budCounts, tableCards, cardLevels, packCounts, jarCounts, prices, rep, popularity,
+        lastTick: lastTickRef.current, lastSaleTs: idleTsRef.current,
       }))
     } catch {}
-  }, [planted, bank, budCounts, tableCards, cardLevels, packCounts, jarCounts, prices])
+  }, [planted, bank, budCounts, tableCards, cardLevels, packCounts, jarCounts, prices, rep, popularity])
 
   // Place a plant slot, charging the bank (no-op if you can't afford it).
   const placeSlot = (slot, cost) => {
@@ -356,7 +453,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
           z-index keeps him above the room art/counters but still under the UI
           chrome (top bar, arrows) that floats over everything. */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-        {cur.key === 'shop' && <ShopFront art={cur.art} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} prices={prices} onSetPrice={setStrainPrice} onSell={sellJar} />}
+        {cur.key === 'shop' && <ShopFront art={cur.art} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} prices={prices} popularity={popularity} rep={rep} onSetPrice={setStrainPrice} onSell={sellJar} />}
         {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} packCounts={packCounts} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} />}
         {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} budResync={budResync} onBudLand={advanceNow} tableCards={tableCards} onAdd={setPicking} onUproot={uprootTable} skatePhase={skate.phase} skateStart={skate.start} />}
       </div>
@@ -377,6 +474,13 @@ export default function TrapHouse({ onBack, isOwner = true }) {
           <div style={{ color: '#fff', fontSize: 15, fontWeight: 700, lineHeight: 1.1, textShadow: '0 1px 4px #000' }}>{cur.name}</div>
         </div>
         <div style={{ flex: 1 }} />
+        {/* Shop reputation — drives how fast customers come in. */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(26,21,16,0.85)', border: `0.5px solid ${GOLD}55`, borderRadius: 13, padding: '7px 12px' }}>
+          <span style={{ color: DIM, fontSize: 11, fontWeight: 700, letterSpacing: 1 }}>REP</span>
+          <span style={{ color: rep >= 66 ? GREEN : rep >= 33 ? '#e0a93f' : '#c0392b', fontWeight: 800, fontSize: 20, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+            <i className="ti ti-star-filled" style={{ fontSize: 13 }} /> {Math.round(rep)}
+          </span>
+        </div>
         {/* Bank balance for this store — sits left of the rotate button, sized up
             so the take reads at a glance. */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', background: 'rgba(26,21,16,0.85)', border: `0.5px solid ${GOLD}55`, borderRadius: 13, padding: '7px 18px' }}>
@@ -519,7 +623,7 @@ const BEG_DIALOG = [
   { who: 'bum',    text: "Y'all trash anyway! 😤", ms: 2000 },
 ]
 
-function ShopFront({ art, jarCounts = {}, tableCards = {}, cardLevels = {}, prices = {}, onSetPrice, onSell }) {
+function ShopFront({ art, jarCounts = {}, tableCards = {}, cardLevels = {}, prices = {}, popularity = {}, rep = 50, onSetPrice, onSell }) {
   const [menuOpen, setMenuOpen] = useState(false)
   // One tinted jar per banked unit, in the order strains were planted, capped at
   // the shelf's slot count so the stock never overflows the cabinet.
@@ -533,7 +637,7 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, cardLevels = {}, pric
     const cap = SHELF_SLOTS.length
     const inv = placedIds
       .map(id => ({ id, color: PLANTS.find(p => p.id === id)?.jarColor || '#8e44ad',
-        weight: Math.floor(jarCounts[id] || 0) /* × demand[id] later */ }))
+        weight: Math.floor(jarCounts[id] || 0) * (popularity[id] || 1) }))   // stock × demand
       .filter(x => x.weight > 0)
     const total = inv.reduce((s, x) => s + x.weight, 0)
     if (!total) return []
@@ -625,7 +729,7 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, cardLevels = {}, pric
         </div>
 
         {/* Customer queue — shoppers walk in the door, line up, and buy jars. */}
-        <ShopCustomers onSell={handleSell} jarCount={placedIds.reduce((s, id) => s + Math.floor(jarCounts[id] || 0), 0)} />
+        <ShopCustomers onSell={handleSell} rep={rep} />
 
         {/* The MENU board on the wall is the price editor — tap to set sell prices. */}
         <button onClick={() => setMenuOpen(true)} aria-label="Edit menu prices"
@@ -635,7 +739,7 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, cardLevels = {}, pric
       </div>
 
       {menuOpen && (
-        <MenuEditor placedIds={placedIds} cardLevels={cardLevels} prices={prices}
+        <MenuEditor placedIds={placedIds} cardLevels={cardLevels} prices={prices} popularity={popularity}
           onSetPrice={onSetPrice} onClose={() => setMenuOpen(false)} />
       )}
     </div>
@@ -645,7 +749,7 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, cardLevels = {}, pric
 // The price editor behind the MENU board: one row per strain you sell, with its street
 // price (what ~95% will pay) and −/＋ to set your price. Pricing above street loses
 // customers; below it leaves money on the table.
-function MenuEditor({ placedIds, cardLevels, prices, onSetPrice, onClose }) {
+function MenuEditor({ placedIds, cardLevels, prices, popularity = {}, onSetPrice, onClose }) {
   const rows = placedIds.map(id => PLANTS.find(p => p.id === id)).filter(Boolean)
   return (
     <div onClick={onClose} style={{
@@ -681,7 +785,10 @@ function MenuEditor({ placedIds, cardLevels, prices, onSetPrice, onClose }) {
               border: `1px solid ${(strain.jarColor || GOLD)}55`, borderRadius: 12, padding: '9px 11px', marginBottom: 8 }}>
               <div style={{ width: 14, height: 14, borderRadius: 4, background: strain.jarColor || GOLD, flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>{strain.shortName || strain.name}</div>
+                <div style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>
+                  {strain.shortName || strain.name}
+                  {(popularity[strain.id] || 1) > 1.2 && <span style={{ color: '#ff7a3d', fontSize: 10, fontWeight: 800, marginLeft: 6 }}>🔥 HOT</span>}
+                </div>
                 <div style={{ color: DIM, fontSize: 10 }}>street ${street.toLocaleString()} · <span style={{ color: tone }}>{pct}%</span></div>
               </div>
               <button onClick={() => onSetPrice(strain.id, price - step)} style={priceBtn}>−</button>
@@ -829,12 +936,12 @@ function DialogBubble({ line }) {
 // banks the jar value and the front leaves. SALES_ENABLED off ⇒ nobody buys, so the
 // line just stacks to full. Each on-screen customer gets a DISTINCT sprite. State is
 // a ref (single source of truth for the timer machine); `bump` forces a re-render.
-function ShopCustomers({ onSell, jarCount = 0 }) {
+function ShopCustomers({ onSell, rep = 50 }) {
   const [, bump] = useState(0)
   const modelRef = useRef([])
   const beggarRef = useRef(null)                 // the bum's current state, or null
   const onSellRef = useRef(onSell); onSellRef.current = onSell
-  const jarsRef = useRef(jarCount); jarsRef.current = jarCount
+  const repRef = useRef(rep); repRef.current = rep
 
   useEffect(() => {
     let alive = true
@@ -871,9 +978,10 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
       spawnPending = true
       let sec
       if (SALES_ENABLED) {
-        const ratio = Math.min(1, (jarsRef.current || 0) / 12)   // ~12 jars = fully busy
-        // ~2.5s when fully stocked → ~14s when empty (never dead, just slow when low).
-        sec = Math.min(16, Math.max(2, (2.5 + (1 - ratio) * 12) * (0.75 + Math.random() * 0.5)))
+        // Arrival rate tracks REPUTATION (same demand curve the idle engine uses), so
+        // a well-run shop draws crowds and a low-rep one trickles.
+        const base = 60 / demandPerMin(repRef.current)         // avg seconds between arrivals
+        sec = Math.max(1.6, base * (0.7 + Math.random() * 0.6))
       } else {
         sec = 3 + Math.random() * 3                          // sales off: steady trickle to watch it stack
       }
