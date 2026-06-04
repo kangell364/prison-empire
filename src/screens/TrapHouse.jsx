@@ -302,6 +302,17 @@ export default function TrapHouse({ onBack, isOwner = true }) {
     sfx.buy?.()
   }
 
+  // Uproot a table — clear its plants + strain + any un-hauled buds so you can replant
+  // (the grow CARD stays owned; planting only assigns it to a table). Targets one table.
+  const uprootTable = (table) => {
+    setPlanted(p => p.filter(id => !id.startsWith(`T${table}-`)))
+    setTableCards(tc => { const next = { ...tc }; delete next[table]; return next })
+    setBudCounts(c => ({ ...c, [table]: 0 }))
+    budCountsRef.current = { ...budCountsRef.current, [table]: 0 }
+    setBudResync(r => r + 1)
+    sfx.tap?.()
+  }
+
   // True landscape — either the browser actually rotated, or we forced it via CSS.
   const wide = land || rotated
 
@@ -350,7 +361,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
         {cur.key === 'shop' && <ShopFront art={cur.art} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} prices={prices} onSetPrice={setStrainPrice} onSell={sellJar} />}
         {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} packCounts={packCounts} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} />}
-        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} budResync={budResync} onBudLand={advanceNow} tableCards={tableCards} onAdd={setPicking} skatePhase={skate.phase} skateStart={skate.start} />}
+        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} budResync={budResync} onBudLand={advanceNow} tableCards={tableCards} onAdd={setPicking} onUproot={uprootTable} skatePhase={skate.phase} skateStart={skate.start} />}
       </div>
 
       {/* Arrows — step between rooms. Left = toward the front, right = deeper. */}
@@ -1298,7 +1309,7 @@ const SLOTH_CENTERS = [27.0, 51.5, 78.0]   // one sloth per table (over the plan
 const SLOTH_PIVOT = '19.7% 53%'                  // arm shoulder (% of the sloth canvas)
 const SLOTH_ARM_DELAYS = ['0s', '-0.55s', '-1.05s']
 
-function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBudLand, tableCards = {}, onAdd, skatePhase = 'idle', skateStart = 0 }) {
+function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBudLand, tableCards = {}, onAdd, onUproot, skatePhase = 'idle', skateStart = 0 }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the plant overlays stay glued to the benches
@@ -1429,6 +1440,24 @@ function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBud
                 }}>{n.toLocaleString()}</span>
               </div>
             </div>
+          )
+        })}
+
+        {/* Uproot button — clear a planted table so you can replant a new strain. The
+            grow card stays owned; this just frees the table (and drops un-hauled buds). */}
+        {[1, 2, 3].map(tbl => {
+          if (!tableStarted(tbl, planted)) return null
+          const [, x1, yTop] = BINS[tbl]
+          return (
+            <button key={`up${tbl}`} onClick={() => onUproot && onUproot(tbl)} title={`Uproot table ${tbl}`}
+              style={{ position: 'absolute', left: `${x1 + 1.5}%`, top: `${yTop}%`,
+                transform: 'translate(-50%, -150%)', zIndex: 5, padding: 0,
+                width: 24, height: 24, borderRadius: '50%',
+                background: 'rgba(120,28,22,0.92)', border: '1px solid #e06a5a', color: '#fff',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.55)' }}>
+              <i className="ti ti-trash" style={{ fontSize: 13 }} />
+            </button>
           )
         })}
       </div>
