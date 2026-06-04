@@ -98,7 +98,8 @@ export function CameraEncounter({ onBack }) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
       streamRef.current = stream
-      if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play().catch(() => {}) }
+      // NOTE: the <video> isn't mounted yet (we're still on the intro screen) —
+      // a useEffect attaches the stream once phase flips to 'live'. See below.
     } catch { setError('Camera blocked. Allow camera access (and open over HTTPS).'); return }
     try {
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -124,6 +125,17 @@ export function CameraEncounter({ onBack }) {
     window.removeEventListener('deviceorientation', onOrient, true)
   }, [onOrient])
   useEffect(() => stopAll, [stopAll])
+
+  // Attach the camera stream once the <video> actually mounts (phase → 'live').
+  // Doing this in start() fails because the element doesn't exist there yet.
+  useEffect(() => {
+    if (phase !== 'live') return
+    const v = videoRef.current
+    if (v && streamRef.current && v.srcObject !== streamRef.current) {
+      v.srcObject = streamRef.current
+      v.play().catch(() => {})
+    }
+  }, [phase])
 
   const fullStop = () => { stopAll(); onBack && onBack() }
 
