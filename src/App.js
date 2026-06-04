@@ -20,7 +20,8 @@ import { useBlockPayoutTicker } from './state/blocksStore'
 import { usePlayerCard } from './state/profileStore'
 import { useUnreadCount } from './state/fightLogStore'
 import { NotificationsModal } from './components/NotificationsModal'
-import { CameraEncounter } from './components/CameraEncounter'
+// NOTE: AR camera encounter (src/components/CameraEncounter.jsx) is built but
+// parked — re-import + re-add the header button below to bring it back.
 
 // Profile lives on the header avatar (top-right) so the bottom nav stays at 6.
 const NAV_ITEMS = [
@@ -43,7 +44,6 @@ export default function App() {
   const [trapFrom, setTrapFrom] = useState('home')
   const [muted, setMutedState] = useState(isMuted())
   const [showNotifs, setShowNotifs] = useState(false)
-  const [arOpen, setArOpen] = useState(false)   // AR wild-carrier encounter prototype
   const unread = useUnreadCount()
 
   // Global hourly block-income payout — runs app-wide regardless of screen.
@@ -123,10 +123,6 @@ export default function App() {
             <i className="ti ti-bell" aria-hidden="true" />
             {unread > 0 && <div className="notif-dot" />}
           </button>
-          {/* AR wild-carrier encounter (prototype) — needs the phone camera + GPS. */}
-          <button className="icon-btn" aria-label="AR encounter" onClick={() => { sfx.tap(); setArOpen(true) }}>
-            <i className="ti ti-viewfinder" aria-hidden="true" />
-          </button>
           <div className="user-avatar" onClick={() => handleNav('profile')} style={{ overflow: 'hidden', padding: 0, position: 'relative' }}>
             {playerCard.avatar
               ? <img src={playerCard.avatar} alt={playerCard.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', filter: vitals.ko ? KO_FILTER : 'none' }} />
@@ -149,8 +145,6 @@ export default function App() {
 
       {/* Screen Content */}
       {renderScreen()}
-
-      {arOpen && <CameraEncounter onBack={() => setArOpen(false)} />}
 
       {showNotifs && (
         <NotificationsModal onClose={() => setShowNotifs(false)} onNavigate={setScreen} />
