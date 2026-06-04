@@ -1,0 +1,88 @@
+-- ===================================================================
+-- Prison Empire - Multiplayer M1: shared houses + blocks
+-- Paste this whole thing into the Supabase SQL Editor and press Run.
+-- Safe to run more than once.
+-- ===================================================================
+
+-- ---- HOUSES: one row per player's trap house ----------------------
+create table if not exists public.houses (
+  id           uuid primary key default gen_random_uuid(),
+  owner_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  kind         text not null default 'personal',
+  name         text,
+  lat          double precision,
+  lng          double precision,
+  county_fips  text,
+  hp           int  not null default 100,
+  hp_max       int  not null default 100,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create index if not exists houses_county_idx on public.houses (county_fips);
+create index if not exists houses_owner_idx  on public.houses (owner_id);
+
+alter table public.houses enable row level security;
+
+drop policy if exists houses_read   on public.houses;
+drop policy if exists houses_insert on public.houses;
+drop policy if exists houses_update on public.houses;
+drop policy if exists houses_delete on public.houses;
+
+create policy houses_read   on public.houses for select to authenticated using (true);
+create policy houses_insert on public.houses for insert to authenticated with check (owner_id = auth.uid());
+create policy houses_update on public.houses for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy houses_delete on public.houses for delete to authenticated using (owner_id = auth.uid());
+
+-- ---- BLOCKS: shared turf ownership (only CLAIMED cells stored) -----
+create table if not exists public.blocks (
+  county_fips       text not null,
+  gx                int  not null,
+  gy                int  not null,
+  owner_id          uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  loyalty           int  not null default 0,
+  base_loyalty      int  not null default 0,
+  income_per_hr     int  not null default 0,
+  npc               text,
+  last_collected_at timestamptz not null default now(),
+  last_poach_at     timestamptz not null default now(),
+  updated_at        timestamptz not null default now(),
+  primary key (county_fips, gx, gy)
+);
+create index if not exists blocks_owner_idx on public.blocks (owner_id);
+
+alter table public.blocks enable row level security;
+
+drop policy if exists blocks_read   on public.blocks;
+drop policy if exists blocks_insert on public.blocks;
+drop policy if exists blocks_update on public.blocks;
+drop policy if exists blocks_delete on public.blocks;
+
+-- everyone signed in can SEE all claimed turf (so the shared map works)
+create policy blocks_read   on public.blocks for select to authenticated using (true);
+-- you can claim a vacant cell only INTO your own name
+create policy blocks_insert on public.blocks for insert to authenticated with check (owner_id = auth.uid());
+-- you can take over (poach) any cell, but only INTO your own name
+create policy blocks_update on public.blocks for update to authenticated using (true) with check (owner_id = auth.uid());
+-- you can release only your OWN cell
+create policy blocks_delete on public.blocks for delete to authenticated using (owner_id = auth.uid());
+
+-- ---- PUBLIC PROFILES: expose ONLY safe identity fields ------------
+-- Lets the map show WHO owns a house/block (name + character look)
+-- without leaking hustle/steel/etc from the profiles table.
+drop view if exists public.public_profiles;
+create view public.public_profiles as
+  select id, display_name, player_look_id from public.profiles;
+grant select on public.public_profiles to authenticated;
+
+-- ---- REALTIME: stream changes so the map updates live -------------
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables
+                 where pubname='supabase_realtime' and schemaname='public' and tablename='blocks') then
+    alter publication supabase_realtime add table public.blocks;
+  end if;
+  if not exists (select 1 from pg_publication_tables
+                 where pubname='supabase_realtime' and schemaname='public' and tablename='houses') then
+    alter publication supabase_realtime add table public.houses;
+  end if;
+end $$;

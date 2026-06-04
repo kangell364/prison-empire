@@ -7,7 +7,7 @@ import { ScoutScreen } from '../components/ScoutScreen'
 import { TurfMap } from '../components/TurfMap'
 import { BlockSheet } from '../components/BlockSheet'
 import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks, setLandTest } from '../state/blocksStore'
-import { useMapData, buildCityCountyMap, buildUnlockedCountyTest, HARRIS_CENTER, STATE_CODE_TO_FIPS, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
+import { useMapData, buildCityCountyMap, buildUnlockedCountyTest, UNLOCKED_COUNTY_FIPS, HARRIS_CENTER, STATE_CODE_TO_FIPS, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
 import { knockOut } from '../state/vitalsStore'
 import { getBounty } from '../state/bountyStore'
 import { useDisplayName } from '../state/profileStore'
@@ -315,6 +315,13 @@ export default function MapScreen({ onNavigate }) {
   useEffect(() => {
     if (mapData) setLandTest(buildUnlockedCountyTest(mapData))
   }, [mapData])
+
+  // Locked counties/states are uncolored on the overview maps — color (turf /
+  // facility control) only shows once a county is unlocked/open. A state counts
+  // as unlocked if it has any unlocked county.
+  const LOCKED_FILL = '#1e1e2a'
+  const unlockedCountySet = useMemo(() => new Set(UNLOCKED_COUNTY_FIPS), [])
+  const unlockedStateSet  = useMemo(() => new Set(UNLOCKED_COUNTY_FIPS.map(f => f.slice(0, 2))), [])
   const territories = useTerritories()
   const world = useWorld()
   const cityById = useMemo(() => new Map(ALL_CITIES.map(c => [c.id, c])), [])
@@ -667,7 +674,10 @@ export default function MapScreen({ onNavigate }) {
             <USStateMap
               stateFips={stateView.fips}
               stateName={stateView.name}
-              colorFor={(fips) => { const f = facilityByFips[fips]; return f ? facilityControl[f.id].color : '#15151f' }}
+              colorFor={(fips) => {
+                if (!unlockedCountySet.has(String(fips).padStart(5, '0'))) return LOCKED_FILL   // locked county → no color
+                const f = facilityByFips[fips]; return f ? facilityControl[f.id].color : '#15151f'
+              }}
               strokeFor={(fips) => facilityByFips[fips] ? '#fff' : `${GOLD}59`}
               strokeWidthFor={(fips) => facilityByFips[fips] ? 1.5 : 0.7}
               onCountyClick={(c) => {
@@ -683,7 +693,10 @@ export default function MapScreen({ onNavigate }) {
             />
           ) : (
             <USCountryMap
-              colorFor={(fips, code) => stateColorFor(stateControl[code], mobColorById)}
+              colorFor={(fips, code) => {
+                if (!unlockedStateSet.has(String(fips).padStart(2, '0'))) return LOCKED_FILL   // locked state → no color
+                return stateColorFor(stateControl[code], mobColorById)
+              }}
               onStateClick={(s) => setStateView(s)}
               marker={deviceCoords || homeCoords}
               height="58vh"
