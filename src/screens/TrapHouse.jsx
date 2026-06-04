@@ -872,7 +872,8 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
       let sec
       if (SALES_ENABLED) {
         const ratio = Math.min(1, (jarsRef.current || 0) / 12)   // ~12 jars = fully busy
-        sec = Math.min(60, Math.max(2, (2 + (1 - ratio) * 58) * (0.75 + Math.random() * 0.5)))
+        // ~2.5s when fully stocked → ~14s when empty (never dead, just slow when low).
+        sec = Math.min(16, Math.max(2, (2.5 + (1 - ratio) * 12) * (0.75 + Math.random() * 0.5)))
       } else {
         sec = 3 + Math.random() * 3                          // sales off: steady trickle to watch it stack
       }
@@ -900,10 +901,10 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
     const tryBuy = () => {
       if (!SALES_ENABLED) return                             // sales stopped — just stack the line
       if (beggarRef.current && beggarRef.current.phase === 'beg') return  // cashier busy with the bum
-      const front = at(0), behind = at(1)
-      if (front && front.phase === 'wait' && behind && behind.phase === 'wait') {
-        front.phase = 'pause'; commit()                      // don't buy until the next is in line
-        after(2000, () => resolveBuy(front.key))             // 2s pause at the counter
+      const front = at(0)
+      if (front && front.phase === 'wait') {                 // serve as soon as they reach the counter
+        front.phase = 'pause'; commit()
+        after(900, () => resolveBuy(front.key))              // brief beat, then they transact + react
       }
     }
     const resolveBuy = (key) => {
@@ -1341,7 +1342,7 @@ function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBud
         })}
         {/* The skater monkey passes through the grow room during phase B. */}
         {skatePhase === 'B' && <Skater phase="B" start={skateStart} />}
-        <BeltBud planted={planted} budCounts={budCounts} resyncKey={budResync} onBudLand={onBudLand} />
+        <BeltBud planted={planted} budCounts={budCounts} resyncKey={budResync} onBudLand={onBudLand} tableCards={tableCards} />
         {PLANT_SLOTS.filter(s => planted.includes(s.id)).map((s) => {
           // Each table grows the art of whatever strain is planted on it.
           const strain = PLANTS.find(p => p.id === tableCards[s.table])
@@ -1430,7 +1431,7 @@ function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBud
                 background: 'rgba(10,8,5,0.82)', border: `1px solid ${GOLD}66`, borderRadius: 999,
                 padding: '2px 8px', boxShadow: '0 2px 7px rgba(0,0,0,0.55)',
               }}>
-                <img src="/bud.webp" alt="" style={{ width: 13, height: 13, objectFit: 'contain' }} />
+                <img src={strain?.bud || '/bud.webp'} alt="" style={{ width: 13, height: 13, objectFit: 'contain' }} />
                 <span key={n} style={{
                   color: GREEN, fontWeight: 900, fontSize: 13, fontVariantNumeric: 'tabular-nums',
                   lineHeight: 1, animation: 'budTick 0.35s ease-out',
@@ -1540,7 +1541,7 @@ function PlantPicker({ table, onPick, onClose }) {
 // wall-clock forward at that frame so the displayed floor() updates on the drop.
 // Re-locks (recomputes delays) only when the plant set changes or a box is hauled
 // (resyncKey) — never every tick, so the animation runs smoothly.
-function BeltBud({ planted, budCounts = {}, resyncKey = 0, onBudLand }) {
+function BeltBud({ planted, budCounts = {}, resyncKey = 0, onBudLand, tableCards = {} }) {
   const kf = Object.entries(BUD_PATHS).map(([t, pts]) => {
     const frames = pts.map((p, i) => {
       const pct = BUD_PCTS[i]
@@ -1585,7 +1586,8 @@ function BeltBud({ planted, budCounts = {}, resyncKey = 0, onBudLand }) {
     <>
       <style>{kf}</style>
       {buds.map(s => (
-        <img key={s.id} src="/bud.webp" alt="" aria-hidden data-bud={s.id}
+        <img key={s.id} src={PLANTS.find(p => p.id === tableCards[s.table])?.bud || '/bud.webp'}
+          alt="" aria-hidden data-bud={s.id}
           onAnimationIteration={onBudLand ? () => onBudLand(s.table) : undefined}
           style={{ position: 'absolute', width: `${BUD_W}%`,
             animation: `bud${s.table} ${BUD_SECS}s linear ${s.delay.toFixed(2)}s infinite`,

@@ -714,6 +714,7 @@ export const PLANTS = [
     starter: true,                    // granted to every player (seed + backfill)
     jarColor: '#8e44ad',              // colour of this strain's packed jar (Trap House packing room)
     grow: '/plant.webp',              // the potted-plant art shown growing on the bench
+    bud: '/bud.webp',                 // the nug art that flows down the grow-room belt
   },
   {
     id: 'plant_golden_mist',
@@ -731,6 +732,7 @@ export const PLANTS = [
     starter: true,
     jarColor: '#d9a528',              // amber/gold jar
     grow: '/plant-golden-mist.webp',
+    bud: '/bud-golden-mist.webp',
   },
   {
     id: 'plant_red_dawn',
@@ -748,6 +750,7 @@ export const PLANTS = [
     starter: true,
     jarColor: '#c0392b',              // red jar
     grow: '/plant-red-dawn.webp',
+    bud: '/bud-red-dawn.webp',
   },
 ]
 
