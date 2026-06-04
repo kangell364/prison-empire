@@ -100,18 +100,10 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   // plant id). Climbs on deposit, drops by JAR_FILL each time the machine pops a jar.
   const [packCounts, setPackCounts] = useState(() => saved.packCounts || {})
   // LEFT packing box — finished jars per strain. The box's $ value is jars ×
-  // (card cash value × JAR_FILL); see PackingRoom. The SHELF is the real stock, so the
-  // total is capped at its slot count (trimming any old over-stock on load) — that way
-  // each sale frees a visible slot instead of being hidden behind a full shelf.
-  const [jarCounts, setJarCounts] = useState(() => {
-    const jc = { ...(saved.jarCounts || {}) }
-    const cap = SHELF_SLOTS.length
-    let total = Object.values(jc).reduce((s, v) => s + Math.floor(v || 0), 0)
-    for (const id of Object.keys(jc).sort((a, b) => (jc[b] || 0) - (jc[a] || 0))) {
-      while (total > cap && Math.floor(jc[id] || 0) > 0) { jc[id] = Math.floor(jc[id]) - 1; total-- }
-    }
-    return jc
-  })
+  // (card cash value × JAR_FILL); see PackingRoom. The shelf shows up to its slot count;
+  // anything beyond that is back-room storage (kept, not capped). A sale flies a jar off
+  // the shelf and the slot refills from the back-room.
+  const [jarCounts, setJarCounts] = useState(() => saved.jarCounts || {})
   // Which table the "+ Add" slot was tapped for — opens the card picker.
   const [picking, setPicking] = useState(null)
 
@@ -240,16 +232,8 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   useEffect(() => {
     const id = setInterval(() => {
       const pc = packCountsRef.current
-      const jc = jarCountsRef.current
-      // The SHELF is the real stock: don't bank more finished jars than it can hold, so
-      // each sale frees a visible slot for the machine to refill (backpressure when full).
-      let total = Object.values(jc).reduce((s, v) => s + Math.floor(v || 0), 0)
-      const cap = SHELF_SLOTS.length
       const popped = []
-      for (const strain in pc) {
-        if (total >= cap) break
-        if ((pc[strain] || 0) >= JAR_FILL) { popped.push(strain); total++ }
-      }
+      for (const strain in pc) { if ((pc[strain] || 0) >= JAR_FILL) popped.push(strain) }
       if (!popped.length) return
       setPackCounts(prev => {
         const next = { ...prev }
@@ -511,6 +495,27 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, onSell }) {
     for (let i = 0; i < n && stock.length < SHELF_SLOTS.length; i++) stock.push(color)
     if (stock.length >= SHELF_SLOTS.length) break
   }
+  // Live mirrors of the shelf so a sale (which fires from a child timer) can read the
+  // current top jar without going stale.
+  const stockRef = useRef(stock); stockRef.current = stock
+
+  // On each sale, fly a jar off the top of the shelf to the customer at the counter,
+  // then the slot refills from the back-room (jarCounts beyond the shelf's capacity).
+  const [flying, setFlying] = useState([])
+  const flyKey = useRef(0)
+  const handleSell = useCallback(() => {
+    const value = onSell ? onSell() : 0
+    if (value > 0) {
+      const s = stockRef.current
+      const slot = SHELF_SLOTS[Math.max(0, s.length - 1)] || SHELF_SLOTS[0]
+      const key = ++flyKey.current
+      setFlying(f => [...f, { key, color: s[s.length - 1] || '#8e44ad', x: slot.x, y: slot.y, to: false }])
+      setTimeout(() => setFlying(f => f.map(j => j.key === key ? { ...j, to: true } : j)), 30)
+      setTimeout(() => setFlying(f => f.filter(j => j.key !== key)), 850)
+    }
+    return value
+  }, [onSell])
+
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the clerk lines up with the counter at any size. */}
@@ -525,6 +530,18 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, onSell }) {
             filter: 'drop-shadow(0 3px 4px rgba(0,0,0,0.45))',
           }}>
             <Jar color={color} />
+          </div>
+        ))}
+        {/* Jars sold — fly from the shelf top down to the customer at the counter. */}
+        {flying.map(j => (
+          <div key={j.key} style={{
+            position: 'absolute', left: `${j.to ? 43 : j.x}%`, top: `${j.to ? 64 : j.y}%`,
+            width: `${SHELF_JAR_W * 1.15}%`, transform: 'translate(-50%, -100%)',
+            zIndex: 23, pointerEvents: 'none', opacity: j.to ? 0 : 1,
+            transition: 'left 0.8s ease-in, top 0.8s cubic-bezier(.45,0,.7,1), opacity 0.8s ease-in',
+            filter: 'drop-shadow(0 3px 5px rgba(0,0,0,0.5))',
+          }}>
+            <Jar color={j.color} />
           </div>
         ))}
         {/* Nodding clerk standing BEHIND the counter — clipped at the counter
@@ -546,7 +563,7 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, onSell }) {
         </div>
 
         {/* Customer queue — shoppers walk in the door, line up, and buy jars. */}
-        <ShopCustomers onSell={onSell} jarCount={placedIds.reduce((s, id) => s + Math.floor(jarCounts[id] || 0), 0)} />
+        <ShopCustomers onSell={handleSell} jarCount={placedIds.reduce((s, id) => s + Math.floor(jarCounts[id] || 0), 0)} />
       </div>
     </div>
   )
