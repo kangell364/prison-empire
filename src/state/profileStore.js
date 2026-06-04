@@ -34,6 +34,24 @@ let userId = null
 let initPromise = null
 const listeners = new Set()
 
+// ---- auth state ----------------------------------------------------
+// Every player has a Supabase session: anonymous by default, or a permanent
+// email account once they "Save your account". `authEmail` is null while a guest.
+let authEmail = null
+let isAnon = true
+let profileChannel = null            // active realtime channel (torn down on re-login)
+const authListeners = new Set()
+function notifyAuth() { const s = getAuth(); authListeners.forEach(fn => fn(s)) }
+
+export function getAuth() {
+  return { userId, email: authEmail, isAnonymous: isAnon, signedIn: !!authEmail, configured: isSupabaseConfigured }
+}
+export function useAuth() {
+  const [s, setS] = useState(getAuth)
+  useEffect(() => { authListeners.add(setS); setS(getAuth()); return () => authListeners.delete(setS) }, [])
+  return s
+}
+
 // ---- public API ----------------------------------------------------
 
 export function getProfile()      { return state }
@@ -121,6 +139,115 @@ export function ensureAuth() {
   return initPromise
 }
 
+// ---- auth actions (email login) ------------------------------------
+// All return { ok, error? } so the UI can show a friendly message.
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+export const PASSWORD_MIN = 8
+
+function validateCredentials(email, password) {
+  if (!EMAIL_RE.test(email || '')) return 'Enter a valid email address.'
+  if (!password || password.length < PASSWORD_MIN) return `Password must be at least ${PASSWORD_MIN} characters.`
+  return null
+}
+
+// CREATE ACCOUNT — upgrades the current anonymous session into a permanent
+// email account IN PLACE (same user id), so all progress is preserved. If the
+// player is somehow not on an anon session, falls back to a fresh signUp.
+export async function signUpWithEmail(email, password) {
+  if (!isSupabaseConfigured) return { ok: false, error: 'Accounts are unavailable right now.' }
+  const bad = validateCredentials(email, password); if (bad) return { ok: false, error: bad }
+  email = email.trim().toLowerCase()
+  await ensureAuth()
+  try {
+    if (isAnon && userId) {
+      // Convert the anonymous user → permanent (keeps the same id + all data).
+      const { error } = await supabase.auth.updateUser({ email, password })
+      if (error) return { ok: false, error: friendlyAuthError(error) }
+      await loadProfileForSession()
+      return { ok: true }
+    }
+    const { error } = await supabase.auth.signUp({ email, password })
+    if (error) return { ok: false, error: friendlyAuthError(error) }
+    await loadProfileForSession()
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: 'Something went wrong. Try again.' }
+  }
+}
+
+// SIGN IN — load an existing account. WARNING for the caller: this replaces the
+// current (possibly guest) session, so any unsynced local-only progress on this
+// device is left behind in favor of the cloud account. The UI confirms first.
+export async function signInWithEmail(email, password) {
+  if (!isSupabaseConfigured) return { ok: false, error: 'Accounts are unavailable right now.' }
+  const bad = validateCredentials(email, password); if (bad) return { ok: false, error: bad }
+  email = email.trim().toLowerCase()
+  try {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) return { ok: false, error: friendlyAuthError(error) }
+    initPromise = Promise.resolve()        // session already established
+    await loadProfileForSession()
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: 'Something went wrong. Try again.' }
+  }
+}
+
+// FORGOT PASSWORD — emails a reset link back to the app.
+export async function sendPasswordReset(email) {
+  if (!isSupabaseConfigured) return { ok: false, error: 'Accounts are unavailable right now.' }
+  if (!EMAIL_RE.test(email || '')) return { ok: false, error: 'Enter a valid email address.' }
+  const redirectTo = (typeof window !== 'undefined') ? `${window.location.origin}/` : undefined
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo })
+  if (error) return { ok: false, error: friendlyAuthError(error) }
+  return { ok: true }
+}
+
+// SIGN OUT — drop the account session and return to a fresh anonymous guest so
+// the app keeps working (it never sits in a logged-out dead end).
+export async function signOut() {
+  if (!isSupabaseConfigured) return { ok: false }
+  try {
+    if (profileChannel) { try { supabase.removeChannel(profileChannel) } catch {} ; profileChannel = null }
+    await supabase.auth.signOut()
+    state = { ...DEFAULTS }; persistLocal(); notify()
+    initPromise = null
+    await ensureAuth()                     // new anonymous session + profile row
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: 'Could not sign out.' }
+  }
+}
+
+// DELETE ACCOUNT — store-mandated (Apple 5.1.1(v) + Google Play). Calls the
+// server `delete_user` RPC (a SECURITY DEFINER function that removes the
+// player's data rows AND their auth.users row), then signs out into a fresh
+// guest. See docs/auth-setup.md for the SQL to create that function.
+export async function deleteAccount() {
+  if (!isSupabaseConfigured) return { ok: false, error: 'Accounts are unavailable right now.' }
+  try {
+    const { error } = await supabase.rpc('delete_user')
+    if (error) return { ok: false, error: 'Could not delete account: ' + error.message }
+    try { localStorage.removeItem(MIGRATED_FLAG_KEY) } catch {}
+    await signOut()
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: 'Could not delete account. Try again.' }
+  }
+}
+
+// Map Supabase's raw auth errors to friendlier copy.
+function friendlyAuthError(error) {
+  const m = (error?.message || '').toLowerCase()
+  if (m.includes('already registered') || m.includes('already been registered')) return 'That email already has an account. Try signing in instead.'
+  if (m.includes('invalid login')) return 'Wrong email or password.'
+  if (m.includes('email not confirmed')) return 'Check your email to confirm your account first.'
+  if (m.includes('rate limit') || m.includes('too many')) return 'Too many attempts — wait a minute and try again.'
+  if (m.includes('weak') || m.includes('password')) return `Password must be at least ${PASSWORD_MIN} characters.`
+  return error?.message || 'Something went wrong. Try again.'
+}
+
 // ---- internals -----------------------------------------------------
 
 function commit(patch) {
@@ -161,8 +288,20 @@ async function bootSupabase() {
       return
     }
   }
+  await loadProfileForSession({ allowLocalMigration: true })
+}
+
+// Load (or reload) the profile for whatever Supabase session is currently
+// active. Re-runnable: called on boot, and again after sign-in / sign-out so a
+// fresh account's cloud save replaces the previous one. Tears down any prior
+// realtime channel first so we don't leak subscriptions across logins.
+async function loadProfileForSession({ allowLocalMigration = false } = {}) {
   const { data: userData } = await supabase.auth.getUser()
-  userId = userData.user?.id
+  const u = userData.user
+  userId  = u?.id || null
+  authEmail = u?.email || null
+  isAnon  = u ? (u.is_anonymous ?? !u.email) : true
+  notifyAuth()
   if (!userId) return
 
   // Fetch the row (created by handle_new_user trigger). On the very first
@@ -178,23 +317,26 @@ async function bootSupabase() {
   }
 
   // First-sign-in migration: if the row is fresh AND we have legacy
-  // localStorage keys, push them up and clear them. Only runs once.
-  const isFreshRow   = (Date.now() - new Date(row.created_at).getTime()) < 60_000
-  const alreadyMigrated = localStorage.getItem(MIGRATED_FLAG_KEY) === '1'
-  if (isFreshRow && !alreadyMigrated) {
-    const migrated = await migrateFromLocal(row)
-    if (migrated) row = { ...row, ...migrated }
-    try { localStorage.setItem(MIGRATED_FLAG_KEY, '1') } catch {}
+  // localStorage keys, push them up and clear them. Only runs once, and only on
+  // the initial anonymous boot (not when signing into an existing account).
+  if (allowLocalMigration) {
+    const isFreshRow      = (Date.now() - new Date(row.created_at).getTime()) < 60_000
+    const alreadyMigrated = localStorage.getItem(MIGRATED_FLAG_KEY) === '1'
+    if (isFreshRow && !alreadyMigrated) {
+      const migrated = await migrateFromLocal(row)
+      if (migrated) row = { ...row, ...migrated }
+      try { localStorage.setItem(MIGRATED_FLAG_KEY, '1') } catch {}
+    }
   }
 
-  // Adopt server state as authoritative (overrides the localStorage seed
-  // we used at module load).
+  // Adopt server state as authoritative (overrides the localStorage seed).
   state = { ...DEFAULTS, ...row }
   persistLocal()
   notify()
 
   // Realtime: keep the local cache in sync with any other tabs / devices.
-  supabase
+  if (profileChannel) { try { supabase.removeChannel(profileChannel) } catch {} }
+  profileChannel = supabase
     .channel(`profile:${userId}`)
     .on('postgres_changes', {
       event: 'UPDATE',

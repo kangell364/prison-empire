@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react'
 import { PLAYER, PLAYER_LOOKS, CARDS_COLLECTION, TRAITS, RARITY_COLORS, SKILLS } from '../data/gameData'
 import { sfx } from '../sounds'
-import { useHustle, usePlayerLook, useDisplayName } from '../state/profileStore'
+import { useHustle, usePlayerLook, useDisplayName, useAuth, signOut, deleteAccount } from '../state/profileStore'
+import { AuthModal } from '../components/AuthModal'
 import { useVitals } from '../state/vitalsStore'
 import { Avatar, KoOverlay, KO_FILTER } from '../components/Avatar'
 import { useCrew, atkOf, defOf } from '../state/crewStore'
@@ -39,6 +40,7 @@ export default function Profile({ onBack }) {
         <SubTab active={tab === 'training'}  onClick={() => setTab('training')}>Training</SubTab>
         <SubTab active={tab === 'skills'}    onClick={() => setTab('skills')}>Skills</SubTab>
         <SubTab active={tab === 'equipment'} onClick={() => setTab('equipment')}>Equipment</SubTab>
+        <SubTab active={tab === 'account'}   onClick={() => setTab('account')}>Account</SubTab>
       </div>
 
       {tab === 'upgrades'  && <UpgradesTab traits={traits} points={points} onUpgrade={upgrade} />}
@@ -47,9 +49,87 @@ export default function Profile({ onBack }) {
         body="Equip learned skills into Battle Dice slots 2–12. When a roll lands on an occupied slot the skill fires for the round. Fixed slots for v1; drag-to-assign UI coming next." />}
       {tab === 'equipment' && <PlaceholderTab title="Equipment"
         body="Shanks, body armor, contraband phones — slots that stack on top of your base traits. Coming with the Supabase pass." />}
+      {tab === 'account'   && <AccountTab />}
     </div>
   )
 }
+
+// ---------------------------------------------------------------------
+// Account tab — email login / sign-out / delete account (store-required).
+// ---------------------------------------------------------------------
+function AccountTab() {
+  const auth = useAuth()
+  const [showAuth, setShowAuth] = useState(false)
+  const [busy, setBusy] = useState('')
+
+  const doSignOut = async () => {
+    if (!window.confirm('Sign out of this account on this device?')) return
+    setBusy('signout'); await signOut(); setBusy('')
+  }
+  const doDelete = async () => {
+    if (!window.confirm('Permanently delete your account and all progress? This cannot be undone.')) return
+    if (!window.confirm('Are you absolutely sure? Your empire will be erased forever.')) return
+    setBusy('delete')
+    const r = await deleteAccount()
+    setBusy('')
+    if (!r.ok) window.alert(r.error || 'Could not delete account.')
+    else window.alert('Your account has been deleted.')
+  }
+
+  if (!auth.configured) {
+    return <PlaceholderTab title="Account"
+      body="Accounts are offline right now (no backend configured). Your progress is saved on this device." />
+  }
+
+  return (
+    <div className="section" style={{ marginTop: 14 }}>
+      <div className="section-label">Account</div>
+
+      {auth.signedIn ? (
+        <div className="card card-pad" style={{ padding: 16 }}>
+          <div style={{ color: '#888', fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase' }}>Signed in as</div>
+          <div style={{ color: '#fff', fontSize: 15, fontWeight: 700, marginTop: 3, wordBreak: 'break-all' }}>{auth.email}</div>
+          <div style={{ color: '#2ecc71', fontSize: 11.5, marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <i className="ti ti-cloud-check" /> Progress synced to the cloud
+          </div>
+
+          <button onClick={doSignOut} disabled={!!busy} style={btnGhost}>
+            {busy === 'signout' ? 'Signing out…' : 'Sign Out'}
+          </button>
+          {/* Store-mandated in-app account deletion (Apple 5.1.1(v) + Play). */}
+          <button onClick={doDelete} disabled={!!busy} style={btnDanger}>
+            {busy === 'delete' ? 'Deleting…' : 'Delete Account'}
+          </button>
+        </div>
+      ) : (
+        <div className="card card-pad" style={{ padding: 16 }}>
+          <div style={{ color: '#fff', fontSize: 15, fontWeight: 700 }}>Playing as a guest</div>
+          <div style={{ color: '#888', fontSize: 12.5, lineHeight: 1.55, marginTop: 6 }}>
+            Your empire is saved on this device. Create an account to back it up and play on any phone — your current progress carries over.
+          </div>
+          <button onClick={() => setShowAuth(true)} style={btnPrimary}>
+            <i className="ti ti-cloud-lock" style={{ marginRight: 6 }} /> Save Your Account
+          </button>
+          <button onClick={() => setShowAuth('signin')} style={{ ...btnGhost, marginTop: 8 }}>
+            I already have an account
+          </button>
+        </div>
+      )}
+
+      {showAuth && (
+        <AuthModal
+          initialMode={showAuth === 'signin' ? 'signin' : 'signup'}
+          hasGuestProgress={auth.isAnonymous}
+          onClose={() => setShowAuth(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+const btnPrimary = { width: '100%', marginTop: 14, padding: '13px 0', borderRadius: 11, background: GOLD, color: '#0a0a0f', border: 'none', fontSize: 14.5, fontWeight: 800, letterSpacing: 0.3, cursor: 'pointer' }
+const btnGhost   = { width: '100%', marginTop: 12, padding: '12px 0', borderRadius: 11, background: 'transparent', color: '#ccc', border: '1px solid #2a2a3a', fontSize: 14, fontWeight: 700, cursor: 'pointer' }
+const btnDanger  = { width: '100%', marginTop: 10, padding: '12px 0', borderRadius: 11, background: 'transparent', color: '#e74c3c', border: '1px solid #e74c3c55', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }
 
 // ---------------------------------------------------------------------
 // Status bar (top of profile)
