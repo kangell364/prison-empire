@@ -49,7 +49,7 @@ export default function Profile({ onBack }) {
         body="Equip learned skills into Battle Dice slots 2–12. When a roll lands on an occupied slot the skill fires for the round. Fixed slots for v1; drag-to-assign UI coming next." />}
       {tab === 'equipment' && <PlaceholderTab title="Equipment"
         body="Shanks, body armor, contraband phones — slots that stack on top of your base traits. Coming with the Supabase pass." />}
-      {tab === 'account'   && <AccountTab />}
+      {tab === 'account'   && <AccountTab onAuthed={onBack} />}
     </div>
   )
 }
@@ -57,7 +57,7 @@ export default function Profile({ onBack }) {
 // ---------------------------------------------------------------------
 // Account tab — email login / sign-out / delete account (store-required).
 // ---------------------------------------------------------------------
-function AccountTab() {
+function AccountTab({ onAuthed }) {
   const auth = useAuth()
   const [showAuth, setShowAuth] = useState(false)
   const [busy, setBusy] = useState('')
@@ -120,6 +120,7 @@ function AccountTab() {
         <AuthModal
           initialMode={showAuth === 'signin' ? 'signin' : 'signup'}
           hasGuestProgress={auth.isAnonymous}
+          onAuthed={() => { setShowAuth(false); onAuthed && onAuthed() }}
           onClose={() => setShowAuth(false)}
         />
       )}
