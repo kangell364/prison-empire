@@ -453,7 +453,7 @@ const QUEUE_SPOTS = [
 ]
 const CUST_SPEED = 11          // walk speed, % of room width per second (constant pace)
 const moveSecs = (ax, bx) => Math.max(0.6, Math.abs(ax - bx) / CUST_SPEED)
-const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp', '/gnome-6.webp', '/gnome-7.webp', '/gnome-8.webp']
+const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp', '/gnome-6.webp', '/gnome-7.webp', '/gnome-8.webp', '/gnome-9.webp']
 const CUST_SIZE = {                            // per-sprite size multipliers
   '/gnome-2.webp': 1,
   '/gnome-5.webp': 1.2,
@@ -621,10 +621,17 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
       for (let i = 0; i < before; i++) { const c = at(i); if (!c || c.phase !== 'wait') return false }
       return true
     }
+    // A sprite not currently anywhere in the room (in line OR walking out) — we never
+    // show two of the same customer at once, so if none is free we simply don't spawn.
+    const freeSprite = () => {
+      const used = new Set(modelRef.current.map(c => c.sprite))
+      const pool = CUSTOMER_SPRITES.filter(s => !used.has(s))
+      return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null
+    }
     const maybeSpawn = () => {
       if (spawnPending) return
       const idx = firstEmpty()
-      if (idx < 0 || !rowsAheadReady(idx)) return            // full, or an earlier row isn't standing yet
+      if (idx < 0 || !rowsAheadReady(idx) || !freeSprite()) return  // full / row not up / no unique sprite
       spawnPending = true
       let sec
       if (SALES_ENABLED) {
@@ -637,13 +644,11 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
     }
     const spawn = () => {
       const k = firstEmpty()
-      if (k < 0 || !rowsAheadReady(k)) { maybeSpawn(); return }
-      const used = new Set(modelRef.current.map(c => c.sprite))
-      const pool = CUSTOMER_SPRITES.filter(s => !used.has(s))
-      const choices = pool.length ? pool : CUSTOMER_SPRITES  // distinct on screen when possible
+      const sprite = freeSprite()
+      if (k < 0 || !rowsAheadReady(k) || !sprite) { maybeSpawn(); return }   // nothing to do / no unique sprite
       const key = ++n
       modelRef.current.push({
-        key, sprite: choices[Math.floor(Math.random() * choices.length)], pos: k, phase: 'enter', value: 0,
+        key, sprite, pos: k, phase: 'enter', value: 0,
         anim: `custIn${k}`, dur: moveSecs(CUST_DOOR.x, QUEUE_SPOTS[k].x),
       })
       commit()
@@ -673,7 +678,7 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
     const startLeave = (key) => {
       const c = byKey(key); if (!c) return
       c.phase = 'leave'; c.anim = 'custOut'; c.dur = moveSecs(QUEUE_SPOTS[0].x, CUST_OUT.x); c.pos = 'gone'; commit()
-      after(c.dur * 1000, () => { modelRef.current = modelRef.current.filter(x => x.key !== key); commit() })
+      after(c.dur * 1000, () => { modelRef.current = modelRef.current.filter(x => x.key !== key); commit(); maybeSpawn() })
       lined().filter(x => x.pos > 0).forEach(x => {          // everyone behind shifts one forward
         x.pos -= 1
         x.anim = `custAdv${x.pos}`
