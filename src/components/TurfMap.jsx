@@ -67,6 +67,7 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
       layer = L.layerGroup().addTo(map)
       for (let gx = x0; gx < x1; gx++) for (let gy = y0; gy < y1; gy++) {
         const blk = getBlock(gx, gy)
+        if (blk.land === false) continue   // ocean / Canada / Mexico — off the board, draw nothing
         const owner = blk.owner
         const color = owner ? (owner === 'you' ? CREW_COLORS.you : blk.color) : '#3a3a4a'
         const w = gx * GRID, s = gy * GRID

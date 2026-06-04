@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react'
 import { feature, neighbors } from 'topojson-client'
-import { geoContains } from 'd3-geo'
+import { geoContains, geoBounds } from 'd3-geo'
 
 const URL = `${process.env.PUBLIC_URL || ''}/data/counties-10m.json`
 
@@ -151,6 +151,25 @@ export function countyForPoint(mapData, lng, lat) {
     if (geoContains(f, point)) return String(f.id).padStart(5, '0')
   }
   return null
+}
+
+// US-land mask. A point [lng, lat] is "claimable US turf" iff it falls inside
+// some US state polygon. State outlines hug the coastline and stop at the
+// national border, so this naturally excludes the ocean, Canada, and Mexico —
+// the block / NPC economy is gated on it so turf only exists on real US land.
+// Each state's bounding box is precomputed once; a cheap bbox test prefilters
+// before the precise (and expensive) point-in-polygon check, so a test only
+// runs geoContains on the handful of states whose bbox covers the point.
+export function buildUSLandTest(mapData) {
+  if (!mapData || !mapData.states) return null
+  const feats = mapData.states.features.map(f => ({ f, bbox: geoBounds(f) }))
+  return (lng, lat) => {
+    for (const { f, bbox } of feats) {
+      if (lng < bbox[0][0] || lng > bbox[1][0] || lat < bbox[0][1] || lat > bbox[1][1]) continue
+      if (geoContains(f, [lng, lat])) return true
+    }
+    return false
+  }
 }
 
 // Lightweight centroid for a single GeoJSON feature — averages the first

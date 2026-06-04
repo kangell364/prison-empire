@@ -6,8 +6,8 @@ import { USStateMap } from '../components/USStateMap'
 import { ScoutScreen } from '../components/ScoutScreen'
 import { TurfMap } from '../components/TurfMap'
 import { BlockSheet } from '../components/BlockSheet'
-import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks } from '../state/blocksStore'
-import { useMapData, buildCityCountyMap, STATE_CODE_TO_FIPS, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
+import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks, setLandTest } from '../state/blocksStore'
+import { useMapData, buildCityCountyMap, buildUSLandTest, STATE_CODE_TO_FIPS, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
 import { knockOut } from '../state/vitalsStore'
 import { getBounty } from '../state/bountyStore'
 import { useDisplayName } from '../state/profileStore'
@@ -308,6 +308,11 @@ export default function MapScreen({ onNavigate }) {
   const [, setMoveTick] = useState(0)                       // ticks the move countdown
   const { attacks, landed, launch, dismissLanded } = useDriveBys()
   const { data: mapData } = useMapData()
+  // Gate the block / NPC economy on real US land once the states GeoJSON loads —
+  // clears any procedural turf the renderer was showing in the ocean or Canada.
+  useEffect(() => {
+    if (mapData) setLandTest(buildUSLandTest(mapData))
+  }, [mapData])
   const territories = useTerritories()
   const world = useWorld()
   const cityById = useMemo(() => new Map(ALL_CITIES.map(c => [c.id, c])), [])

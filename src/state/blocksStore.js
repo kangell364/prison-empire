@@ -56,8 +56,45 @@ export function cellCenter(gx, gy) { return [gy * GRID + GRID / 2, gx * GRID + G
 export function cellOf(lng, lat) { return [Math.floor(lng / GRID), Math.floor(lat / GRID)] }
 function hoursSince(ts) { return Math.max(0, (Date.now() - ts) / 3_600_000) }
 
+// ---- US-land mask --------------------------------------------------
+// The block / NPC economy only exists on real US land. A predicate built from
+// the states GeoJSON (installed via setLandTest once map data loads) tells us
+// whether a cell's center falls on US turf; ocean, Canada, and Mexico return
+// false → no NPCs spawn there and nobody can take those cells over. Canada is a
+// later expansion; the ocean is permanently off-limits.
+let landTest = null                 // (lng,lat) => bool ; null until map data loads
+const landCache = new Map()         // cellKey → bool (memoized; each cell tested at most once)
+
+// Install the US-land predicate. Until it's set every cell reads as land, so
+// the world isn't blank during the async map-data load. Setting it clears the
+// memo and notifies listeners so the map repaints with ocean/Canada cleared.
+export function setLandTest(fn) {
+  landTest = fn
+  landCache.clear()
+  listeners.forEach(f => f(overrides))
+}
+
+// Is this cell on claimable US turf? Memoized per cell. Returns true before the
+// predicate loads (so nothing flickers blank on first paint).
+export function isLandCell(gx, gy) {
+  if (!landTest) return true
+  const k = cellKey(gx, gy)
+  let v = landCache.get(k)
+  if (v === undefined) {
+    const [lat, lng] = cellCenter(gx, gy)
+    v = landTest(lng, lat)
+    landCache.set(k, v)
+  }
+  return v
+}
+
 // Ambient (procedural) state for any cell — rival crews hold turf everywhere.
 function blockDefault(gx, gy) {
+  // Off US land (ocean / Canada / Mexico): an empty, non-claimable cell — no
+  // owner, no NPC, zero income. The map skips drawing these entirely.
+  if (!isLandCell(gx, gy)) {
+    return { owner: null, ownerKind: null, color: null, loyalty: 0, baseLoyalty: 0, incomePerHr: 0, npc: null, land: false }
+  }
   const h = cellRng(gx, gy, 0)
   const owner = h < 0.08 ? 'red' : h < 0.15 ? 'blue' : h < 0.20 ? 'purple' : null
   const tier = Math.floor(cellRng(gx, gy, 1) * 3)        // 0..2
@@ -66,7 +103,7 @@ function blockDefault(gx, gy) {
   const npc = NPC_NAMES[Math.floor(cellRng(gx, gy, 2) * NPC_NAMES.length)]
   return {
     owner, ownerKind: owner ? 'ai' : null, color: owner ? CREW_COLORS[owner] : null,
-    loyalty: owner ? baseLoyalty : 0, baseLoyalty, incomePerHr, npc,
+    loyalty: owner ? baseLoyalty : 0, baseLoyalty, incomePerHr, npc, land: true,
   }
 }
 
@@ -160,6 +197,7 @@ export function pendingIncome(gx, gy) {
 // Recruit a member onto a VACANT block. Returns { ok, reason?, cost }.
 export function recruit(gx, gy, homeTurf) {
   const b = getBlock(gx, gy)
+  if (b.land === false) return { ok: false, reason: 'offmap' }
   if (b.owner) return { ok: false, reason: 'taken' }
   if (yourBlockCount() >= blockCap()) return { ok: false, reason: 'cap' }
   const cost = recruitCost(b, homeTurf)
@@ -179,6 +217,7 @@ export function recruit(gx, gy, homeTurf) {
 // (ambient AI has no recipient — the spend is a Hustle sink).
 export function poach(gx, gy, homeTurf) {
   const b = getBlock(gx, gy)
+  if (b.land === false) return { ok: false, reason: 'offmap' }
   if (!b.owner || b.owner === 'you') return { ok: false, reason: 'own' }
   if (onCooldown(b)) return { ok: false, reason: 'cooldown' }
   if (yourBlockCount() >= blockCap()) return { ok: false, reason: 'cap' }
@@ -212,6 +251,7 @@ export function scatterToBlock(lng, lat, maxRing = 14) {
     for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) {
       if (r > 0 && Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue   // ring r only
       const gx = bx + dx, gy = by + dy
+      if (!isLandCell(gx, gy)) continue                          // never land in ocean / off-US
       const b = getBlock(gx, gy)
       if (!b.owner) return claimLanding(gx, gy)                  // vacant — land here, free
       const cost = poachPrice(b, false)                          // owned — remember the cheapest
