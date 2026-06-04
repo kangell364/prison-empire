@@ -17,7 +17,7 @@ const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.pn
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
 const GOLD = '#c9a84c'
 
-export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse, onTrapHouseTap }) {
+export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse, onTrapHouseTap, otherHouses, myUserId }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const onBlockTapRef = useRef(onBlockTap)
@@ -107,6 +107,28 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
     m.on('click', () => onTrapTapRef.current && onTrapTapRef.current())
     return () => { try { map.removeLayer(m) } catch {} }
   }, [tLat, tLng])
+
+  // OTHER players' trap houses (the shared world). Red-tinted house pins with
+  // the owner's name; excludes your own (which has its own gold pin above).
+  const othersKey = (otherHouses || [])
+    .filter(h => h.owner_id !== myUserId).map(h => `${h.id}:${h.lat}:${h.lng}`).join('|')
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const houses = (otherHouses || []).filter(h => h.owner_id !== myUserId && h.lat != null && h.lng != null)
+    if (!houses.length) return
+    const layer = L.layerGroup().addTo(map)
+    houses.forEach(h => {
+      const name = String(h.name || 'Player').replace(/[<>]/g, '')
+      const icon = L.divIcon({ className: '', iconSize: [40, 48], iconAnchor: [20, 42], html: `<div style="text-align:center">
+        <div style="width:32px;height:32px;border-radius:10px;background:#1a1015;border:2px solid #e74c3c;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 2px 8px rgba(0,0,0,.7);margin:0 auto">🏚️</div>
+        <div style="margin-top:2px;font-size:9px;color:#fff;background:rgba(0,0,0,.62);border-radius:4px;padding:1px 4px;white-space:nowrap;max-width:84px;overflow:hidden;text-overflow:ellipsis">${name}</div>
+      </div>` })
+      L.marker([h.lat, h.lng], { icon }).addTo(layer)
+    })
+    return () => { try { map.removeLayer(layer) } catch {} }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [othersKey])
 
   // County borders + the live "which county am I in" HUD. Faint outlines for the
   // counties in view (so you can see where the lines are as you roam), the

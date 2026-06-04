@@ -10,7 +10,8 @@ import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks, s
 import { useMapData, buildCityCountyMap, buildUnlockedCountyTest, UNLOCKED_COUNTY_FIPS, HARRIS_CENTER, STATE_CODE_TO_FIPS, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
 import { knockOut } from '../state/vitalsStore'
 import { getBounty } from '../state/bountyStore'
-import { useDisplayName } from '../state/profileStore'
+import { useDisplayName, useAuth } from '../state/profileStore'
+import { ensureMyHouse, useSharedHouses, harrisSpotFor } from '../state/sharedHousesStore'
 import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
 import { useWorld, moveHouse, arriveHouse, getHouse, applyHomeRaid, attackHouse } from '../state/worldStore'
 import { AI_MOBS } from '../data/mobs'
@@ -322,6 +323,15 @@ export default function MapScreen({ onNavigate }) {
   const LOCKED_FILL = '#1e1e2a'
   const unlockedCountySet = useMemo(() => new Set(UNLOCKED_COUNTY_FIPS), [])
   const unlockedStateSet  = useMemo(() => new Set(UNLOCKED_COUNTY_FIPS.map(f => f.slice(0, 2))), [])
+
+  // Shared-world trap houses (M2a): make sure mine exists in the open county,
+  // then stream every player's house so the turf map shows the real population.
+  const auth = useAuth()
+  const myName = useDisplayName()
+  const sharedHouses = useSharedHouses()
+  useEffect(() => { if (auth.userId && myName) ensureMyHouse(myName) }, [auth.userId, myName])
+  // My trap house's spot in the open county (matches the row others see).
+  const myHouseCoords = useMemo(() => (auth.userId ? harrisSpotFor(auth.userId) : null), [auth.userId])
   const territories = useTerritories()
   const world = useWorld()
   const cityById = useMemo(() => new Map(ALL_CITIES.map(c => [c.id, c])), [])
@@ -809,8 +819,10 @@ export default function MapScreen({ onNavigate }) {
           counties={mapData?.counties}
           onBlockTap={(gx, gy) => setBlockSel({ gx, gy })}
           onBack={() => setTurfView(null)}
-          trapHouse={homeCoords ? { lat: homeCoords[1], lng: homeCoords[0] } : null}
+          trapHouse={myHouseCoords || (homeCoords ? { lat: homeCoords[1], lng: homeCoords[0] } : null)}
           onTrapHouseTap={() => onNavigate && onNavigate('traphouse')}
+          otherHouses={sharedHouses}
+          myUserId={auth.userId}
         />
       )}
 
