@@ -444,16 +444,23 @@ const QUEUE_SPOTS = [
   { x: 59,   y: 78.5, w: 6.5 },   // 2
   { x: 66,   y: 78.5, w: 6.3 },   // 3
   { x: 73,   y: 78.5, w: 6.1 },   // 4 — end of row 1
-  { x: 44,   y: 90,   w: 7.8 },   // 5 — below spot 0 (row 2, front)
-  { x: 51.5, y: 90,   w: 7.5 },   // 6
-  { x: 59,   y: 90,   w: 7.2 },   // 7
-  { x: 66,   y: 90,   w: 7.0 },   // 8
-  { x: 73,   y: 90,   w: 6.8 },   // 9 — end of row 2
+  // Row 2 starts UNDER spot 1 (x 51.5), not spot 0 — leaving the front of line 1 in
+  // clear view (no one stands directly in front of the customer being served).
+  { x: 51.5, y: 90,   w: 7.5 },   // 5 — row 2, front
+  { x: 59,   y: 90,   w: 7.2 },   // 6
+  { x: 66,   y: 90,   w: 7.0 },   // 7
+  { x: 73,   y: 90,   w: 6.8 },   // 8 — end of row 2
 ]
 const CUST_SPEED = 11          // walk speed, % of room width per second (constant pace)
 const moveSecs = (ax, bx) => Math.max(0.6, Math.abs(ax - bx) / CUST_SPEED)
 const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp', '/gnome-6.webp', '/gnome-7.webp', '/gnome-8.webp']
-const CUST_SIZE = { '/gnome-2.webp': 1 }       // per-sprite size multiplier (GNOME 2 = 1× now)
+const CUST_SIZE = {                            // per-sprite size multipliers
+  '/gnome-2.webp': 1,
+  '/gnome-5.webp': 1.2,
+  '/gnome-6.webp': 1.1,
+  '/gnome-7.webp': 1.1,
+  '/gnome-8.webp': 1.2,
+}
 
 function ShopFront({ art, jarCounts = {}, tableCards = {}, onSell }) {
   // One tinted jar per banked unit, in the order strains were planted, capped at
@@ -538,7 +545,11 @@ function CustomerSprite({ c }) {
   const walking = c.phase === 'enter' || c.phase === 'leave'
   const ease = c.anim === 'custOut' ? 'ease-in' : c.anim.startsWith('custAdv') ? 'ease-in-out' : 'ease-out'
   const size = CUST_SIZE[c.sprite] || 1
-  const z = c.phase === 'leave' ? 31 : (typeof c.pos === 'number' ? 30 - c.pos : 20)
+  // Later rows are nearer the viewer, so they paint IN FRONT of earlier rows; within a
+  // row the front-of-line sits on top. A leaving customer crosses in front of everyone.
+  const inLine = typeof c.pos === 'number'
+  const row = inLine ? Math.floor(c.pos / CUST_ROW_LEN) : 0
+  const z = c.phase === 'leave' ? 50 : 20 + row * 5 - (inLine ? c.pos % CUST_ROW_LEN : 0)
   return (
     <div style={{
       position: 'absolute', transform: 'translate(-50%, -100%)', zIndex: z, pointerEvents: 'none',
