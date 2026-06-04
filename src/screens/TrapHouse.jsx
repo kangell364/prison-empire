@@ -100,8 +100,18 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   // plant id). Climbs on deposit, drops by JAR_FILL each time the machine pops a jar.
   const [packCounts, setPackCounts] = useState(() => saved.packCounts || {})
   // LEFT packing box — finished jars per strain. The box's $ value is jars ×
-  // (card cash value × JAR_FILL); see PackingRoom.
-  const [jarCounts, setJarCounts] = useState(() => saved.jarCounts || {})
+  // (card cash value × JAR_FILL); see PackingRoom. The SHELF is the real stock, so the
+  // total is capped at its slot count (trimming any old over-stock on load) — that way
+  // each sale frees a visible slot instead of being hidden behind a full shelf.
+  const [jarCounts, setJarCounts] = useState(() => {
+    const jc = { ...(saved.jarCounts || {}) }
+    const cap = SHELF_SLOTS.length
+    let total = Object.values(jc).reduce((s, v) => s + Math.floor(v || 0), 0)
+    for (const id of Object.keys(jc).sort((a, b) => (jc[b] || 0) - (jc[a] || 0))) {
+      while (total > cap && Math.floor(jc[id] || 0) > 0) { jc[id] = Math.floor(jc[id]) - 1; total-- }
+    }
+    return jc
+  })
   // Which table the "+ Add" slot was tapped for — opens the card picker.
   const [picking, setPicking] = useState(null)
 
@@ -230,8 +240,16 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   useEffect(() => {
     const id = setInterval(() => {
       const pc = packCountsRef.current
+      const jc = jarCountsRef.current
+      // The SHELF is the real stock: don't bank more finished jars than it can hold, so
+      // each sale frees a visible slot for the machine to refill (backpressure when full).
+      let total = Object.values(jc).reduce((s, v) => s + Math.floor(v || 0), 0)
+      const cap = SHELF_SLOTS.length
       const popped = []
-      for (const strain in pc) { if ((pc[strain] || 0) >= JAR_FILL) popped.push(strain) }
+      for (const strain in pc) {
+        if (total >= cap) break
+        if ((pc[strain] || 0) >= JAR_FILL) { popped.push(strain); total++ }
+      }
       if (!popped.length) return
       setPackCounts(prev => {
         const next = { ...prev }
