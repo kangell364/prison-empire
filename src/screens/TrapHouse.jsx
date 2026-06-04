@@ -435,6 +435,9 @@ const CUST_OUT  = { x: 3,  y: 67, w: 4.6 }     // exit, back out the door (fades
 // The line on the RIGHT, FRONT first → back, each spot a touch smaller/farther.
 // Two rows so the line never runs onto the display case: row 1 (back) is 5 spots on
 // the right; row 2 (front, lower/closer + a touch bigger) is 5 more directly below it.
+// CUST_ROW_LEN spots make a row; a new customer only heads to a later row once every
+// earlier row is fully ARRIVED (so nobody takes the 2nd-line path until line 1 is up).
+const CUST_ROW_LEN = 5
 const QUEUE_SPOTS = [
   { x: 44,   y: 78.5, w: 7.0 },   // 0 — front / serving (row 1, back)
   { x: 51.5, y: 78.5, w: 6.7 },   // 1
@@ -449,7 +452,7 @@ const QUEUE_SPOTS = [
 ]
 const CUST_SPEED = 11          // walk speed, % of room width per second (constant pace)
 const moveSecs = (ax, bx) => Math.max(0.6, Math.abs(ax - bx) / CUST_SPEED)
-const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp', '/gnome-6.webp', '/gnome-7.webp']
+const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp', '/gnome-6.webp', '/gnome-7.webp', '/gnome-8.webp']
 const CUST_SIZE = { '/gnome-2.webp': 1 }       // per-sprite size multiplier (GNOME 2 = 1× now)
 
 function ShopFront({ art, jarCounts = {}, tableCards = {}, onSell }) {
@@ -598,8 +601,19 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
     const at = (pos) => modelRef.current.find(c => c.pos === pos)
     const byKey = (key) => modelRef.current.find(c => c.key === key)
 
+    // The next open spot, scanning front → back, so the line always fills in order.
+    const firstEmpty = () => { for (let i = 0; i < N; i++) if (!at(i)) return i; return -1 }
+    // A spot may only be filled once EVERY spot in the rows before it holds an arrived
+    // customer — so a customer never takes the 2nd-line path until line 1 is fully up.
+    const rowsAheadReady = (idx) => {
+      const before = Math.floor(idx / CUST_ROW_LEN) * CUST_ROW_LEN
+      for (let i = 0; i < before; i++) { const c = at(i); if (!c || c.phase !== 'wait') return false }
+      return true
+    }
     const maybeSpawn = () => {
-      if (spawnPending || lined().length >= N) return        // line full
+      if (spawnPending) return
+      const idx = firstEmpty()
+      if (idx < 0 || !rowsAheadReady(idx)) return            // full, or an earlier row isn't standing yet
       spawnPending = true
       let sec
       if (SALES_ENABLED) {
@@ -611,8 +625,8 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
       after(sec * 1000, () => { spawnPending = false; spawn() })
     }
     const spawn = () => {
-      const k = lined().length                               // join at the back of the line
-      if (k >= N) return
+      const k = firstEmpty()
+      if (k < 0 || !rowsAheadReady(k)) { maybeSpawn(); return }
       const used = new Set(modelRef.current.map(c => c.sprite))
       const pool = CUSTOMER_SPRITES.filter(s => !used.has(s))
       const choices = pool.length ? pool : CUSTOMER_SPRITES  // distinct on screen when possible
@@ -623,12 +637,13 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
       })
       commit()
       after(modelRef.current[modelRef.current.length - 1].dur * 1000, () => arrive(key))
-      maybeSpawn()                                           // keep feeding until full
+      maybeSpawn()                                           // keep feeding line 1 in parallel
     }
     const arrive = (key) => {
       const c = byKey(key); if (!c) return
       c.phase = 'wait'; commit()
       tryBuy()
+      maybeSpawn()                                           // an arrival may unlock the next row
     }
     const tryBuy = () => {
       if (!SALES_ENABLED) return                             // sales stopped — just stack the line
