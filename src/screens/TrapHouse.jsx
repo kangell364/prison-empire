@@ -429,7 +429,7 @@ const SHELF_SLOTS = SHELF_ROWS.flatMap(y =>               // all slot centers, i
 // scaled by width %. A customer joins at the BACK of the line and shifts forward a
 // spot each time the front leaves. The front only buys once someone is in line behind
 // it. SALES_ENABLED gates buying — off for now so the line just stacks up.
-const SALES_ENABLED = false
+const SALES_ENABLED = true
 const CUST_DOOR = { x: 14, y: 73, w: 5.2 }     // entry, at the left doorway (small/far)
 const CUST_OUT  = { x: 3,  y: 67, w: 4.6 }     // exit, back out the door (fades)
 // The line on the RIGHT, FRONT first → back, each spot a touch smaller/farther.
@@ -444,12 +444,13 @@ const QUEUE_SPOTS = [
   { x: 59,   y: 78.5, w: 6.5 },   // 2
   { x: 66,   y: 78.5, w: 6.3 },   // 3
   { x: 73,   y: 78.5, w: 6.1 },   // 4 — end of row 1
-  // Row 2 starts UNDER spot 1 (x 51.5), not spot 0 — leaving the front of line 1 in
-  // clear view (no one stands directly in front of the customer being served).
-  { x: 51.5, y: 90,   w: 7.5 },   // 5 — row 2, front
-  { x: 59,   y: 90,   w: 7.2 },   // 6
-  { x: 66,   y: 90,   w: 7.0 },   // 7
-  { x: 73,   y: 90,   w: 6.8 },   // 8 — end of row 2
+  // Row 2 SNAKES back the other way (right → left), and starts under spot 1 (not spot
+  // 0) so the served customer stays in clear view. Snaking keeps every advance a short
+  // step: 4→ turn the corner down, then walk left along the front row.
+  { x: 73,   y: 90,   w: 6.8 },   // 5 — corner, below spot 4
+  { x: 66,   y: 90,   w: 7.0 },   // 6
+  { x: 59,   y: 90,   w: 7.2 },   // 7
+  { x: 51.5, y: 90,   w: 7.5 },   // 8 — back of the line (below spot 1)
 ]
 const CUST_SPEED = 11          // walk speed, % of room width per second (constant pace)
 const moveSecs = (ax, bx) => Math.max(0.6, Math.abs(ax - bx) / CUST_SPEED)
@@ -577,7 +578,7 @@ function CustomerSprite({ c }) {
       filter: 'drop-shadow(0 6px 9px rgba(0,0,0,0.4))',
       animation: `${c.anim} ${c.dur}s ${ease} forwards`,
     }}>
-      {(c.phase === 'buy' || c.phase === 'angry') && <CustomerBubble angry={c.phase === 'angry'} value={c.value} />}
+      {(c.phase === 'buy' || c.phase === 'angry') && <CustomerBubble angry={c.phase === 'angry'} value={c.value} size={size} />}
       <div style={{ width: '100%', transform: `scale(${size})`, transformOrigin: '50% 100%' }}>
         <img src={c.sprite} alt="" aria-hidden style={{
           display: 'block', width: '100%', transformOrigin: '50% 100%',
@@ -590,10 +591,10 @@ function CustomerSprite({ c }) {
 
 // Speech bubble over a customer's head — green "+$X" on a sale, red anger on an
 // empty shelf. Sized in px so it stays readable regardless of the sprite scale.
-function CustomerBubble({ angry, value }) {
+function CustomerBubble({ angry, value, size = 1 }) {
   return (
     <div style={{
-      position: 'absolute', left: '50%', top: '-4%', transformOrigin: '50% 100%',
+      position: 'absolute', left: '50%', top: `${-4 - (size - 1) * 100}%`, transformOrigin: '50% 100%',
       background: '#fff', border: '2px solid #1a1206', borderRadius: 10, padding: '4px 9px',
       whiteSpace: 'nowrap', zIndex: 21, boxShadow: '0 3px 7px rgba(0,0,0,0.45)',
       animation: 'custBubblePop 0.25s ease-out forwards',
@@ -727,6 +728,7 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
     }
     const tryBuy = () => {
       if (!SALES_ENABLED) return                             // sales stopped — just stack the line
+      if (beggarRef.current && beggarRef.current.phase === 'beg') return  // cashier busy with the bum
       const front = at(0), behind = at(1)
       if (front && front.phase === 'wait' && behind && behind.phase === 'wait') {
         front.phase = 'pause'; commit()                      // don't buy until the next is in line
@@ -771,6 +773,7 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
       if (!b || b.key !== key) return
       if (i >= BEG_DIALOG.length) {                           // told off — storm out mad
         b.phase = 'out'; b.line = null; commit()
+        tryBuy()                                              // cashier's free now — serve the held line
         after(moveSecs(BEG_SPOT.x, CUST_OUT.x) * 1000, () => {
           if (beggarRef.current && beggarRef.current.key === key) { beggarRef.current = null; commit() }
           scheduleBeggar()
