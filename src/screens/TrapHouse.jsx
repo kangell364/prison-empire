@@ -434,15 +434,16 @@ const CUST_DOOR = { x: 14, y: 73, w: 5.2 }     // entry, at the left doorway (sm
 const CUST_OUT  = { x: 3,  y: 67, w: 4.6 }     // exit, back out the door (fades)
 // The line on the RIGHT, FRONT first → back, each spot a touch smaller/farther.
 const QUEUE_SPOTS = [
-  { x: 44,   y: 82,   w: 7.3 },   // 0 — front / serving (in front of the counter)
-  { x: 53,   y: 81.4, w: 7.0 },   // 1
-  { x: 61.5, y: 80.8, w: 6.7 },   // 2
-  { x: 70,   y: 80.3, w: 6.4 },   // 3
-  { x: 78.5, y: 80,   w: 6.1 },   // 4 — back of the line
+  { x: 44,   y: 82,   w: 7.2 },   // 0 — front / serving (in front of the counter)
+  { x: 51.5, y: 81.5, w: 6.9 },   // 1
+  { x: 59,   y: 81,   w: 6.6 },   // 2
+  { x: 66,   y: 80.6, w: 6.3 },   // 3
+  { x: 73,   y: 80.3, w: 6.1 },   // 4
+  { x: 80,   y: 80,   w: 5.8 },   // 5 — back of the line
 ]
 const CUST_SPEED = 11          // walk speed, % of room width per second (constant pace)
 const moveSecs = (ax, bx) => Math.max(0.6, Math.abs(ax - bx) / CUST_SPEED)
-const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp']
+const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp', '/gnome-6.webp']
 const CUST_SIZE = { '/gnome-2.webp': 2 }       // per-sprite size multiplier (GNOME 2 = 2×)
 
 function ShopFront({ art, jarCounts = {}, tableCards = {}, onSell }) {
