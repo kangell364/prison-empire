@@ -453,7 +453,8 @@ const QUEUE_SPOTS = [
 ]
 const CUST_SPEED = 11          // walk speed, % of room width per second (constant pace)
 const moveSecs = (ax, bx) => Math.max(0.6, Math.abs(ax - bx) / CUST_SPEED)
-const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp', '/gnome-6.webp', '/gnome-7.webp', '/gnome-8.webp', '/gnome-9.webp', '/gnome-10.webp']
+// Paying customers for the line pool. GNOME 10 is NOT here — he's the bum (below).
+const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp', '/gnome-6.webp', '/gnome-7.webp', '/gnome-8.webp', '/gnome-9.webp', '/gnome-11.webp']
 const CUST_SIZE = {                            // per-sprite size multipliers
   '/gnome-2.webp': 1,
   '/gnome-5.webp': 1.2,
@@ -462,6 +463,23 @@ const CUST_SIZE = {                            // per-sprite size multipliers
   '/gnome-8.webp': 1.2,
   '/gnome-9.webp': 2,
 }
+
+// THE BUM (GNOME 10) — a recurring gag, separate from the paying line. He shuffles up
+// to the counter, begs the cashier for free buds (holding everyone up), gets told to
+// get lost, and storms off mad. BEG_SPOT is his foreground spot at the register.
+const BUM_SPRITE = '/gnome-10.webp'
+const BEG_SPOT = { x: 36, y: 88, w: 6.6 }      // at the register, in the foreground
+const BEG_EVERY = [22, 45]                     // seconds between bum visits [min, max]
+// Dialog, alternating bum ↔ cashier; the last bum line is his exit huff.
+const BEG_DIALOG = [
+  { who: 'bum',    text: "Ayo, spare one free nug?", ms: 2100 },
+  { who: 'clerk',  text: "This ain't a charity, dawg.", ms: 2000 },
+  { who: 'bum',    text: "C'mon, just a lil' crumb!", ms: 2100 },
+  { who: 'clerk',  text: "Pay up or step off.", ms: 1900 },
+  { who: 'bum',    text: "I'll get you back next week, swear!", ms: 2300 },
+  { who: 'clerk',  text: "GET LOST, bum!", ms: 1900 },
+  { who: 'bum',    text: "Y'all trash anyway! 😤", ms: 2000 },
+]
 
 function ShopFront({ art, jarCounts = {}, tableCards = {}, onSell }) {
   // One tinted jar per banked unit, in the order strains were planted, capped at
@@ -533,6 +551,8 @@ function CustomerKeyframes() {
     if (k > 0) kf += `@keyframes custAdv${k - 1} { 0% { ${f(QUEUE_SPOTS[k])} } 100% { ${f(QUEUE_SPOTS[k - 1])} } }\n`
   })
   kf += `@keyframes custOut { 0% { ${f(QUEUE_SPOTS[0])}; opacity:1; } 80% { opacity:1; } 100% { ${f(CUST_OUT)}; opacity:0; } }\n`
+  kf += `@keyframes custBegIn  { 0% { ${f(CUST_DOOR)} } 100% { ${f(BEG_SPOT)} } }\n`
+  kf += `@keyframes custBegOut { 0% { ${f(BEG_SPOT)}; opacity:1; } 80% { opacity:1; } 100% { ${f(CUST_OUT)}; opacity:0; } }\n`
   kf += `@keyframes custWaddle { 0%,50%,100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-4%) rotate(2.5deg); } 75% { transform: translateY(-4%) rotate(-2.5deg); } }\n`
   kf += `@keyframes custBubblePop { 0% { transform: translate(-50%,-100%) scale(0.5); opacity:0; } 100% { transform: translate(-50%,-100%) scale(1); opacity:1; } }`
   return <style>{kf}</style>
@@ -589,6 +609,48 @@ function CustomerBubble({ angry, value }) {
   )
 }
 
+// The bum shuffling to the counter and out again (its own walk anims; waddles while
+// moving). Painted above the line so he's clearly the one holding things up.
+function Beggar({ b }) {
+  const walking = b.phase === 'in' || b.phase === 'out'
+  const anim = b.phase === 'out'
+    ? `custBegOut ${moveSecs(BEG_SPOT.x, CUST_OUT.x)}s ease-in forwards`
+    : `custBegIn ${moveSecs(CUST_DOOR.x, BEG_SPOT.x)}s ease-out forwards`
+  return (
+    <div style={{
+      position: 'absolute', transform: 'translate(-50%, -100%)', zIndex: 40, pointerEvents: 'none',
+      filter: 'drop-shadow(0 7px 10px rgba(0,0,0,0.45))', animation: anim,
+    }}>
+      <img src={BUM_SPRITE} alt="" aria-hidden style={{
+        display: 'block', width: '100%', transformOrigin: '50% 100%',
+        animation: walking ? 'custWaddle 0.5s ease-in-out infinite' : 'none',
+      }} />
+    </div>
+  )
+}
+
+// A line of dialog — over the BUM (red) or over the CASHIER (dark), one at a time.
+function DialogBubble({ line }) {
+  const fromBum = line.who === 'bum'
+  const x = fromBum ? BEG_SPOT.x : 52      // over the bum, or over the clerk at the counter
+  const y = fromBum ? 44 : 37
+  return (
+    <div style={{
+      position: 'absolute', left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -100%)',
+      transformOrigin: '50% 100%', zIndex: 42, pointerEvents: 'none', width: '26%', maxWidth: 220,
+      background: '#fff', border: '2px solid #1a1206', borderRadius: 12, padding: '6px 11px',
+      boxShadow: '0 4px 9px rgba(0,0,0,0.5)', animation: 'custBubblePop 0.2s ease-out forwards',
+    }}>
+      <span style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.25, display: 'block', textAlign: 'center',
+        color: fromBum ? '#b23b2e' : '#1a1206' }}>{line.text}</span>
+      <div style={{
+        position: 'absolute', left: '50%', bottom: -9, transform: 'translateX(-50%)', width: 0, height: 0,
+        borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderTop: '10px solid #1a1206',
+      }} />
+    </div>
+  )
+}
+
 // The customer pipeline — an N-deep queue (N = QUEUE_SPOTS.length). A customer joins
 // at the back, and when the front leaves everyone shifts one spot forward and a new
 // one fills the back. The front only buys once someone is in line behind it; a sale
@@ -598,6 +660,7 @@ function CustomerBubble({ angry, value }) {
 function ShopCustomers({ onSell, jarCount = 0 }) {
   const [, bump] = useState(0)
   const modelRef = useRef([])
+  const beggarRef = useRef(null)                 // the bum's current state, or null
   const onSellRef = useRef(onSell); onSellRef.current = onSell
   const jarsRef = useRef(jarCount); jarsRef.current = jarCount
 
@@ -691,7 +754,35 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
       maybeSpawn()                                           // refill the back
     }
 
+    // --- THE BUM (GNOME 10): recurring gag, independent of the paying line ---
+    let bumKey = 0
+    const scheduleBeggar = () => {
+      const [lo, hi] = BEG_EVERY
+      after((lo + Math.random() * (hi - lo)) * 1000, runBeggar)
+    }
+    const runBeggar = () => {
+      const key = ++bumKey
+      beggarRef.current = { key, phase: 'in', line: null }
+      commit()
+      after(moveSecs(CUST_DOOR.x, BEG_SPOT.x) * 1000, () => beg(key, 0))
+    }
+    const beg = (key, i) => {
+      const b = beggarRef.current
+      if (!b || b.key !== key) return
+      if (i >= BEG_DIALOG.length) {                           // told off — storm out mad
+        b.phase = 'out'; b.line = null; commit()
+        after(moveSecs(BEG_SPOT.x, CUST_OUT.x) * 1000, () => {
+          if (beggarRef.current && beggarRef.current.key === key) { beggarRef.current = null; commit() }
+          scheduleBeggar()
+        })
+        return
+      }
+      b.phase = 'beg'; b.line = BEG_DIALOG[i]; commit()       // show this dialog line
+      after(BEG_DIALOG[i].ms, () => beg(key, i + 1))
+    }
+
     maybeSpawn()                                             // first customer after a short beat
+    scheduleBeggar()                                          // and the bum drops by every so often
     return () => { alive = false; timers.forEach(clearTimeout) }
   }, [])
 
@@ -699,6 +790,8 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
     <>
       <CustomerKeyframes />
       {modelRef.current.map(c => <CustomerSprite key={c.key} c={c} />)}
+      {beggarRef.current && <Beggar b={beggarRef.current} />}
+      {beggarRef.current?.line && <DialogBubble line={beggarRef.current.line} />}
     </>
   )
 }
