@@ -6,7 +6,7 @@ import { USStateMap } from '../components/USStateMap'
 import { ScoutScreen } from '../components/ScoutScreen'
 import { TurfMap } from '../components/TurfMap'
 import { BlockSheet } from '../components/BlockSheet'
-import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks, setLandTest } from '../state/blocksStore'
+import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks, setLandTest, initSharedBlocks } from '../state/blocksStore'
 import { useMapData, buildCityCountyMap, buildUnlockedCountyTest, UNLOCKED_COUNTY_FIPS, HARRIS_CENTER, STATE_CODE_TO_FIPS, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
 import { knockOut } from '../state/vitalsStore'
 import { getBounty } from '../state/bountyStore'
@@ -330,6 +330,10 @@ export default function MapScreen({ onNavigate }) {
   const myName = useDisplayName()
   const sharedHouses = useSharedHouses()
   useEffect(() => { if (auth.userId && myName) ensureMyHouse(myName) }, [auth.userId, myName])
+  // Load the shared turf for the open county + start streaming other players'
+  // claims. Gated on mapData so the Harris land-mask (setLandTest, above) is set
+  // first — otherwise the one-time publish could mis-tag out-of-county turf.
+  useEffect(() => { if (auth.userId && mapData) initSharedBlocks() }, [auth.userId, mapData])
   // My trap house's spot in the open county (matches the row others see).
   const myHouseCoords = useMemo(() => (auth.userId ? harrisSpotFor(auth.userId) : null), [auth.userId])
   const territories = useTerritories()

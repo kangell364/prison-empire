@@ -18,9 +18,16 @@
 // in-game trap house location (passed in by the caller), not the phone's GPS.
 
 import { useEffect, useState } from 'react'
-import { addHustle, spendHustle } from './profileStore'
+import { supabase, isSupabaseConfigured } from '../supabase'
+import { addHustle, spendHustle, getUserId } from './profileStore'
 import { gangBlockIncomeMult } from './gangStore'
 import { getProgress } from './progressionStore'
+
+// Shared world (M2b): the open county. My claimed turf stays in localStorage
+// (offline-friendly, economy unchanged) AND publishes to the Supabase `blocks`
+// table; other players' claims stream back in via `remoteBlocks`. Must match
+// sharedHousesStore's county.
+const COUNTY_FIPS = '48201'   // Harris
 
 // One block = the "merged 4×4" unit (~1.8km / ~1.1mi across — a neighborhood).
 // Each block has one NPC, one recruit card, one color, one centered icon.
@@ -120,6 +127,118 @@ export function useBlocksVersion() {
   useEffect(() => subscribeBlocks(() => set(v => v + 1)), [])
 }
 
+// ---- shared world: other players' turf -----------------------------
+// `remoteBlocks` holds OTHER players' claimed cells (keyed by cellKey), streamed
+// from Supabase. My own turf lives in `overrides` (above) and takes precedence.
+let remoteBlocks = {}
+let myId = null
+let blocksChannel = null
+
+const RIVAL_COLORS = ['#e74c3c', '#4a9eff', '#9b59b6', '#2ecc71', '#e67e22', '#16a085', '#d35400', '#8e44ad']
+function rivalColor(id) {
+  let h = 0; const s = String(id || '')
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return RIVAL_COLORS[h % RIVAL_COLORS.length]
+}
+function rowToRemote(r) {
+  return {
+    owner: 'rival', ownerKind: 'player', owner_id: r.owner_id, color: rivalColor(r.owner_id),
+    npc: r.npc, loyalty: r.loyalty, baseLoyalty: r.base_loyalty, incomePerHr: r.income_per_hr,
+    lastPoachAt: r.last_poach_at ? new Date(r.last_poach_at).getTime() : null, land: true,
+  }
+}
+function rowToMine(r) {
+  return {
+    owner: 'you', ownerKind: 'you', npc: r.npc, baseLoyalty: r.base_loyalty,
+    incomePerHr: r.income_per_hr, loyalty: r.loyalty, basePaid: r.loyalty,
+    lastCollectedAt: r.last_collected_at ? new Date(r.last_collected_at).getTime() : Date.now(),
+    lastPoachAt: r.last_poach_at ? new Date(r.last_poach_at).getTime() : Date.now(),
+  }
+}
+
+// Called from the map once auth is ready. Loads the county's claimed turf,
+// publishes my local turf so others can see it, and opens a realtime stream.
+export async function initSharedBlocks() {
+  if (!isSupabaseConfigured) return
+  myId = getUserId()
+  if (!myId) return
+  await loadRemoteBlocks()
+  await publishMyLocalBlocks()
+  subscribeBlockRealtime()
+}
+
+async function loadRemoteBlocks() {
+  const { data, error } = await supabase.from('blocks').select('*').eq('county_fips', COUNTY_FIPS)
+  if (error || !data) return
+  const next = {}
+  for (const r of data) {
+    const k = cellKey(r.gx, r.gy)
+    if (r.owner_id === myId) { if (!overrides[k]) overrides[k] = rowToMine(r) }   // my turf from another device
+    else next[k] = rowToRemote(r)
+  }
+  remoteBlocks = next
+  commit()
+}
+
+// One-time publish of my existing local Harris turf so other players see it.
+async function publishMyLocalBlocks() {
+  const uid = myId; if (!uid) return
+  if (!landTest) return    // land mask not loaded yet — don't mis-tag out-of-county turf
+  const rows = []
+  for (const [k, b] of Object.entries(overrides)) {
+    if (b.owner !== 'you') continue
+    const [gx, gy] = k.split('_').map(Number)
+    if (!isLandCell(gx, gy)) continue                 // only cells inside the open county
+    rows.push(claimRow(gx, gy, b, uid))
+  }
+  if (rows.length) {
+    const { error } = await supabase.from('blocks').upsert(rows, { onConflict: 'county_fips,gx,gy' })
+    if (error) console.warn('[blocks] publish failed', error)
+  }
+}
+
+function claimRow(gx, gy, o, uid) {
+  return {
+    county_fips: COUNTY_FIPS, gx, gy, owner_id: uid,
+    loyalty: o.loyalty, base_loyalty: o.baseLoyalty, income_per_hr: o.incomePerHr, npc: o.npc,
+    last_collected_at: new Date(o.lastCollectedAt || Date.now()).toISOString(),
+    last_poach_at: new Date(o.lastPoachAt || Date.now()).toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+}
+
+// Push one of my claims/poaches to the shared table (fire-and-forget, optimistic).
+function pushClaim(gx, gy) {
+  if (!isSupabaseConfigured) return
+  const uid = getUserId(); if (!uid) return
+  const k = cellKey(gx, gy)
+  if (remoteBlocks[k]) { delete remoteBlocks[k] }     // it's mine now, not a rival's
+  const o = overrides[k]; if (!o) return
+  supabase.from('blocks').upsert(claimRow(gx, gy, o, uid), { onConflict: 'county_fips,gx,gy' })
+    .then(({ error }) => { if (error) console.warn('[blocks] claim push failed', error) })
+}
+
+function subscribeBlockRealtime() {
+  if (blocksChannel) return
+  blocksChannel = supabase
+    .channel(`blocks:${COUNTY_FIPS}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'blocks', filter: `county_fips=eq.${COUNTY_FIPS}` }, payload => {
+      const row = payload.eventType === 'DELETE' ? payload.old : payload.new
+      if (!row || row.gx == null) return
+      const k = cellKey(row.gx, row.gy)
+      if (payload.eventType === 'DELETE') {
+        delete remoteBlocks[k]
+      } else if (row.owner_id === myId) {
+        delete remoteBlocks[k]                         // now mine (e.g. another device) — local wins
+      } else {
+        remoteBlocks[k] = rowToRemote(row)             // a rival's claim/poach
+        if (overrides[k] && overrides[k].owner === 'you') delete overrides[k]  // they took MY block
+      }
+      commit()
+    })
+    .subscribe()
+}
+
 // Loyalty with decay applied (decays toward base once past the cooldown).
 export function effectiveLoyalty(b) {
   if (!b.lastPoachAt) return b.loyalty
@@ -129,10 +248,16 @@ export function effectiveLoyalty(b) {
 
 export function getBlock(gx, gy) {
   const def = blockDefault(gx, gy)
-  const o = overrides[cellKey(gx, gy)]
-  const b = o ? { ...def, ...o } : def
+  const k = cellKey(gx, gy)
+  const mine = overrides[k]
+  const remote = remoteBlocks[k]
+  // My own turf wins; otherwise a rival's claim; otherwise the procedural default.
+  const b = mine ? { ...def, ...mine } : remote ? { ...def, ...remote } : def
   b.gx = gx; b.gy = gy
-  b.color = b.owner ? CREW_COLORS[b.owner] : null
+  // Color: me = gold, rival player = their hashed color, ambient AI crew = crew color.
+  if (b.owner === 'you') b.color = CREW_COLORS.you
+  else if (b.owner === 'rival') b.color = b.color || rivalColor(b.owner_id)
+  else b.color = b.owner ? CREW_COLORS[b.owner] : null
   return b
 }
 
@@ -159,6 +284,9 @@ export function useYourBlocks() {
 // — stake back + a cut of the premium — so a loss is a payday, not a wipeout.
 // Returns { payout, crew, npc }.
 export function aiPoachBlock(gx, gy, crew) {
+  // In the shared world, ambient AI no longer steals real player turf (it has no
+  // account to own the cell). Server-side AI is a later phase (M3).
+  if (isSupabaseConfigured) return null
   const key = cellKey(gx, gy)
   const o = overrides[key]
   if (!o || o.owner !== 'you') return null
@@ -209,6 +337,7 @@ export function recruit(gx, gy, homeTurf) {
     loyalty: cost, basePaid: cost, lastCollectedAt: now, lastPoachAt: now,
   }
   commit()
+  pushClaim(gx, gy)
   return { ok: true, cost }
 }
 
@@ -233,6 +362,7 @@ export function poach(gx, gy, homeTurf) {
     loyalty: cost, basePaid: cost, lastCollectedAt: now, lastPoachAt: now,
   }
   commit()
+  pushClaim(gx, gy)
   return { ok: true, cost }
 }
 
@@ -273,6 +403,7 @@ function claimLanding(gx, gy) {
     lastCollectedAt: now, lastPoachAt: now,
   }
   commit()
+  pushClaim(gx, gy)
   return cellCenter(gx, gy)
 }
 
@@ -323,6 +454,11 @@ export function collectAllBlocks() {
 export function resetTurf() {
   overrides = {}
   commit()
+  if (isSupabaseConfigured) {
+    const uid = getUserId()
+    if (uid) supabase.from('blocks').delete().eq('county_fips', COUNTY_FIPS).eq('owner_id', uid)
+      .then(({ error }) => { if (error) console.warn('[blocks] reset delete failed', error) })
+  }
 }
 
 // ---- global hourly payout clock ------------------------------------
