@@ -444,7 +444,7 @@ const QUEUE_SPOTS = [
 const CUST_SPEED = 11          // walk speed, % of room width per second (constant pace)
 const moveSecs = (ax, bx) => Math.max(0.6, Math.abs(ax - bx) / CUST_SPEED)
 const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp', '/gnome-6.webp']
-const CUST_SIZE = { '/gnome-2.webp': 2 }       // per-sprite size multiplier (GNOME 2 = 2×)
+const CUST_SIZE = { '/gnome-2.webp': 1 }       // per-sprite size multiplier (GNOME 2 = 1× now)
 
 function ShopFront({ art, jarCounts = {}, tableCards = {}, onSell }) {
   // One tinted jar per banked unit, in the order strains were planted, capped at
