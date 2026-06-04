@@ -397,6 +397,9 @@ const SHELF_FRAC = [0.18, 0.5, 0.82]                       // jar centers within
 const SHELF_JAR_W = 2.9                                    // jar width, % of room box
 const SHELF_SLOTS = SHELF_ROWS.flatMap(y =>               // all slot centers, in stock order
   SHELF_BAYS.flatMap(([b0, b1]) => SHELF_FRAC.map(f => ({ x: b0 + (b1 - b0) * f, y }))))
+  // The bottom-row left-bay pair sits behind the cash register — drop them so jars
+  // flow past into the next visible spots instead of vanishing behind the counter.
+  .filter(s => !(s.y === SHELF_ROWS[2] && s.x < 45))
 
 function ShopFront({ art, jarCounts = {}, tableCards = {} }) {
   // One tinted jar per banked unit, in the order strains were planted, capped at
@@ -773,6 +776,12 @@ const VINE_H = 4.6          // vine thickness (% of room height)
 const SLOTH_W = 14.5        // sloth width (% of room width)
 const SLOTH_TOP = 4.5       // sloth top — its hands grip the vine here
 const SLOTH_CENTERS = [27.0, 51.5, 78.0]   // one sloth per table (over the plants)
+// The sloth is drawn in two layers (sloth-body + sloth-arm) so the dangling clawed
+// arm can swing on its own, slicing across the plants below. The arm pivots at its
+// shoulder; it starts swinging once the matching table (by index) has its first
+// plant, and each sloth runs the same motion at its own phase (independent delay).
+const SLOTH_PIVOT = '19.7% 53%'                  // arm shoulder (% of the sloth canvas)
+const SLOTH_ARM_DELAYS = ['0s', '-0.55s', '-1.05s']
 
 function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBudLand, tableCards = {}, onAdd, skatePhase = 'idle', skateStart = 0 }) {
   return (
@@ -787,13 +796,26 @@ function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBud
           backgroundImage: 'url(/vine.webp)', backgroundRepeat: 'repeat-x', backgroundSize: 'auto 100%',
           zIndex: 2, pointerEvents: 'none',
         }} />
-        {/* A sloth worker hanging over each table, claws grazing the plant tops. */}
-        {SLOTH_CENTERS.map((cx, i) => (
-          <img key={`sloth${i}`} src="/sloth-worker.webp" alt="" aria-hidden
-            style={{ position: 'absolute', left: `${cx}%`, top: `${SLOTH_TOP}%`, width: `${SLOTH_W}%`,
+        {/* A sloth worker hanging over each table, claws grazing the plant tops.
+            Body + arm are separate layers so the arm can swing (slice) once that
+            table (same index) is planted; each runs the same motion at its own phase. */}
+        {SLOTH_CENTERS.map((cx, i) => {
+          const swinging = tableStarted(i + 1, planted)
+          return (
+            <div key={`sloth${i}`} style={{
+              position: 'absolute', left: `${cx}%`, top: `${SLOTH_TOP}%`, width: `${SLOTH_W}%`,
               transform: 'translateX(-50%)', zIndex: 3, pointerEvents: 'none',
-              filter: 'drop-shadow(0 6px 8px rgba(0,0,0,0.35))' }} />
-        ))}
+              filter: 'drop-shadow(0 6px 8px rgba(0,0,0,0.35))',
+            }}>
+              <img src="/sloth-body.webp" alt="" aria-hidden style={{ display: 'block', width: '100%' }} />
+              <img src="/sloth-arm.webp" alt="" aria-hidden style={{
+                position: 'absolute', left: 0, top: 0, width: '100%',
+                transformOrigin: SLOTH_PIVOT,
+                animation: swinging ? `slothSlice 1.5s ease-in-out ${SLOTH_ARM_DELAYS[i]} infinite` : 'none',
+              }} />
+            </div>
+          )
+        })}
         {/* The skater monkey passes through the grow room during phase B. */}
         {skatePhase === 'B' && <Skater phase="B" start={skateStart} />}
         <BeltBud planted={planted} budCounts={budCounts} resyncKey={budResync} onBudLand={onBudLand} />
@@ -1046,6 +1068,8 @@ function Keyframes() {
       @keyframes rollRightToLeft { from { transform: translateX(85%);  } to { transform: translateX(-85%); } }
       @keyframes rollEnterLeft   { from { transform: translateX(-85%); } to { transform: translateX(0);    } }
       @keyframes wheelSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      /* Sloth arm slicing across the plants — pivots at the shoulder. */
+      @keyframes slothSlice { 0%,100% { transform: rotate(-9deg); } 50% { transform: rotate(16deg); } }
       /* A finished jar appears at the machine end of the belt, slides down to the
          belt's far end, then drops into the left box (left/top in % of room box). */
       @keyframes jarRun {
