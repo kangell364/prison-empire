@@ -772,7 +772,7 @@ const VINE_Y = 7.0          // vine vertical center
 const VINE_H = 4.6          // vine thickness (% of room height)
 const SLOTH_W = 14.5        // sloth width (% of room width)
 const SLOTH_TOP = 4.5       // sloth top — its hands grip the vine here
-const SLOTH_CENTERS = [21.5, 46.0, 72.5]   // one sloth per table (over the plants)
+const SLOTH_CENTERS = [27.0, 51.5, 78.0]   // one sloth per table (over the plants)
 
 function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBudLand, tableCards = {}, onAdd, skatePhase = 'idle', skateStart = 0 }) {
   return (
