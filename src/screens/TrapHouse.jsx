@@ -106,6 +106,10 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   const [jarCounts, setJarCounts] = useState(() => saved.jarCounts || {})
   // Which table the "+ Add" slot was tapped for — opens the card picker.
   const [picking, setPicking] = useState(null)
+  // Player-set SELL PRICE per strain ($/jar). Unset ⇒ defaults to the strain's street
+  // price (its card value × JAR_FILL). The MENU board edits these; customers compare
+  // the price to the street price (and their own tolerance) to decide whether to buy.
+  const [prices, setPrices] = useState(() => saved.prices || {})
 
   // Skater-monkey journey — purely COSMETIC (production runs on its own wall-clock
   // via advanceProduction(), not on his trips). He sits idle at his spot in the
@@ -144,18 +148,35 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   // current stock. (jarCounts/cardLevels mutate seldom, so a per-render ref is fine.)
   const jarCountsRef = useRef(jarCounts); jarCountsRef.current = jarCounts
   const cardLevelsRef = useRef(cardLevels); cardLevelsRef.current = cardLevels
-  const sellJar = useCallback(() => {
+  const pricesRef = useRef(prices); pricesRef.current = prices
+  // Edit a strain's sell price (the MENU board calls this). Clamped to a $1 floor.
+  const setStrainPrice = useCallback((id, price) => {
+    setPrices(p => ({ ...p, [id]: Math.max(1, Math.round(price)) }))
+  }, [])
+  // A customer (with a personal price `tolerance`, 1.0 = pays street price) tries to
+  // buy a jar of the best-stocked strain at its set price. Returns { value, reaction,
+  // color }; reaction ∈ cheap | happy | grumble | refuse | nostock. Only 'refuse' and
+  // 'nostock' are no-sales. price defaults to the strain's street price when unset.
+  const sellJar = useCallback((tolerance = 1.2) => {
     const jc = jarCountsRef.current
-    let best = null, bestN = 0
-    for (const id in jc) { const k = Math.floor(jc[id] || 0); if (k > bestN) { bestN = k; best = id } }
-    if (!best || bestN < 1) return 0
+    // Pick a random in-stock strain, weighted by how many jars it has, so every
+    // planted strain sells and every price the player set is live.
+    const inStock = Object.keys(jc).filter(id => Math.floor(jc[id] || 0) >= 1)
+    if (!inStock.length) return { value: 0, reaction: 'nostock', color: null }
+    let roll = Math.random() * inStock.reduce((s, id) => s + Math.floor(jc[id] || 0), 0)
+    let best = inStock[0]
+    for (const id of inStock) { roll -= Math.floor(jc[id] || 0); if (roll <= 0) { best = id; break } }
     const strain = PLANTS.find(p => p.id === best)
-    if (!strain) return 0
-    const value = plantCashValue(strain, cardLevelsRef.current[best] || 1) * JAR_FILL
+    if (!strain) return { value: 0, reaction: 'nostock', color: null }
+    const street = plantCashValue(strain, cardLevelsRef.current[best] || 1) * JAR_FILL
+    const price = pricesRef.current[best] != null ? pricesRef.current[best] : street
+    if (price > street * tolerance) return { value: 0, reaction: 'refuse', color: strain.jarColor }  // too pricey for them
     jarCountsRef.current = { ...jc, [best]: (jc[best] || 0) - 1 }   // sync so a quick next sale sees it
     setJarCounts(j => ({ ...j, [best]: Math.max(0, (j[best] || 0) - 1) }))
-    setBank(b => b + value)
-    return value
+    setBank(b => b + price)
+    const ratio = price / street
+    const reaction = ratio <= 0.95 ? 'cheap' : ratio <= 1.05 ? 'happy' : 'grumble'
+    return { value: price, reaction, color: strain.jarColor }
   }, [])
 
   // GENERATION: advance the wall-clock accumulator to `now`. Runs on mount (offline
@@ -255,11 +276,11 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   useEffect(() => {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
-        planted, bank, budCounts, tableCards, cardLevels, packCounts, jarCounts,
+        planted, bank, budCounts, tableCards, cardLevels, packCounts, jarCounts, prices,
         lastTick: lastTickRef.current,
       }))
     } catch {}
-  }, [planted, bank, budCounts, tableCards, cardLevels, packCounts, jarCounts])
+  }, [planted, bank, budCounts, tableCards, cardLevels, packCounts, jarCounts, prices])
 
   // Place a plant slot, charging the bank (no-op if you can't afford it).
   const placeSlot = (slot, cost) => {
@@ -327,7 +348,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
           z-index keeps him above the room art/counters but still under the UI
           chrome (top bar, arrows) that floats over everything. */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-        {cur.key === 'shop' && <ShopFront art={cur.art} jarCounts={jarCounts} tableCards={tableCards} onSell={sellJar} />}
+        {cur.key === 'shop' && <ShopFront art={cur.art} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} prices={prices} onSetPrice={setStrainPrice} onSell={sellJar} />}
         {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} packCounts={packCounts} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} />}
         {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} budResync={budResync} onBudLand={advanceNow} tableCards={tableCards} onAdd={setPicking} skatePhase={skate.phase} skateStart={skate.start} />}
       </div>
@@ -466,6 +487,12 @@ const CUST_SIZE = {                            // per-sprite size multipliers
   '/gnome-8.webp': 1.2,
   '/gnome-9.webp': 2,
 }
+// A customer's personal price tolerance (1.0 = pays the street price exactly). ~95%
+// happily pay street or more; ~5% are picky and balk even at street price.
+function rollTolerance() {
+  if (Math.random() < 0.05) return 0.85 + Math.random() * 0.15   // picky 5%: [0.85, 1.0)
+  return 1.0 + Math.random() * 0.6                                // the rest: [1.0, 1.6]
+}
 
 // THE BUM (GNOME 10) — a recurring gag, separate from the paying line. He shuffles up
 // to the counter, begs the cashier for free buds (holding everyone up), gets told to
@@ -484,7 +511,8 @@ const BEG_DIALOG = [
   { who: 'bum',    text: "Y'all trash anyway! 😤", ms: 2000 },
 ]
 
-function ShopFront({ art, jarCounts = {}, tableCards = {}, onSell }) {
+function ShopFront({ art, jarCounts = {}, tableCards = {}, cardLevels = {}, prices = {}, onSetPrice, onSell }) {
+  const [menuOpen, setMenuOpen] = useState(false)
   // One tinted jar per banked unit, in the order strains were planted, capped at
   // the shelf's slot count so the stock never overflows the cabinet.
   const placedIds = [...new Set(Object.values(tableCards))].filter(id => PLANTS.find(p => p.id === id))
@@ -503,17 +531,17 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, onSell }) {
   // then the slot refills from the back-room (jarCounts beyond the shelf's capacity).
   const [flying, setFlying] = useState([])
   const flyKey = useRef(0)
-  const handleSell = useCallback(() => {
-    const value = onSell ? onSell() : 0
-    if (value > 0) {
+  const handleSell = useCallback((tolerance) => {
+    const res = onSell ? onSell(tolerance) : { value: 0, reaction: 'nostock' }
+    if (res.value > 0) {
       const s = stockRef.current
       const slot = SHELF_SLOTS[Math.max(0, s.length - 1)] || SHELF_SLOTS[0]
       const key = ++flyKey.current
-      setFlying(f => [...f, { key, color: s[s.length - 1] || '#8e44ad', x: slot.x, y: slot.y, to: false }])
+      setFlying(f => [...f, { key, color: res.color || s[s.length - 1] || '#8e44ad', x: slot.x, y: slot.y, to: false }])
       setTimeout(() => setFlying(f => f.map(j => j.key === key ? { ...j, to: true } : j)), 30)
       setTimeout(() => setFlying(f => f.filter(j => j.key !== key)), 850)
     }
-    return value
+    return res
   }, [onSell])
 
   return (
@@ -564,9 +592,77 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, onSell }) {
 
         {/* Customer queue — shoppers walk in the door, line up, and buy jars. */}
         <ShopCustomers onSell={handleSell} jarCount={placedIds.reduce((s, id) => s + Math.floor(jarCounts[id] || 0), 0)} />
+
+        {/* The MENU board on the wall is the price editor — tap to set sell prices. */}
+        <button onClick={() => setMenuOpen(true)} aria-label="Edit menu prices"
+          style={{ position: 'absolute', left: '27%', top: '26%', width: '8.5%', height: '19%',
+            zIndex: 6, background: 'transparent', border: 'none', cursor: 'pointer',
+            animation: placedIds.length ? 'menuGlow 2.2s ease-in-out infinite' : 'none' }} />
+      </div>
+
+      {menuOpen && (
+        <MenuEditor placedIds={placedIds} cardLevels={cardLevels} prices={prices}
+          onSetPrice={onSetPrice} onClose={() => setMenuOpen(false)} />
+      )}
+    </div>
+  )
+}
+
+// The price editor behind the MENU board: one row per strain you sell, with its street
+// price (what ~95% will pay) and −/＋ to set your price. Pricing above street loses
+// customers; below it leaves money on the table.
+function MenuEditor({ placedIds, cardLevels, prices, onSetPrice, onClose }) {
+  const rows = placedIds.map(id => PLANTS.find(p => p.id === id)).filter(Boolean)
+  return (
+    <div onClick={onClose} style={{
+      position: 'absolute', inset: 0, zIndex: 30, background: 'rgba(6,5,3,0.9)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 'calc(18px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom))',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 420, background: '#13110d', border: `1px solid ${GOLD}55`,
+        borderRadius: 16, padding: 16,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <div style={{ color: '#fff', fontSize: 17, fontWeight: 800, letterSpacing: 1 }}>MENU — Set Prices</div>
+          <button onClick={onClose} aria-label="Close" style={{
+            width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.08)',
+            border: '0.5px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 16, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}><i className="ti ti-x" /></button>
+        </div>
+        <div style={{ color: DIM, fontSize: 11, marginBottom: 12 }}>$ per jar. Most customers pay the street price; charge more and some walk.</div>
+        {rows.length === 0 ? (
+          <div style={{ background: '#1a1712', border: '0.5px solid #2a2722', borderRadius: 12, padding: 20, textAlign: 'center', color: '#7a766a', fontSize: 12 }}>
+            Plant a strain in the grow room first.
+          </div>
+        ) : rows.map(strain => {
+          const street = plantCashValue(strain, cardLevels[strain.id] || 1) * JAR_FILL
+          const price = prices[strain.id] != null ? prices[strain.id] : street
+          const step = Math.max(1, Math.round(street * 0.05))
+          const pct = Math.round((price / street) * 100)
+          const tone = price > street ? '#e0a93f' : price < street ? '#4a9eff' : GREEN
+          return (
+            <div key={strain.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#1a1712',
+              border: `1px solid ${(strain.jarColor || GOLD)}55`, borderRadius: 12, padding: '9px 11px', marginBottom: 8 }}>
+              <div style={{ width: 14, height: 14, borderRadius: 4, background: strain.jarColor || GOLD, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>{strain.shortName || strain.name}</div>
+                <div style={{ color: DIM, fontSize: 10 }}>street ${street.toLocaleString()} · <span style={{ color: tone }}>{pct}%</span></div>
+              </div>
+              <button onClick={() => onSetPrice(strain.id, price - step)} style={priceBtn}>−</button>
+              <div style={{ color: tone, fontWeight: 900, fontSize: 16, minWidth: 64, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>${price.toLocaleString()}</div>
+              <button onClick={() => onSetPrice(strain.id, price + step)} style={priceBtn}>＋</button>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
+}
+const priceBtn = {
+  width: 32, height: 32, borderRadius: 8, background: '#2a2620', color: '#fff',
+  border: '0.5px solid #4a443a', fontSize: 18, fontWeight: 800, cursor: 'pointer', flexShrink: 0,
 }
 
 // The keyframes that move a customer between the door / line / front / exit spots.
@@ -613,7 +709,7 @@ function CustomerSprite({ c }) {
       filter: 'drop-shadow(0 6px 9px rgba(0,0,0,0.4))',
       animation: `${c.anim} ${c.dur}s ${ease} forwards`,
     }}>
-      {(c.phase === 'buy' || c.phase === 'angry') && <CustomerBubble angry={c.phase === 'angry'} value={c.value} size={size} />}
+      {(c.phase === 'buy' || c.phase === 'angry') && <CustomerBubble reaction={c.reaction} value={c.value} size={size} />}
       <div style={{ width: '100%', transform: `scale(${size})`, transformOrigin: '50% 100%' }}>
         <img src={c.sprite} alt="" aria-hidden style={{
           display: 'block', width: '100%', transformOrigin: '50% 100%',
@@ -624,9 +720,17 @@ function CustomerSprite({ c }) {
   )
 }
 
-// Speech bubble over a customer's head — green "+$X" on a sale, red anger on an
-// empty shelf. Sized in px so it stays readable regardless of the sprite scale.
-function CustomerBubble({ angry, value, size = 1 }) {
+// Speech bubble over a customer's head — the 4-tier price reaction (+ stock-out).
+// Sized in px so it stays readable regardless of the sprite scale.
+const REACTIONS = {
+  cheap:   { color: '#2e9bff', text: (v) => `🤑 +$${v.toLocaleString()}` },   // underpriced steal
+  happy:   { color: '#1f7a33', text: (v) => `🛒 +$${v.toLocaleString()}` },   // ideal
+  grumble: { color: '#d9881f', text: (v) => `😒 +$${v.toLocaleString()}` },   // overpriced but pays
+  refuse:  { color: '#c0392b', text: () => `😤 Too high!` },                   // walks
+  nostock: { color: '#c0392b', text: () => `😠 No jars?!` },                   // empty shelf
+}
+function CustomerBubble({ reaction = 'happy', value = 0, size = 1 }) {
+  const r = REACTIONS[reaction] || REACTIONS.happy
   return (
     <div style={{
       position: 'absolute', left: '50%', top: `${-4 - (size - 1) * 100}%`, transformOrigin: '50% 100%',
@@ -634,9 +738,7 @@ function CustomerBubble({ angry, value, size = 1 }) {
       whiteSpace: 'nowrap', zIndex: 21, boxShadow: '0 3px 7px rgba(0,0,0,0.45)',
       animation: 'custBubblePop 0.25s ease-out forwards',
     }}>
-      <span style={{ fontSize: 13, fontWeight: 800, color: angry ? '#c0392b' : '#1f7a33' }}>
-        {angry ? '😠 No jars?!' : `🛒 +$${value.toLocaleString()}`}
-      </span>
+      <span style={{ fontSize: 13, fontWeight: 800, color: r.color }}>{r.text(value)}</span>
       <div style={{
         position: 'absolute', left: '50%', bottom: -7, transform: 'translateX(-50%)', width: 0, height: 0,
         borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '8px solid #1a1206',
@@ -748,7 +850,7 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
       if (k < 0 || !rowsAheadReady(k) || !sprite) { maybeSpawn(); return }   // nothing to do / no unique sprite
       const key = ++n
       modelRef.current.push({
-        key, sprite, pos: k, phase: 'enter', value: 0,
+        key, sprite, pos: k, phase: 'enter', value: 0, reaction: 'happy', tolerance: rollTolerance(),
         anim: `custIn${k}`, dur: moveSecs(CUST_DOOR.x, QUEUE_SPOTS[k].x),
       })
       commit()
@@ -772,9 +874,11 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
     }
     const resolveBuy = (key) => {
       const c = byKey(key); if (!c || c.phase !== 'pause') return
-      const value = onSellRef.current ? onSellRef.current() : 0
-      c.phase = value > 0 ? 'buy' : 'angry'; c.value = value; commit()
-      after(1700, () => startLeave(key))
+      const res = onSellRef.current ? onSellRef.current(c.tolerance) : { value: 0, reaction: 'nostock' }
+      c.value = res.value; c.reaction = res.reaction
+      c.phase = res.value > 0 ? 'buy' : 'angry'   // 'angry' = refuse or empty shelf (no sale)
+      commit()
+      after(res.value > 0 ? 1500 : 1600, () => startLeave(key))
     }
     const startLeave = (key) => {
       const c = byKey(key); if (!c) return
@@ -1204,11 +1308,15 @@ function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBud
         {/* The skater monkey passes through the grow room during phase B. */}
         {skatePhase === 'B' && <Skater phase="B" start={skateStart} />}
         <BeltBud planted={planted} budCounts={budCounts} resyncKey={budResync} onBudLand={onBudLand} />
-        {PLANT_SLOTS.filter(s => planted.includes(s.id)).map((s) => (
-          <img key={s.id} src="/plant.webp" alt="" aria-hidden data-slot={s.id}
-            style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: `${plantW(s.y)}%`,
-              transform: 'translate(-50%, -100%)', pointerEvents: 'none' }} />
-        ))}
+        {PLANT_SLOTS.filter(s => planted.includes(s.id)).map((s) => {
+          // Each table grows the art of whatever strain is planted on it.
+          const strain = PLANTS.find(p => p.id === tableCards[s.table])
+          return (
+            <img key={s.id} src={strain?.grow || '/plant.webp'} alt="" aria-hidden data-slot={s.id}
+              style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: `${plantW(s.y)}%`,
+                transform: 'translate(-50%, -100%)', pointerEvents: 'none' }} />
+          )
+        })}
         {/* Bins heaped full of buds. */}
         {BINS_FULL && Object.values(BINS).flatMap(([x0, x1, yTop], b) => {
           const bw = x1 - x0
@@ -1455,6 +1563,8 @@ function Keyframes() {
       @keyframes wheelSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       /* Sloth arm slicing across the plants — pivots at the shoulder. */
       @keyframes slothSlice { 0%,100% { transform: rotate(-9deg); } 50% { transform: rotate(16deg); } }
+      /* Subtle glow hinting the MENU board is tappable to set prices. */
+      @keyframes menuGlow { 0%,100% { box-shadow: 0 0 0 0 rgba(201,168,76,0); } 50% { box-shadow: 0 0 12px 2px rgba(201,168,76,0.5); } }
       /* A finished jar appears at the machine end of the belt, slides down to the
          belt's far end, then drops into the left box (left/top in % of room box). */
       @keyframes jarRun {

@@ -713,6 +713,41 @@ export const PLANTS = [
     baseCashValue: 25,                // $ at Lvl 1; doubles every card level
     starter: true,                    // granted to every player (seed + backfill)
     jarColor: '#8e44ad',              // colour of this strain's packed jar (Trap House packing room)
+    grow: '/plant.webp',              // the potted-plant art shown growing on the bench
+  },
+  {
+    id: 'plant_golden_mist',
+    name: 'GOLDEN MIST',
+    shortName: 'Golden Mist',
+    emoji: '🌬️',
+    avatar: '/plant-golden-mist.webp',
+    rarity: 'common',
+    description: 'A hazy golden sativa — bright, light, and easy money on the block.',
+    category: 'Strain',
+    minLevel: 1,
+    maxLevel: 100,
+    perLevelYield: 8,                 // same stats as PURPLE HAZE
+    baseCashValue: 25,
+    starter: true,
+    jarColor: '#d9a528',              // amber/gold jar
+    grow: '/plant-golden-mist.webp',
+  },
+  {
+    id: 'plant_red_dawn',
+    name: 'RED DAWN',
+    shortName: 'Red Dawn',
+    emoji: '🌅',
+    avatar: '/plant-red-dawn.webp',
+    rarity: 'common',
+    description: 'Crimson-haired indica that hits at sunrise — heavy, mellow, moves itself.',
+    category: 'Strain',
+    minLevel: 1,
+    maxLevel: 100,
+    perLevelYield: 8,                 // same stats as PURPLE HAZE
+    baseCashValue: 25,
+    starter: true,
+    jarColor: '#c0392b',              // red jar
+    grow: '/plant-red-dawn.webp',
   },
 ]
 
