@@ -29,6 +29,7 @@ const CAMERA_FOV_DEG = 60    // assumed horizontal field of view for screen<->be
 const PLACE_DIST_M   = 6     // how far ahead a freshly-pinned NPC is anchored
 const SHOW_RANGE_M   = 80    // only render pinned NPCs within this radius
 const NKEY = 'pe_ar_npcs_v1' // localStorage key for pinned NPCs
+const HEADING_DEADBAND_DEG = 2.5  // ignore compass wobble smaller than this (anti-drift)
 
 // ---- geo math ------------------------------------------------------
 const R = 6371000
@@ -82,6 +83,7 @@ export function CameraEncounter({ onBack }) {
   const pinchRef  = useRef(null)      // {d, scale} during a two-finger pinch
   const layerRef  = useRef(null)
   const headRef   = useRef(null)      // smoothed heading (kept in a ref between events)
+  const commitRef = useRef(null)      // last heading actually pushed to state (deadband anchor)
   const lastSetRef = useRef(0)        // throttle stamp for heading state updates
 
   const [phase, setPhase]     = useState('intro')   // intro | live
@@ -100,11 +102,18 @@ export function CameraEncounter({ onBack }) {
     if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading
     else if (typeof e.alpha === 'number') h = 360 - e.alpha
     if (h == null || Number.isNaN(h)) return
-    // Low-pass the raw reading, then push to state at ~30fps so the NPC glides
-    // instead of twitching on every noisy sensor tick.
-    headRef.current = emaAngle(headRef.current, (h + 360) % 360, 0.12)
+    // Low-pass the raw reading (kills high-frequency noise)...
+    headRef.current = emaAngle(headRef.current, (h + 360) % 360, 0.1)
     const now = (typeof performance !== 'undefined' ? performance.now() : 0)
-    if (now - lastSetRef.current > 33) { lastSetRef.current = now; setHeading(headRef.current) }
+    if (now - lastSetRef.current <= 33) return
+    lastSetRef.current = now
+    // ...then a DEADBAND: only actually move the NPC once the smoothed heading
+    // has shifted more than HEADING_DEADBAND_DEG from where we last placed it.
+    // Under that, it stays frozen — no drift while you hold the phone still.
+    if (commitRef.current == null || Math.abs(wrap180(headRef.current - commitRef.current)) > HEADING_DEADBAND_DEG) {
+      commitRef.current = headRef.current
+      setHeading(headRef.current)
+    }
   }, [])
 
   // --- start (inside the tap for iOS perms) ---
@@ -258,7 +267,7 @@ export function CameraEncounter({ onBack }) {
           <img key={n.id} src={NPC_IMG} alt="carrier" draggable={false}
             onClick={() => setVisited({ ...n, d })}
             style={{ position: 'absolute', left: `${xPct}%`, top: `${n.yPct}%`, transform: 'translate(-50%,-50%)',
-              height: `${h}vh`, cursor: 'pointer', transition: 'left .18s ease-out',
+              height: `${h}vh`, cursor: 'pointer', transition: 'left .14s ease-out',
               filter: `drop-shadow(0 4px 10px rgba(0,0,0,.6))`, willChange: 'left' }} />
         ) : (
           <div key={n.id} style={{ position: 'absolute', top: '46%', [offSide]: 16, color: GOLD, fontSize: 46,
