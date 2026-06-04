@@ -21,7 +21,7 @@ const SKATER_Z = 50   // the monkey — always above PROP_Z, in every room
 
 // The room screen's operating state (plants, bank, bud + packed counts) is kept
 // in this one localStorage blob so the whole line resumes across reloads.
-const SAVE_KEY = 'pe_traphouse_room_v2'
+const SAVE_KEY = 'pe_traphouse_room_v3'
 function loadSaved() {
   try { const raw = localStorage.getItem(SAVE_KEY); if (raw) return JSON.parse(raw) || {} } catch {}
   return {}
@@ -516,13 +516,39 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, cardLevels = {}, pric
   // One tinted jar per banked unit, in the order strains were planted, capped at
   // the shelf's slot count so the stock never overflows the cabinet.
   const placedIds = [...new Set(Object.values(tableCards))].filter(id => PLANTS.find(p => p.id === id))
-  const stock = []
-  for (const id of placedIds) {
-    const color = PLANTS.find(p => p.id === id)?.jarColor || '#8e44ad'
-    const n = Math.floor(jarCounts[id] || 0)
-    for (let i = 0; i < n && stock.length < SHELF_SLOTS.length; i++) stock.push(color)
-    if (stock.length >= SHELF_SLOTS.length) break
-  }
+  // The shelf FRONT-FACES your inventory: its slots are split between the strains in
+  // proportion to each one's share of stock (× demand weight — uniform for now), then
+  // interleaved so the colors are mixed across the shelf rather than blocked together.
+  // Anything past the shelf's capacity sits in back storage. So if you mostly hold
+  // Purple Haze with a little Golden Mist, the shelf is mostly purple with some gold.
+  const stock = (() => {
+    const cap = SHELF_SLOTS.length
+    const inv = placedIds
+      .map(id => ({ id, color: PLANTS.find(p => p.id === id)?.jarColor || '#8e44ad',
+        weight: Math.floor(jarCounts[id] || 0) /* × demand[id] later */ }))
+      .filter(x => x.weight > 0)
+    const total = inv.reduce((s, x) => s + x.weight, 0)
+    if (!total) return []
+    const shown = Math.min(total, cap)
+    // Proportional slot allocation, largest-remainder rounded to exactly `shown`.
+    inv.forEach(x => { const exact = shown * x.weight / total; x.n = Math.floor(exact); x.frac = exact - x.n })
+    let rem = shown - inv.reduce((s, x) => s + x.n, 0)
+    inv.slice().sort((a, b) => b.frac - a.frac).forEach(x => { if (rem > 0) { x.n++; rem-- } })
+    // Highest-averages interleave so each strain's jars spread evenly across the slots.
+    const out = []
+    const placed = {}; inv.forEach(x => { placed[x.id] = 0 })
+    for (let i = 0; i < shown; i++) {
+      let best = null, bestP = -1
+      for (const x of inv) {
+        if (placed[x.id] >= x.n) continue
+        const p = x.n / (placed[x.id] + 1)
+        if (p > bestP) { bestP = p; best = x }
+      }
+      if (!best) break
+      out.push(best.color); placed[best.id]++
+    }
+    return out
+  })()
   // Live mirrors of the shelf so a sale (which fires from a child timer) can read the
   // current top jar without going stale.
   const stockRef = useRef(stock); stockRef.current = stock
