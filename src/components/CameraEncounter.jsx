@@ -67,8 +67,10 @@ export function CameraEncounter({ onBack }) {
   const streamRef = useRef(null)
   const watchRef  = useRef(null)
   const spawnRef  = useRef(null)      // carrier lat/lng, set once on first GPS fix
+  const meRef     = useRef(null)      // latest GPS position (for the debug spawn)
 
   const [phase, setPhase]     = useState('intro')   // intro | live | caught
+  const [pinned, setPinned]   = useState(false)     // debug: carrier pinned dead-ahead, instant catch
   const [error, setError]     = useState('')
   const [heading, setHeading] = useState(null)      // compass deg, null until we get one
   const [dist, setDist]       = useState(null)      // meters to carrier
@@ -111,6 +113,7 @@ export function CameraEncounter({ onBack }) {
     watchRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        meRef.current = p
         setAcc(pos.coords.accuracy)
         if (!spawnRef.current) {
           // First fix → drop the carrier ~20m away on a random bearing.
@@ -135,6 +138,19 @@ export function CameraEncounter({ onBack }) {
 
   useEffect(() => stopAll, [stopAll])   // stop on unmount
 
+  // DEBUG: drop the carrier 3m dead-ahead, instantly catchable — for demoing
+  // indoors where GPS won't lock. With a GPS fix it anchors 3m in your facing
+  // direction; with no fix at all it just pins to screen-center.
+  const spawnAhead = useCallback(() => {
+    const p = meRef.current
+    if (p) {
+      const sp = destPoint(p, 3, heading ?? 0)
+      spawnRef.current = sp
+      setDist(distMeters(p, sp)); setBrg(bearingDeg(p, sp))
+    }
+    setPinned(true)
+  }, [heading])
+
   // --- where the carrier sits on screen ---
   // Relative bearing (carrier bearing − where I'm facing). Inside the FOV it maps
   // to a horizontal screen %; outside it, the carrier is off-screen and we point
@@ -142,9 +158,9 @@ export function CameraEncounter({ onBack }) {
   // Catch range widens to swallow GPS jitter — when accuracy is ±15m a fixed 6m
   // ring would never trigger, so we honor whichever is more forgiving.
   const catchR = Math.max(CATCH_RADIUS_M, (accuracy || 0) * 0.75)
-  const inRange = dist != null && dist <= catchR
+  const inRange = pinned || (dist != null && dist <= catchR)
   let onScreen = true, xPct = 50, offSide = null
-  if (heading != null && brgToNpc != null) {
+  if (!pinned && heading != null && brgToNpc != null) {
     const delta = wrap180(brgToNpc - heading)
     if (Math.abs(delta) <= CAMERA_FOV_DEG / 2) {
       xPct = 50 + (delta / (CAMERA_FOV_DEG / 2)) * 50
@@ -196,7 +212,7 @@ export function CameraEncounter({ onBack }) {
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
 
       {/* The carrier, anchored to its real-world bearing */}
-      {onScreen && spawnRef.current && (
+      {onScreen && (spawnRef.current || pinned) && (
         <img
           src={NPC_IMG} alt="carrier"
           onClick={() => { if (inRange) { stopAll(); setPhase('caught') } }}
@@ -226,6 +242,11 @@ export function CameraEncounter({ onBack }) {
         <div style={{ textAlign: 'right', color: '#fff', fontSize: 12.5, lineHeight: 1.5, textShadow: '0 1px 4px #000' }}>
           <div>{heading == null ? 'compass: —' : `facing ${Math.round(heading)}°`}</div>
           <div>{accuracy == null ? 'gps: locating…' : `gps ±${Math.round(accuracy)}m`}</div>
+          {/* DEBUG: foolproof spawn for demos / bad indoor GPS. */}
+          <button onClick={spawnAhead} style={{ marginTop: 6, background: '#000a', border: '1px solid #ffffff44',
+            color: '#fff', borderRadius: 8, padding: '5px 9px', fontSize: 11, fontWeight: 700 }}>
+            ⚡ Spawn ahead (debug)
+          </button>
         </div>
       </div>
 
