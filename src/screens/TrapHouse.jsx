@@ -403,6 +403,15 @@ const SHELF_JAR_W = 2.52                                   // jar width, % of ro
 const SHELF_SLOTS = SHELF_ROWS.flatMap(y =>               // all slot centers, in stock order
   SHELF_BAYS.flatMap(([b0, b1]) => SHELF_FRAC.map(f => ({ x: b0 + (b1 - b0) * f, y }))))
 
+// A gnome customer walks in the front door (left) and stops in front of the
+// counter. He's anchored by his FEET (bottom-center) at these % points of the room
+// box, growing a touch as he comes forward; the walk waddles (bob + tilt) and stops
+// when he arrives. GNOME_W is his width % at the counter.
+const GNOME_W = 8
+const GNOME_DOOR = { x: 16.5, y: 70, w: GNOME_W * 0.78 }    // start, at the doorway (smaller/farther)
+const GNOME_COUNTER = { x: 41, y: 82, w: GNOME_W }          // end, in front of the counter
+const GNOME_WALK_SECS = 3.5
+
 function ShopFront({ art, jarCounts = {}, tableCards = {} }) {
   // One tinted jar per banked unit, in the order strains were planted, capped at
   // the shelf's slot count so the stock never overflows the cabinet.
@@ -446,6 +455,32 @@ function ShopFront({ art, jarCounts = {}, tableCards = {} }) {
               transformOrigin: '50% 30%', animation: 'thugNod 2.6s ease-in-out infinite',
             }} />
           </div>
+        </div>
+
+        {/* A gnome customer walks in the front door and stops at the counter. The
+            outer layer carries him along the floor (left/top) and grows him as he
+            comes forward; the inner img waddles (bob + tilt) for the walk's length
+            then settles. He's in front of the counter, so he sits above everything. */}
+        <style>{`
+          @keyframes gnomeWalk {
+            0%   { left:${GNOME_DOOR.x}%;    top:${GNOME_DOOR.y}%;    width:${GNOME_DOOR.w}%; }
+            100% { left:${GNOME_COUNTER.x}%; top:${GNOME_COUNTER.y}%; width:${GNOME_COUNTER.w}%; }
+          }
+          @keyframes gnomeWaddle {
+            0%,50%,100% { transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(-4%) rotate(2.5deg); }
+            75% { transform: translateY(-4%) rotate(-2.5deg); }
+          }
+        `}</style>
+        <div style={{
+          position: 'absolute', transform: 'translate(-50%, -100%)', zIndex: 20, pointerEvents: 'none',
+          filter: 'drop-shadow(0 6px 9px rgba(0,0,0,0.4))',
+          animation: `gnomeWalk ${GNOME_WALK_SECS}s ease-out forwards`,
+        }}>
+          <img src="/gnome.webp" alt="" aria-hidden style={{
+            display: 'block', width: '100%', transformOrigin: '50% 100%',
+            animation: `gnomeWaddle 0.5s ease-in-out ${Math.round(GNOME_WALK_SECS / 0.5)}`,
+          }} />
         </div>
       </div>
     </div>
