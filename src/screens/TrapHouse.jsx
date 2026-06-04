@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { sfx } from '../sounds'
 import { PLANTS, plantCashValue, RARITY_COLORS } from '../data/gameData'
 import { getOwnedPlantTuples } from '../state/plantCardsStore'
@@ -81,20 +81,16 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   const [bank, setBank] = useState(() => typeof saved.bank === 'number' ? saved.bank : 200000)      // this store's bank balance ($) — full bank for testing
   // Running tally of buds delivered into each table's bin. One bud "drops" each
   // time its path animation completes a loop; the counter on the box reflects it.
+  // The ONE source of truth for the grow-box tally — a wall-clock accumulator that
+  // keeps filling whether or not you're watching (other room, app closed, logged
+  // out). The counter shows floor(budCounts); the monkey hauls budCounts. The belt
+  // buds are phase-locked to this clock (see BeltBud) so a bud visibly lands in the
+  // box at the exact moment the count ticks up — but the count never depends on the
+  // animation running, so it's correct everywhere.
   const [budCounts, setBudCounts] = useState(() => saved.budCounts || { 1: 0, 2: 0, 3: 0 })
-  // What the grow-box counter SHOWS — an integer that steps up the instant a bud's
-  // belt animation drops it into the box (onBudLand), so the number ticks in time
-  // with the visible drop instead of on the steady wall-clock. budCounts above is
-  // still the source of truth (offline accrual + what the monkey actually hauls);
-  // this only governs the on-screen tally. Seeded from the saved float so an
-  // offline-accrued pile shows immediately, then re-synced on big catch-ups below.
-  const [shownBuds, setShownBuds] = useState(() => {
-    const bc = saved.budCounts || {}
-    return { 1: Math.floor(bc[1] || 0), 2: Math.floor(bc[2] || 0), 3: Math.floor(bc[3] || 0) }
-  })
-  // One bud's belt animation just completed a loop (it landed in table `t`'s box):
-  // step that box's visible tally up by one. Only planted buds report (see BeltBud).
-  const onBudLand = (t) => setShownBuds(s => ({ ...s, [t]: (s[t] || 0) + 1 }))
+  // Bumped whenever a box is emptied (haul) so the belt buds re-lock their phase to
+  // the freshly-reset count.
+  const [budResync, setBudResync] = useState(0)
   // Which Grow Card is planted on each table (the card the player added).
   const [tableCards, setTableCards] = useState(() => saved.tableCards || {})
   // The card LEVEL each planted strain is at, keyed by plant id. Drives a jar's
@@ -136,38 +132,29 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   useEffect(() => { tableCardsRef.current = tableCards }, [tableCards])
   const lastTickRef = useRef(typeof saved.lastTick === 'number' ? saved.lastTick : Date.now())
 
-  // GENERATION: offline catch-up on mount + a 1s live ticker. Both call the same
-  // advance fn, so grow boxes keep filling whether or not the app was open.
+  // GENERATION: advance the wall-clock accumulator to `now`. Runs on mount (offline
+  // catch-up), on a 1s live ticker, when the app returns to the foreground, AND the
+  // instant a bud's belt animation lands in the box — that last call makes the
+  // displayed floor() tick at the exact frame the bud drops in, while the ticker
+  // keeps it counting when no one's watching.
+  const advanceNow = useCallback(() => {
+    const now = Date.now()
+    const next = advanceProduction(
+      { planted: plantedRef.current, budCounts: budCountsRef.current, lastTick: lastTickRef.current },
+      now,
+    )
+    lastTickRef.current = next.lastTick
+    setBudCounts(next.budCounts)
+  }, [])
   useEffect(() => {
-    const tick = () => {
-      const now = Date.now()
-      const prev = budCountsRef.current
-      const next = advanceProduction(
-        { planted: plantedRef.current, budCounts: prev, lastTick: lastTickRef.current },
-        now,
-      )
-      lastTickRef.current = next.lastTick
-      // Normal live ticks add < 1 bud/sec, so the bud-drop animation drives the
-      // shown tally. But a big jump means the app was closed/backgrounded (the
-      // catch-up) — the animations didn't run, so snap the shown tally up to match.
-      setShownBuds(s => {
-        const ns = { ...s }
-        for (const t of [1, 2, 3]) {
-          const grew = Math.floor(next.budCounts[t] || 0) - Math.floor(prev[t] || 0)
-          if (grew >= 2) ns[t] = Math.floor(next.budCounts[t] || 0)
-        }
-        return ns
-      })
-      setBudCounts(next.budCounts)
-    }
-    tick()                                   // immediate catch-up for time away
-    const id = setInterval(tick, 1000)       // then advance live
+    advanceNow()                                  // immediate catch-up for time away
+    const id = setInterval(advanceNow, 1000)      // then advance live
     // Also catch up the instant the tab/app returns to the foreground (mobile
     // throttles timers while backgrounded, so the interval may have stalled).
-    const onVis = () => { if (!document.hidden) tick() }
+    const onVis = () => { if (!document.hidden) advanceNow() }
     document.addEventListener('visibilitychange', onVis)
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
-  }, [])
+  }, [advanceNow])
 
   // HAULING: the skater's trip carries each grow box's buds to the right packing
   // box. carryRef holds the current trip's haul, banked per strain.
@@ -186,7 +173,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
           const n = budCountsRef.current[tbl] || 0
           if (id && n) carryRef.current[id] = (carryRef.current[id] || 0) + n
           setBudCounts(c => ({ ...c, [tbl]: 0 }))                   // empty the grow counter on pass
-          setShownBuds(s => ({ ...s, [tbl]: 0 }))                   // and zero its visible tally
+          setBudResync(r => r + 1)                                  // re-lock belt-bud phase to 0
         }, passTimeMs((x0 + x1) / 2, SKATE_MS.B))
       })
       return () => timers.forEach(clearTimeout)
@@ -314,7 +301,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
         {cur.key === 'shop' && <ShopFront art={cur.art} jarCounts={jarCounts} tableCards={tableCards} />}
         {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} packCounts={packCounts} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} />}
-        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} shownBuds={shownBuds} onBudLand={onBudLand} tableCards={tableCards} onAdd={setPicking} skatePhase={skate.phase} skateStart={skate.start} />}
+        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} budResync={budResync} onBudLand={advanceNow} tableCards={tableCards} onAdd={setPicking} skatePhase={skate.phase} skateStart={skate.start} />}
       </div>
 
       {/* Arrows — step between rooms. Left = toward the front, right = deeper. */}
@@ -777,16 +764,39 @@ const BIN_PILE = [
 ]
 const BINS_FULL = false  // preview: show every bin heaped with buds
 
-function GrowRoom({ planted, bank, onPlace, shownBuds = {}, onBudLand, tableCards = {}, onAdd, skatePhase = 'idle', skateStart = 0 }) {
+// A vine strung across the FULL width of the grow room with a sloth worker hanging
+// from it over each table, its claws grazing the plant tops. Pure scenery — kept
+// under the skater's z (≤ PROP_Z) so the monkey still rolls in front, and above the
+// plants so the claws read as resting on them. All values are % of the room box.
+const VINE_Y = 7.0          // vine vertical center
+const VINE_H = 4.6          // vine thickness (% of room height)
+const SLOTH_W = 14.5        // sloth width (% of room width)
+const SLOTH_TOP = 4.5       // sloth top — its hands grip the vine here
+const SLOTH_CENTERS = [21.5, 46.0, 72.5]   // one sloth per table (over the plants)
+
+function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBudLand, tableCards = {}, onAdd, skatePhase = 'idle', skateStart = 0 }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the plant overlays stay glued to the benches
           at any screen size / orientation. */}
       <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
         <img src="/grow-room.webp" alt="Grow Room" style={{ display: 'block', width: '100%', height: '100%' }} />
+        {/* Vine across the full width, tiled at a fixed thickness. */}
+        <div aria-hidden style={{
+          position: 'absolute', left: 0, right: 0, top: `${VINE_Y - VINE_H / 2}%`, height: `${VINE_H}%`,
+          backgroundImage: 'url(/vine.webp)', backgroundRepeat: 'repeat-x', backgroundSize: 'auto 100%',
+          zIndex: 2, pointerEvents: 'none',
+        }} />
+        {/* A sloth worker hanging over each table, claws grazing the plant tops. */}
+        {SLOTH_CENTERS.map((cx, i) => (
+          <img key={`sloth${i}`} src="/sloth-worker.webp" alt="" aria-hidden
+            style={{ position: 'absolute', left: `${cx}%`, top: `${SLOTH_TOP}%`, width: `${SLOTH_W}%`,
+              transform: 'translateX(-50%)', zIndex: 3, pointerEvents: 'none',
+              filter: 'drop-shadow(0 6px 8px rgba(0,0,0,0.35))' }} />
+        ))}
         {/* The skater monkey passes through the grow room during phase B. */}
         {skatePhase === 'B' && <Skater phase="B" start={skateStart} />}
-        <BeltBud planted={planted} onBudLand={onBudLand} />
+        <BeltBud planted={planted} budCounts={budCounts} resyncKey={budResync} onBudLand={onBudLand} />
         {PLANT_SLOTS.filter(s => planted.includes(s.id)).map((s) => (
           <img key={s.id} src="/plant.webp" alt="" aria-hidden data-slot={s.id}
             style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: `${plantW(s.y)}%`,
@@ -851,7 +861,7 @@ function GrowRoom({ planted, bank, onPlace, shownBuds = {}, onBudLand, tableCard
         {[1, 2, 3].map(tbl => {
           if (!planted.some(id => id.startsWith(`T${tbl}-`))) return null
           const [x0, x1, yTop] = BINS[tbl]
-          const n = shownBuds[tbl] || 0   // steps up in time with the bud-drop animation
+          const n = Math.floor(budCounts[tbl] || 0)   // wall-clock truth; a bud lands as it ticks
           const strain = PLANTS.find(p => p.id === tableCards[tbl])
           return (
             <div key={`cnt${tbl}`} style={{
@@ -954,12 +964,16 @@ function PlantPicker({ table, onPick, onClose }) {
 }
 
 // Buds ride their table's shared bud-path (back of belt → down the belt, growing
-// with perspective → into the bin). The path has FOUR evenly-spaced "lanes"
-// (phases at 0/25/50/75%); each plant is locked to one lane by its number. ALL
-// bud elements are mounted up front (hidden until their plant is placed) so the
-// animations stay phase-locked — the buds stay evenly spaced no matter when you
-// buy each plant.
-function BeltBud({ planted, onBudLand }) {
+// with perspective → into the bin). Each table's PLANTED buds are spread EVENLY in
+// time — one bud lands every BUD_SECS/n seconds (n = plants on that table) — and
+// the whole set is PHASE-LOCKED to the wall-clock count: the negative animation
+// delay is solved so a bud reaches the box at the exact instant budCounts crosses
+// the next integer. So the buds stay evenly spaced for any plant count, and each
+// drop coincides with the counter ticking up. onAnimationIteration nudges the
+// wall-clock forward at that frame so the displayed floor() updates on the drop.
+// Re-locks (recomputes delays) only when the plant set changes or a box is hauled
+// (resyncKey) — never every tick, so the animation runs smoothly.
+function BeltBud({ planted, budCounts = {}, resyncKey = 0, onBudLand }) {
   const kf = Object.entries(BUD_PATHS).map(([t, pts]) => {
     const frames = pts.map((p, i) => {
       const pct = BUD_PCTS[i]
@@ -973,25 +987,42 @@ function BeltBud({ planted, onBudLand }) {
     frames.splice(1, 0, '8% { opacity:1; }')   // fade in early
     return `@keyframes bud${t} { ${frames.join(' ')} }`
   }).join('\n')
+
+  // Snapshot budCounts via a ref so the delay solve reads the CURRENT count when it
+  // (re)runs, without making the count a dep that would recompute every tick.
+  const bcRef = useRef(budCounts)
+  bcRef.current = budCounts
+  const plantedSig = PLANT_SLOTS.filter(s => planted.includes(s.id) && BUD_PATHS[s.table]).map(s => s.id).join(',')
+  const buds = useMemo(() => {
+    const bc = bcRef.current
+    const byTable = { 1: [], 2: [], 3: [] }
+    PLANT_SLOTS.forEach(s => { if (planted.includes(s.id) && BUD_PATHS[s.table]) byTable[s.table].push(s) })
+    const out = []
+    for (const t of [1, 2, 3]) {
+      const list = byTable[t].sort((a, b) => a.plant - b.plant)
+      const n = list.length
+      if (!n) continue
+      const c0 = bc[t] || 0
+      const step = BUD_SECS / n                       // even spacing between drops
+      const tNext = (Math.floor(c0) + 1 - c0) * step  // secs until the next integer crossing (lane 0 drops)
+      list.forEach((s, j) => {
+        let remaining = tNext + j * step              // secs until THIS bud drops
+        remaining = ((remaining % BUD_SECS) + BUD_SECS) % BUD_SECS
+        out.push({ ...s, delay: -(BUD_SECS - remaining) })  // negative delay → lands at `remaining`
+      })
+    }
+    return out
+  }, [plantedSig, resyncKey])  // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <>
       <style>{kf}</style>
-      {PLANT_SLOTS.filter(s => BUD_PATHS[s.table]).map(s => {
-        const isPlanted = planted.includes(s.id)
-        return (
+      {buds.map(s => (
         <img key={s.id} src="/bud.webp" alt="" aria-hidden data-bud={s.id}
-          // Each loop ends as the bud drops into its box; report that landing so the
-          // box's visible tally ticks up in time with the drop. Only planted buds
-          // report (hidden, unplanted buds still animate but must not count).
-          onAnimationIteration={isPlanted && onBudLand ? () => onBudLand(s.table) : undefined}
-          // All buds stay mounted (for phase-lock) even when hidden, so the lanes
-          // stay evenly spaced as you add plants.
+          onAnimationIteration={onBudLand ? () => onBudLand(s.table) : undefined}
           style={{ position: 'absolute', width: `${BUD_W}%`,
-            visibility: isPlanted ? 'visible' : 'hidden',
-            // lane = plant number (1-4) → one of four evenly-spaced phases
-            animation: `bud${s.table} ${BUD_SECS}s linear ${(-(s.plant - 1) * BUD_SECS / 4).toFixed(2)}s infinite`,
+            animation: `bud${s.table} ${BUD_SECS}s linear ${s.delay.toFixed(2)}s infinite`,
             pointerEvents: 'none' }} />
-      )})}
       ))}
     </>
   )
