@@ -36,11 +36,11 @@ export default function Profile({ onBack }) {
 
       {/* Sub-tabs */}
       <div style={{ padding: '14px 16px 0', display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+        <SubTab active={tab === 'account'}   onClick={() => setTab('account')}>Account</SubTab>
         <SubTab active={tab === 'upgrades'}  onClick={() => setTab('upgrades')}>Upgrades</SubTab>
         <SubTab active={tab === 'training'}  onClick={() => setTab('training')}>Training</SubTab>
         <SubTab active={tab === 'skills'}    onClick={() => setTab('skills')}>Skills</SubTab>
         <SubTab active={tab === 'equipment'} onClick={() => setTab('equipment')}>Equipment</SubTab>
-        <SubTab active={tab === 'account'}   onClick={() => setTab('account')}>Account</SubTab>
       </div>
 
       {tab === 'upgrades'  && <UpgradesTab traits={traits} points={points} onUpgrade={upgrade} />}
