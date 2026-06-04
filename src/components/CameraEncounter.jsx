@@ -55,6 +55,14 @@ function destPoint(origin, distM, brgDeg) {
   const λ2 = λ1 + Math.atan2(Math.sin(θ) * Math.sin(δ) * Math.cos(φ1), Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2))
   return { lat: toDeg(φ2), lng: ((toDeg(λ2) + 540) % 360) - 180 }
 }
+// Wrap-aware exponential smoothing for a compass heading (averages via the unit
+// vector so 359°→1° doesn't whip through 180°). Low alpha = steadier but laggier.
+function emaAngle(prev, next, alpha) {
+  if (prev == null || Number.isNaN(prev)) return next
+  const s = Math.sin(toRad(prev)) + (Math.sin(toRad(next)) - Math.sin(toRad(prev))) * alpha
+  const c = Math.cos(toRad(prev)) + (Math.cos(toRad(next)) - Math.cos(toRad(prev))) * alpha
+  return (toDeg(Math.atan2(s, c)) + 360) % 360
+}
 function touchDist(touches) {
   const dx = touches[0].clientX - touches[1].clientX
   const dy = touches[0].clientY - touches[1].clientY
@@ -73,6 +81,8 @@ export function CameraEncounter({ onBack }) {
   const meRef     = useRef(null)      // latest GPS position
   const pinchRef  = useRef(null)      // {d, scale} during a two-finger pinch
   const layerRef  = useRef(null)
+  const headRef   = useRef(null)      // smoothed heading (kept in a ref between events)
+  const lastSetRef = useRef(0)        // throttle stamp for heading state updates
 
   const [phase, setPhase]     = useState('intro')   // intro | live
   const [mode, setMode]       = useState('view')    // view | place
@@ -89,7 +99,12 @@ export function CameraEncounter({ onBack }) {
     let h = null
     if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading
     else if (typeof e.alpha === 'number') h = 360 - e.alpha
-    if (h != null && !Number.isNaN(h)) setHeading((h + 360) % 360)
+    if (h == null || Number.isNaN(h)) return
+    // Low-pass the raw reading, then push to state at ~30fps so the NPC glides
+    // instead of twitching on every noisy sensor tick.
+    headRef.current = emaAngle(headRef.current, (h + 360) % 360, 0.12)
+    const now = (typeof performance !== 'undefined' ? performance.now() : 0)
+    if (now - lastSetRef.current > 33) { lastSetRef.current = now; setHeading(headRef.current) }
   }, [])
 
   // --- start (inside the tap for iOS perms) ---
@@ -194,8 +209,9 @@ export function CameraEncounter({ onBack }) {
       if (Math.abs(delta) <= CAMERA_FOV_DEG / 2) xPct = 50 + (delta / (CAMERA_FOV_DEG / 2)) * 50
       else { onScreen = false; offSide = delta > 0 ? 'right' : 'left' }
     }
-    const factor = d == null ? 1 : clamp(PLACE_DIST_M / Math.max(d, PLACE_DIST_M), 0.45, 1.3)
-    return { n, d, onScreen, xPct, offSide, h: n.scaleH * factor }
+    // Hold the size you pinched — modulating it by noisy GPS distance made it
+    // pulse. (Far-away shrink can come back later with smoothed distance.)
+    return { n, d, onScreen, xPct, offSide, h: n.scaleH }
   }).filter(Boolean)
 
   // ---------------------------------------------------------------- UI
@@ -242,8 +258,8 @@ export function CameraEncounter({ onBack }) {
           <img key={n.id} src={NPC_IMG} alt="carrier" draggable={false}
             onClick={() => setVisited({ ...n, d })}
             style={{ position: 'absolute', left: `${xPct}%`, top: `${n.yPct}%`, transform: 'translate(-50%,-50%)',
-              height: `${h}vh`, cursor: 'pointer', transition: 'left .12s linear, height .2s ease',
-              filter: d <= 10 ? `drop-shadow(0 0 16px ${GOLD})` : 'drop-shadow(0 6px 10px rgba(0,0,0,.6))' }} />
+              height: `${h}vh`, cursor: 'pointer', transition: 'left .18s ease-out',
+              filter: `drop-shadow(0 4px 10px rgba(0,0,0,.6))`, willChange: 'left' }} />
         ) : (
           <div key={n.id} style={{ position: 'absolute', top: '46%', [offSide]: 16, color: GOLD, fontSize: 46,
             fontWeight: 900, textShadow: '0 2px 8px #000', pointerEvents: 'none', animation: 'pulse 1s infinite' }}>
