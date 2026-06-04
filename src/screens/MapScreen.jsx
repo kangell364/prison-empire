@@ -7,7 +7,7 @@ import { ScoutScreen } from '../components/ScoutScreen'
 import { TurfMap } from '../components/TurfMap'
 import { BlockSheet } from '../components/BlockSheet'
 import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks, setLandTest } from '../state/blocksStore'
-import { useMapData, buildCityCountyMap, buildUSLandTest, STATE_CODE_TO_FIPS, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
+import { useMapData, buildCityCountyMap, buildUnlockedCountyTest, HARRIS_CENTER, STATE_CODE_TO_FIPS, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
 import { knockOut } from '../state/vitalsStore'
 import { getBounty } from '../state/bountyStore'
 import { useDisplayName } from '../state/profileStore'
@@ -308,10 +308,12 @@ export default function MapScreen({ onNavigate }) {
   const [, setMoveTick] = useState(0)                       // ticks the move countdown
   const { attacks, landed, launch, dismissLanded } = useDriveBys()
   const { data: mapData } = useMapData()
-  // Gate the block / NPC economy on real US land once the states GeoJSON loads —
-  // clears any procedural turf the renderer was showing in the ocean or Canada.
+  // Gate the block / NPC economy to the UNLOCKED counties (MVP: Harris only).
+  // Turf exists only inside an unlocked county; everywhere else (other counties,
+  // Canada, the ocean) is locked — no NPCs, nothing claimable. Open more later by
+  // adding FIPS to UNLOCKED_COUNTY_FIPS in mapData.js. Reuses the land-mask gate.
   useEffect(() => {
-    if (mapData) setLandTest(buildUSLandTest(mapData))
+    if (mapData) setLandTest(buildUnlockedCountyTest(mapData))
   }, [mapData])
   const territories = useTerritories()
   const world = useWorld()
@@ -789,7 +791,7 @@ export default function MapScreen({ onNavigate }) {
 
       {turfView && (
         <TurfMap
-          center={turfView.center}
+          center={turfView.center || HARRIS_CENTER}
           label={turfView.label}
           counties={mapData?.counties}
           onBlockTap={(gx, gy) => setBlockSel({ gx, gy })}

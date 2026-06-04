@@ -172,6 +172,36 @@ export function buildUSLandTest(mapData) {
   }
 }
 
+// ---- county unlock (MVP) -------------------------------------------
+// The world starts as ONE open county and grows by adding FIPS codes here. This
+// is the simple stand-in for the full per-state demand/supply engine in
+// docs/county-unlock-spec.md — turf/NPC blocks only exist inside an unlocked
+// county; everywhere else is locked (no claiming), exactly like the ocean.
+// To open a new county later: add its 5-digit FIPS to this list.
+export const UNLOCKED_COUNTY_FIPS = ['48201']   // Harris County, TX (Houston)
+
+// Center to open the turf map on for the current single unlocked county.
+export const HARRIS_CENTER = [29.7604, -95.3698]  // [lat, lng] — downtown Houston
+
+// Build a predicate (lng,lat) => bool that's true only inside an unlocked
+// county. Same bbox-prefilter + geoContains as buildUSLandTest, just scoped to
+// the unlocked FIPS instead of every state. Used to gate the block economy.
+export function buildUnlockedCountyTest(mapData, fipsList = UNLOCKED_COUNTY_FIPS) {
+  if (!mapData || !mapData.counties) return null
+  const set = new Set(fipsList)
+  const feats = mapData.counties.features
+    .filter(f => set.has(String(f.id).padStart(5, '0')))
+    .map(f => ({ f, bbox: geoBounds(f) }))
+  if (!feats.length) return null
+  return (lng, lat) => {
+    for (const { f, bbox } of feats) {
+      if (lng < bbox[0][0] || lng > bbox[1][0] || lat < bbox[0][1] || lat > bbox[1][1]) continue
+      if (geoContains(f, [lng, lat])) return true
+    }
+    return false
+  }
+}
+
 // Lightweight centroid for a single GeoJSON feature — averages the first
 // ring's coordinates. Good enough for the fallback-nearest tie-breaker.
 function pathCentroid(feature) {
