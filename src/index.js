@@ -24,3 +24,12 @@ root.render(
     </ErrorBoundary>
   </React.StrictMode>
 )
+
+// Register the (network-only) service worker so Android Chrome offers our
+// "Add to Home Screen" install prompt. Wrapped in load + try/catch so it never
+// blocks startup; harmless where unsupported (older iOS Safari just ignores it).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(`${process.env.PUBLIC_URL || ''}/sw.js`).catch(() => {})
+  })
+}

@@ -20,6 +20,7 @@ import { useBlockPayoutTicker } from './state/blocksStore'
 import { usePlayerCard } from './state/profileStore'
 import { useUnreadCount } from './state/fightLogStore'
 import { NotificationsModal } from './components/NotificationsModal'
+import { InstallPrompt } from './components/InstallPrompt'
 // NOTE: AR camera encounter (src/components/CameraEncounter.jsx) is built but
 // parked — re-import + re-add the header button below to bring it back.
 
@@ -145,6 +146,8 @@ export default function App() {
 
       {/* Screen Content */}
       {renderScreen()}
+
+      <InstallPrompt />
 
       {showNotifs && (
         <NotificationsModal onClose={() => setShowNotifs(false)} onNavigate={setScreen} />
