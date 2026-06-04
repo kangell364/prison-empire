@@ -399,7 +399,7 @@ function RoomArrow({ side, label, onClick }) {
 const SHELF_ROWS = [31.4, 38.6, 45.6]                      // jar-bottom baseline, % of room box
 const SHELF_BAYS = [[38.0, 47.5], [50.8, 60.3], [63.6, 73.6]]
 const SHELF_FRAC = [0.18, 0.5, 0.82]                       // jar centers within a bay
-const SHELF_JAR_W = 2.8                                    // jar width, % of room box
+const SHELF_JAR_W = 2.52                                   // jar width, % of room box
 const SHELF_SLOTS = SHELF_ROWS.flatMap(y =>               // all slot centers, in stock order
   SHELF_BAYS.flatMap(([b0, b1]) => SHELF_FRAC.map(f => ({ x: b0 + (b1 - b0) * f, y }))))
 
