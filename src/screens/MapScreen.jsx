@@ -844,6 +844,7 @@ export default function MapScreen({ onNavigate }) {
           onBlockTap={(gx, gy) => setBlockSel({ gx, gy })}
           onBack={() => setTurfView(null)}
           trapHouse={myHouseCoords || (homeCoords ? { lat: homeCoords[1], lng: homeCoords[0] } : null)}
+          trapHouseName={myName}
           onTrapHouseTap={() => onNavigate && onNavigate('traphouse')}
           otherHouses={sharedHouses}
           myUserId={auth.userId}
