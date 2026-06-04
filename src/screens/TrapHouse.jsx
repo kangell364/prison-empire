@@ -460,6 +460,7 @@ const CUST_SIZE = {                            // per-sprite size multipliers
   '/gnome-6.webp': 1.1,
   '/gnome-7.webp': 1.1,
   '/gnome-8.webp': 1.2,
+  '/gnome-9.webp': 2,
 }
 
 function ShopFront({ art, jarCounts = {}, tableCards = {}, onSell }) {
