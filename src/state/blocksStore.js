@@ -134,6 +134,22 @@ let remoteBlocks = {}
 let myId = null
 let blocksChannel = null
 
+// Activity feed bus — fires on every turf takeover (yours or a rival's) so the
+// UI can show a live "who took what" feed. Session-only (not persisted).
+const activityListeners = new Set()
+export function subscribeActivity(fn) { activityListeners.add(fn); return () => activityListeners.delete(fn) }
+function emitActivity(ev) { activityListeners.forEach(fn => fn(ev)) }
+
+// Live turf standings for the leaderboard: { ownerId: blockCount } across me +
+// every rival currently in the shared cache. My own count keys off my user id.
+export function turfStandings() {
+  const counts = {}
+  const me = getUserId() || 'you'
+  for (const b of Object.values(overrides)) if (b.owner === 'you') counts[me] = (counts[me] || 0) + 1
+  for (const b of Object.values(remoteBlocks)) counts[b.owner_id] = (counts[b.owner_id] || 0) + 1
+  return counts
+}
+
 const RIVAL_COLORS = ['#e74c3c', '#4a9eff', '#9b59b6', '#2ecc71', '#e67e22', '#16a085', '#d35400', '#8e44ad']
 function rivalColor(id) {
   let h = 0; const s = String(id || '')
@@ -231,8 +247,10 @@ function subscribeBlockRealtime() {
       } else if (row.owner_id === myId) {
         delete remoteBlocks[k]                         // now mine (e.g. another device) — local wins
       } else {
+        const tookFromMe = !!(overrides[k] && overrides[k].owner === 'you')
         remoteBlocks[k] = rowToRemote(row)             // a rival's claim/poach
-        if (overrides[k] && overrides[k].owner === 'you') delete overrides[k]  // they took MY block
+        if (tookFromMe) delete overrides[k]            // they took MY block
+        emitActivity({ id: `${k}-${row.updated_at || Date.now()}`, actorId: row.owner_id, gx: row.gx, gy: row.gy, tookFromMe, at: Date.now() })
       }
       commit()
     })
@@ -338,6 +356,7 @@ export function recruit(gx, gy, homeTurf) {
   }
   commit()
   pushClaim(gx, gy)
+  emitActivity({ id: `mine-${cellKey(gx, gy)}-${now}`, actorId: getUserId(), gx, gy, mine: true, at: now })
   return { ok: true, cost }
 }
 
@@ -363,6 +382,7 @@ export function poach(gx, gy, homeTurf) {
   }
   commit()
   pushClaim(gx, gy)
+  emitActivity({ id: `mine-${cellKey(gx, gy)}-${now}`, actorId: getUserId(), gx, gy, mine: true, at: now })
   return { ok: true, cost }
 }
 

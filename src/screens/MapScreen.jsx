@@ -12,6 +12,7 @@ import { knockOut } from '../state/vitalsStore'
 import { getBounty } from '../state/bountyStore'
 import { useDisplayName, useAuth } from '../state/profileStore'
 import { ensureMyHouse, useSharedHouses, harrisSpotFor } from '../state/sharedHousesStore'
+import { TurfLeaderboard, ActivityFeed } from '../components/TurfLeaderboard'
 import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
 import { useWorld, moveHouse, arriveHouse, getHouse, applyHomeRaid, attackHouse } from '../state/worldStore'
 import { AI_MOBS } from '../data/mobs'
@@ -734,6 +735,25 @@ export default function MapScreen({ onNavigate }) {
           </div>
         )}
       </div>
+
+      {/* Live competitive layer over the shared Harris turf: who holds the most
+          blocks + a realtime feed of takeovers. Country view only. */}
+      {!stateView && (
+        <div className="section">
+          <div className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-trophy" style={{ color: GOLD }} /> Harris Turf Leaderboard
+          </div>
+          <TurfLeaderboard />
+        </div>
+      )}
+      {!stateView && (
+        <div className="section">
+          <div className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-activity" style={{ color: '#4a9eff' }} /> Activity
+          </div>
+          <ActivityFeed />
+        </div>
+      )}
 
       {/* Country view: the states where you hold NPC blocks, with counts. Tap a
           state to drill into its counties. */}
