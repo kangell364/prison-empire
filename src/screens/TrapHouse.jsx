@@ -424,19 +424,26 @@ const SHELF_JAR_W = 2.52                                   // jar width, % of ro
 const SHELF_SLOTS = SHELF_ROWS.flatMap(y =>               // all slot centers, in stock order
   SHELF_BAYS.flatMap(([b0, b1]) => SHELF_FRAC.map(f => ({ x: b0 + (b1 - b0) * f, y }))))
 
-// CUSTOMERS — a queue of shoppers come in the front door and buy jars. Each is
-// anchored by its FEET (bottom-center) at these % points of the room box, scaled by
-// width %. A customer walks in to the LINE spot beside the one being served; the one
-// at the FRONT only buys once the LINE is filled, then leaves and the LINE customer
-// advances into the FRONT spot. Sprites are random (more art = more variety).
-const CUST_DOOR  = { x: 16, y: 71, w: 5.6 }    // entry, at the doorway (small/far)
-const CUST_LINE  = { x: 30, y: 81, w: 7.2 }    // waiting spot, beside the front
-const CUST_FRONT = { x: 42, y: 82, w: 7.6 }    // serving spot, in front of the counter
-const CUST_OUT   = { x: 4,  y: 67, w: 4.8 }    // exit, back out the door (fades)
-const CUST_WALK_SECS = 3.5     // door → a spot
-const CUST_ADV_SECS = 1.5      // line → front
-const CUST_LEAVE_SECS = 3.0    // front → out
-const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp']   // drop in more for variety
+// CUSTOMERS — a queue of shoppers come in the front door and line up on the RIGHT.
+// Each is anchored by its FEET (bottom-center) at these % points of the room box,
+// scaled by width %. A customer joins at the BACK of the line and shifts forward a
+// spot each time the front leaves. The front only buys once someone is in line behind
+// it. SALES_ENABLED gates buying — off for now so the line just stacks up.
+const SALES_ENABLED = false
+const CUST_DOOR = { x: 14, y: 73, w: 5.2 }     // entry, at the left doorway (small/far)
+const CUST_OUT  = { x: 3,  y: 67, w: 4.6 }     // exit, back out the door (fades)
+// The line on the RIGHT, FRONT first → back, each spot a touch smaller/farther.
+const QUEUE_SPOTS = [
+  { x: 44,   y: 82,   w: 7.3 },   // 0 — front / serving (in front of the counter)
+  { x: 53,   y: 81.4, w: 7.0 },   // 1
+  { x: 61.5, y: 80.8, w: 6.7 },   // 2
+  { x: 70,   y: 80.3, w: 6.4 },   // 3
+  { x: 78.5, y: 80,   w: 6.1 },   // 4 — back of the line
+]
+const CUST_SPEED = 11          // walk speed, % of room width per second (constant pace)
+const moveSecs = (ax, bx) => Math.max(0.6, Math.abs(ax - bx) / CUST_SPEED)
+const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp']
+const CUST_SIZE = { '/gnome-2.webp': 2 }       // per-sprite size multiplier (GNOME 2 = 2×)
 
 function ShopFront({ art, jarCounts = {}, tableCards = {}, onSell }) {
   // One tinted jar per banked unit, in the order strains were planted, capped at
@@ -494,46 +501,47 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, onSell }) {
 // Each is fill-forwards and its 0% matches the previous move's end, so swapping the
 // animation on the same element (e.g. line→front) is seamless. The inner img runs
 // `custWaddle` while walking. Built from the CUST_* constants so they stay in sync.
+// Keyframes for every move between the door / queue spots / exit, generated from the
+// constants. Each is fill-forwards and its 0% matches the previous move's end, so
+// swapping the animation on the same element (advance, leave) is seamless.
+//   custIn{k}  : door → queue spot k        (a customer joining at the back)
+//   custAdv{k} : spot k+1 → spot k          (shifting one place forward)
+//   custOut    : spot 0 → exit (fades)
 function CustomerKeyframes() {
   const f = (p) => `left:${p.x}%; top:${p.y}%; width:${p.w}%;`
-  return (
-    <style>{`
-      @keyframes custWalkInFront { 0% { ${f(CUST_DOOR)} } 100% { ${f(CUST_FRONT)} } }
-      @keyframes custWalkInLine  { 0% { ${f(CUST_DOOR)} } 100% { ${f(CUST_LINE)} } }
-      @keyframes custAdvance     { 0% { ${f(CUST_LINE)} } 100% { ${f(CUST_FRONT)} } }
-      @keyframes custLeaveFront  { 0% { ${f(CUST_FRONT)}; opacity:1; } 80% { opacity:1; } 100% { ${f(CUST_OUT)}; opacity:0; } }
-      @keyframes custWaddle {
-        0%,50%,100% { transform: translateY(0) rotate(0deg); }
-        25% { transform: translateY(-4%) rotate(2.5deg); }
-        75% { transform: translateY(-4%) rotate(-2.5deg); }
-      }
-      @keyframes custBubblePop { 0% { transform: translate(-50%,-100%) scale(0.5); opacity:0; } 100% { transform: translate(-50%,-100%) scale(1); opacity:1; } }
-    `}</style>
-  )
+  let kf = ''
+  QUEUE_SPOTS.forEach((spot, k) => {
+    kf += `@keyframes custIn${k} { 0% { ${f(CUST_DOOR)} } 100% { ${f(spot)} } }\n`
+    if (k > 0) kf += `@keyframes custAdv${k - 1} { 0% { ${f(QUEUE_SPOTS[k])} } 100% { ${f(QUEUE_SPOTS[k - 1])} } }\n`
+  })
+  kf += `@keyframes custOut { 0% { ${f(QUEUE_SPOTS[0])}; opacity:1; } 80% { opacity:1; } 100% { ${f(CUST_OUT)}; opacity:0; } }\n`
+  kf += `@keyframes custWaddle { 0%,50%,100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-4%) rotate(2.5deg); } 75% { transform: translateY(-4%) rotate(-2.5deg); } }\n`
+  kf += `@keyframes custBubblePop { 0% { transform: translate(-50%,-100%) scale(0.5); opacity:0; } 100% { transform: translate(-50%,-100%) scale(1); opacity:1; } }`
+  return <style>{kf}</style>
 }
 
-const CUST_ANIM = {
-  custWalkInFront: `custWalkInFront ${CUST_WALK_SECS}s ease-out forwards`,
-  custWalkInLine:  `custWalkInLine ${CUST_WALK_SECS}s ease-out forwards`,
-  custAdvance:     `custAdvance ${CUST_ADV_SECS}s ease-in-out forwards`,
-  custLeaveFront:  `custLeaveFront ${CUST_LEAVE_SECS}s ease-in forwards`,
-}
-
-// One customer sprite: positioned/scaled by its current move animation; the inner
-// img waddles while walking; a bubble pops over its head when it buys or is angry.
+// One customer sprite. The outer layer carries it between spots via `c.anim` (over
+// `c.dur` seconds at a constant pace); a middle layer scales the whole sprite for the
+// per-sprite size override (GNOME 2 = 2×); the inner img waddles while walking. The
+// closer to the front (lower pos), the higher it paints so the line overlaps right.
 function CustomerSprite({ c }) {
   const walking = c.phase === 'enter' || c.phase === 'leave'
+  const ease = c.anim === 'custOut' ? 'ease-in' : c.anim.startsWith('custAdv') ? 'ease-in-out' : 'ease-out'
+  const size = CUST_SIZE[c.sprite] || 1
+  const z = c.phase === 'leave' ? 31 : (typeof c.pos === 'number' ? 30 - c.pos : 20)
   return (
     <div style={{
-      position: 'absolute', transform: 'translate(-50%, -100%)', zIndex: 20, pointerEvents: 'none',
+      position: 'absolute', transform: 'translate(-50%, -100%)', zIndex: z, pointerEvents: 'none',
       filter: 'drop-shadow(0 6px 9px rgba(0,0,0,0.4))',
-      animation: CUST_ANIM[c.anim],
+      animation: `${c.anim} ${c.dur}s ${ease} forwards`,
     }}>
       {(c.phase === 'buy' || c.phase === 'angry') && <CustomerBubble angry={c.phase === 'angry'} value={c.value} />}
-      <img src={c.sprite} alt="" aria-hidden style={{
-        display: 'block', width: '100%', transformOrigin: '50% 100%',
-        animation: walking ? 'custWaddle 0.5s ease-in-out infinite' : 'none',
-      }} />
+      <div style={{ width: '100%', transform: `scale(${size})`, transformOrigin: '50% 100%' }}>
+        <img src={c.sprite} alt="" aria-hidden style={{
+          display: 'block', width: '100%', transformOrigin: '50% 100%',
+          animation: walking ? 'custWaddle 0.5s ease-in-out infinite' : 'none',
+        }} />
+      </div>
     </div>
   )
 }
@@ -559,12 +567,12 @@ function CustomerBubble({ angry, value }) {
   )
 }
 
-// The customer pipeline. At most two on screen: one at FRONT (being served) and one
-// in LINE. The FRONT customer only buys once the LINE customer has arrived ("don't
-// buy until the next is beside you"); on leaving, the LINE customer advances into the
-// FRONT spot and a fresh customer is scheduled into the LINE after a jar-stock-scaled
-// delay (2s when fully stocked → ~60s when empty). State lives in a ref (the single
-// source of truth for the timer-driven machine); `bump` just forces a re-render.
+// The customer pipeline — an N-deep queue (N = QUEUE_SPOTS.length). A customer joins
+// at the back, and when the front leaves everyone shifts one spot forward and a new
+// one fills the back. The front only buys once someone is in line behind it; a sale
+// banks the jar value and the front leaves. SALES_ENABLED off ⇒ nobody buys, so the
+// line just stacks to full. Each on-screen customer gets a DISTINCT sprite. State is
+// a ref (single source of truth for the timer machine); `bump` forces a re-render.
 function ShopCustomers({ onSell, jarCount = 0 }) {
   const [, bump] = useState(0)
   const modelRef = useRef([])
@@ -573,34 +581,42 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
 
   useEffect(() => {
     let alive = true
+    const N = QUEUE_SPOTS.length
     const timers = new Set()
     const after = (ms, fn) => { const t = setTimeout(() => { timers.delete(t); if (alive) fn() }, ms); timers.add(t) }
     modelRef.current = []
     let n = 0, spawnPending = false
     const commit = () => { if (alive) bump(v => v + 1) }
-    const at = (slot) => modelRef.current.find(c => c.slot === slot)
+    const lined = () => modelRef.current.filter(c => typeof c.pos === 'number')
+    const at = (pos) => modelRef.current.find(c => c.pos === pos)
     const byKey = (key) => modelRef.current.find(c => c.key === key)
 
     const maybeSpawn = () => {
-      if (spawnPending) return
-      if (at('front') && at('line')) return                 // pipeline full
+      if (spawnPending || lined().length >= N) return        // line full
       spawnPending = true
-      const ratio = Math.min(1, (jarsRef.current || 0) / 12) // ~12 jars in stock = fully busy
-      const sec = Math.min(60, Math.max(2, (2 + (1 - ratio) * 58) * (0.75 + Math.random() * 0.5)))
+      let sec
+      if (SALES_ENABLED) {
+        const ratio = Math.min(1, (jarsRef.current || 0) / 12)   // ~12 jars = fully busy
+        sec = Math.min(60, Math.max(2, (2 + (1 - ratio) * 58) * (0.75 + Math.random() * 0.5)))
+      } else {
+        sec = 3 + Math.random() * 3                          // sales off: steady trickle to watch it stack
+      }
       after(sec * 1000, () => { spawnPending = false; spawn() })
     }
     const spawn = () => {
-      const slot = at('front') ? 'line' : 'front'
-      if (at(slot)) { maybeSpawn(); return }
+      const k = lined().length                               // join at the back of the line
+      if (k >= N) return
+      const used = new Set(modelRef.current.map(c => c.sprite))
+      const pool = CUSTOMER_SPRITES.filter(s => !used.has(s))
+      const choices = pool.length ? pool : CUSTOMER_SPRITES  // distinct on screen when possible
       const key = ++n
-      const sprite = CUSTOMER_SPRITES[Math.floor(Math.random() * CUSTOMER_SPRITES.length)]
       modelRef.current.push({
-        key, sprite, slot, phase: 'enter', value: 0,
-        anim: slot === 'front' ? 'custWalkInFront' : 'custWalkInLine',
+        key, sprite: choices[Math.floor(Math.random() * choices.length)], pos: k, phase: 'enter', value: 0,
+        anim: `custIn${k}`, dur: moveSecs(CUST_DOOR.x, QUEUE_SPOTS[k].x),
       })
       commit()
-      after(CUST_WALK_SECS * 1000, () => arrive(key))
-      maybeSpawn()                                           // keep feeding the line
+      after(modelRef.current[modelRef.current.length - 1].dur * 1000, () => arrive(key))
+      maybeSpawn()                                           // keep feeding until full
     }
     const arrive = (key) => {
       const c = byKey(key); if (!c) return
@@ -608,9 +624,10 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
       tryBuy()
     }
     const tryBuy = () => {
-      const front = at('front'), line = at('line')
-      if (front && front.phase === 'wait' && line && line.phase === 'wait') {
-        front.phase = 'pause'; commit()                      // don't buy until line is beside
+      if (!SALES_ENABLED) return                             // sales stopped — just stack the line
+      const front = at(0), behind = at(1)
+      if (front && front.phase === 'wait' && behind && behind.phase === 'wait') {
+        front.phase = 'pause'; commit()                      // don't buy until the next is in line
         after(2000, () => resolveBuy(front.key))             // 2s pause at the counter
       }
     }
@@ -622,17 +639,20 @@ function ShopCustomers({ onSell, jarCount = 0 }) {
     }
     const startLeave = (key) => {
       const c = byKey(key); if (!c) return
-      c.phase = 'leave'; c.anim = 'custLeaveFront'; c.slot = 'gone'; commit()
-      after(CUST_LEAVE_SECS * 1000, () => { modelRef.current = modelRef.current.filter(x => x.key !== key); commit() })
-      const line = at('line')                                // line advances into the vacated front
-      if (line) {
-        line.slot = 'front'; line.anim = 'custAdvance'; line.phase = 'enter'; commit()
-        after(CUST_ADV_SECS * 1000, () => arrive(line.key))
-      }
-      maybeSpawn()                                           // refill the line
+      c.phase = 'leave'; c.anim = 'custOut'; c.dur = moveSecs(QUEUE_SPOTS[0].x, CUST_OUT.x); c.pos = 'gone'; commit()
+      after(c.dur * 1000, () => { modelRef.current = modelRef.current.filter(x => x.key !== key); commit() })
+      lined().filter(x => x.pos > 0).forEach(x => {          // everyone behind shifts one forward
+        x.pos -= 1
+        x.anim = `custAdv${x.pos}`
+        x.dur = moveSecs(QUEUE_SPOTS[x.pos + 1].x, QUEUE_SPOTS[x.pos].x)
+        x.phase = 'enter'
+        after(x.dur * 1000, () => arrive(x.key))
+      })
+      commit()
+      maybeSpawn()                                           // refill the back
     }
 
-    after(800, spawn)                                        // first customer arrives promptly
+    maybeSpawn()                                             // first customer after a short beat
     return () => { alive = false; timers.forEach(clearTimeout) }
   }, [])
 
