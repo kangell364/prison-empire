@@ -95,12 +95,8 @@ export function CameraEncounter({ onBack }) {
   // --- start (inside the tap for iOS perms) ---
   const start = useCallback(async () => {
     setError('')
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
-      streamRef.current = stream
-      // NOTE: the <video> isn't mounted yet (we're still on the intro screen) —
-      // a useEffect attaches the stream once phase flips to 'live'. See below.
-    } catch { setError('Camera blocked. Allow camera access (and open over HTTPS).'); return }
+    // Compass permission MUST be requested first, before any await — iOS only
+    // grants it synchronously inside the tap. Request it, then wire listeners.
     try {
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         await DeviceOrientationEvent.requestPermission().catch(() => {})
@@ -108,6 +104,12 @@ export function CameraEncounter({ onBack }) {
     } catch {}
     window.addEventListener('deviceorientationabsolute', onOrient, true)
     window.addEventListener('deviceorientation', onOrient, true)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+      streamRef.current = stream
+      // NOTE: the <video> isn't mounted yet (we're still on the intro screen) —
+      // a useEffect attaches the stream once phase flips to 'live'. See below.
+    } catch { setError('Camera blocked. Allow camera access (and open over HTTPS).'); return }
     if (navigator.geolocation) {
       watchRef.current = navigator.geolocation.watchPosition(
         (pos) => { const p = { lat: pos.coords.latitude, lng: pos.coords.longitude }; meRef.current = p; setMe(p); setAcc(pos.coords.accuracy) },
@@ -160,12 +162,17 @@ export function CameraEncounter({ onBack }) {
 
   // --- pin the placed NPC to the world ---
   const setHere = () => {
-    const p = meRef.current
-    if (!p) { setError('Need a GPS fix to pin. Move near a window or step outside.'); return }
+    if (heading == null) { setError('No compass yet — wave the phone in a figure-8, then try again.'); return }
     // Screen-x → relative bearing (inverse of the view-mode mapping) → world bearing.
     const worldBrg = ((heading ?? 0) + ((placing.xPct - 50) / 50) * (CAMERA_FOV_DEG / 2) + 360) % 360
-    const anchor = destPoint(p, PLACE_DIST_M, worldBrg)
-    const npc = { id: `${Date.now()}_${Math.floor(Math.random() * 1e6)}`, lat: anchor.lat, lng: anchor.lng, scaleH: placing.scaleH, yPct: placing.yPct, name: 'GNOME 7' }
+    // Anchor lat/lng from GPS if we have a fix (lets you walk away + return);
+    // without one, the compass bearing alone still pins it for look-around.
+    const p = meRef.current
+    const anchor = p ? destPoint(p, PLACE_DIST_M, worldBrg) : { lat: null, lng: null }
+    // Store worldBrg: while you turn in place, the NPC's screen position comes
+    // from (worldBrg − heading) — pure compass, so it stays rock-steady instead
+    // of swinging with GPS noise. The lat/lng is only for "are you nearby" + size.
+    const npc = { id: `${Date.now()}_${Math.floor(Math.random() * 1e6)}`, lat: anchor.lat, lng: anchor.lng, worldBrg, scaleH: placing.scaleH, yPct: placing.yPct, name: 'GNOME 7' }
     const next = [...npcs, npc]; setNpcs(next); saveNpcs(next)
     setPlacing(null); setMode('view')
   }
@@ -173,17 +180,21 @@ export function CameraEncounter({ onBack }) {
   const clearAll = () => { setNpcs([]); saveNpcs([]) }
 
   // --- view-mode: project each pinned NPC onto the screen ---
-  const projected = (me ? npcs : []).map(n => {
-    const d = distMeters(me, n)
-    if (d > SHOW_RANGE_M) return null
-    const brg = bearingDeg(me, n)
+  const projected = npcs.map(n => {
+    // Distance is GPS-only and just gates range + sizing; null until GPS fixes
+    // (or for compass-only pins that have no lat/lng).
+    const d = (me && n.lat != null) ? distMeters(me, n) : null
+    if (d != null && d > SHOW_RANGE_M) return null
+    // Angle comes from the stored compass bearing (steady as you turn). Old saves
+    // without worldBrg fall back to the live GPS bearing.
+    const angle = n.worldBrg != null ? n.worldBrg : (me ? bearingDeg(me, n) : 0)
     let onScreen = true, xPct = 50, offSide = null
     if (heading != null) {
-      const delta = wrap180(brg - heading)
+      const delta = wrap180(angle - heading)
       if (Math.abs(delta) <= CAMERA_FOV_DEG / 2) xPct = 50 + (delta / (CAMERA_FOV_DEG / 2)) * 50
       else { onScreen = false; offSide = delta > 0 ? 'right' : 'left' }
     }
-    const factor = clamp(PLACE_DIST_M / Math.max(d, PLACE_DIST_M), 0.45, 1.3)
+    const factor = d == null ? 1 : clamp(PLACE_DIST_M / Math.max(d, PLACE_DIST_M), 0.45, 1.3)
     return { n, d, onScreen, xPct, offSide, h: n.scaleH * factor }
   }).filter(Boolean)
 
@@ -283,7 +294,7 @@ export function CameraEncounter({ onBack }) {
             <img src={NPC_IMG} alt="" style={{ height: 150, filter: `drop-shadow(0 0 18px ${GOLD})` }} />
             <div style={{ color: GOLD, fontSize: 18, fontWeight: 900, marginTop: 6 }}>{visited.name}</div>
             <div style={{ color: '#aaa', fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
-              You came back to your pinned carrier ({Math.round(visited.d)}m). In the real game this opens its card / a battle.
+              You came back to your pinned carrier{visited.d != null ? ` (${Math.round(visited.d)}m)` : ''}. In the real game this opens its card / a battle.
             </div>
             <button onClick={() => setVisited(null)} style={btn(GOLD, '#0a0a0f')}>Close</button>
           </div>
