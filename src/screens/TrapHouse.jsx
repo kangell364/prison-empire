@@ -396,15 +396,12 @@ function RoomArrow({ side, label, onClick }) {
 // back shelves here, each tinted to its strain's jarColor (Purple Haze = purple).
 // Slots are read off shop-front.webp — three shelf rows × three bays × three jars
 // — and fill front-to-back (top row, left→right) as production banks jars.
-const SHELF_ROWS = [31.6, 39.8, 48.0]                      // jar-bottom baseline, % of room box
-const SHELF_BAYS = [[38.2, 48.0], [49.9, 59.9], [62.4, 72.3]]
+const SHELF_ROWS = [31.4, 38.6, 45.6]                      // jar-bottom baseline, % of room box
+const SHELF_BAYS = [[38.0, 47.5], [50.8, 60.3], [63.6, 73.6]]
 const SHELF_FRAC = [0.18, 0.5, 0.82]                       // jar centers within a bay
-const SHELF_JAR_W = 2.9                                    // jar width, % of room box
+const SHELF_JAR_W = 2.8                                    // jar width, % of room box
 const SHELF_SLOTS = SHELF_ROWS.flatMap(y =>               // all slot centers, in stock order
   SHELF_BAYS.flatMap(([b0, b1]) => SHELF_FRAC.map(f => ({ x: b0 + (b1 - b0) * f, y }))))
-  // The bottom-row left-bay pair sits behind the cash register — drop them so jars
-  // flow past into the next visible spots instead of vanishing behind the counter.
-  .filter(s => !(s.y === SHELF_ROWS[2] && s.x < 45))
 
 function ShopFront({ art, jarCounts = {}, tableCards = {} }) {
   // One tinted jar per banked unit, in the order strains were planted, capped at
@@ -420,7 +417,7 @@ function ShopFront({ art, jarCounts = {}, tableCards = {} }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the clerk lines up with the counter at any size. */}
-      <div style={{ position: 'relative', aspectRatio: '1600 / 905', maxWidth: '100%', maxHeight: '100%' }}>
+      <div style={{ position: 'relative', aspectRatio: '1600 / 900', maxWidth: '100%', maxHeight: '100%' }}>
         <img src={art} alt="Shop Front" style={{ display: 'block', width: '100%', height: '100%' }} />
         {/* Finished jars stocked on the back shelves (grow → pack → shelf). */}
         {stock.map((color, i) => (
