@@ -135,6 +135,27 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   useEffect(() => { tableCardsRef.current = tableCards }, [tableCards])
   const lastTickRef = useRef(typeof saved.lastTick === 'number' ? saved.lastTick : Date.now())
 
+  // SHOP SALE: a customer at the counter buys one finished jar. Sell the strain with
+  // the most jars in stock; drop one from the shelf and bank its cash value (the same
+  // value the packing room shows). Returns the $ earned, or 0 if the shelf is empty
+  // (the customer leaves angry). Reads live via a ref so the customer's timer sees the
+  // current stock. (jarCounts/cardLevels mutate seldom, so a per-render ref is fine.)
+  const jarCountsRef = useRef(jarCounts); jarCountsRef.current = jarCounts
+  const cardLevelsRef = useRef(cardLevels); cardLevelsRef.current = cardLevels
+  const sellJar = useCallback(() => {
+    const jc = jarCountsRef.current
+    let best = null, bestN = 0
+    for (const id in jc) { const k = Math.floor(jc[id] || 0); if (k > bestN) { bestN = k; best = id } }
+    if (!best || bestN < 1) return 0
+    const strain = PLANTS.find(p => p.id === best)
+    if (!strain) return 0
+    const value = plantCashValue(strain, cardLevelsRef.current[best] || 1) * JAR_FILL
+    jarCountsRef.current = { ...jc, [best]: (jc[best] || 0) - 1 }   // sync so a quick next sale sees it
+    setJarCounts(j => ({ ...j, [best]: Math.max(0, (j[best] || 0) - 1) }))
+    setBank(b => b + value)
+    return value
+  }, [])
+
   // GENERATION: advance the wall-clock accumulator to `now`. Runs on mount (offline
   // catch-up), on a 1s live ticker, when the app returns to the foreground, AND the
   // instant a bud's belt animation lands in the box — that last call makes the
@@ -304,7 +325,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
           z-index keeps him above the room art/counters but still under the UI
           chrome (top bar, arrows) that floats over everything. */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-        {cur.key === 'shop' && <ShopFront art={cur.art} jarCounts={jarCounts} tableCards={tableCards} />}
+        {cur.key === 'shop' && <ShopFront art={cur.art} jarCounts={jarCounts} tableCards={tableCards} onSell={sellJar} />}
         {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} packCounts={packCounts} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} />}
         {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} budResync={budResync} onBudLand={advanceNow} tableCards={tableCards} onAdd={setPicking} skatePhase={skate.phase} skateStart={skate.start} />}
       </div>
@@ -403,16 +424,21 @@ const SHELF_JAR_W = 2.52                                   // jar width, % of ro
 const SHELF_SLOTS = SHELF_ROWS.flatMap(y =>               // all slot centers, in stock order
   SHELF_BAYS.flatMap(([b0, b1]) => SHELF_FRAC.map(f => ({ x: b0 + (b1 - b0) * f, y }))))
 
-// A gnome customer walks in the front door (left) and stops in front of the
-// counter. He's anchored by his FEET (bottom-center) at these % points of the room
-// box, growing a touch as he comes forward; the walk waddles (bob + tilt) and stops
-// when he arrives. GNOME_W is his width % at the counter.
-const GNOME_W = 8
-const GNOME_DOOR = { x: 16.5, y: 70, w: GNOME_W * 0.78 }    // start, at the doorway (smaller/farther)
-const GNOME_COUNTER = { x: 41, y: 82, w: GNOME_W }          // end, in front of the counter
-const GNOME_WALK_SECS = 3.5
+// CUSTOMERS — a queue of shoppers come in the front door and buy jars. Each is
+// anchored by its FEET (bottom-center) at these % points of the room box, scaled by
+// width %. A customer walks in to the LINE spot beside the one being served; the one
+// at the FRONT only buys once the LINE is filled, then leaves and the LINE customer
+// advances into the FRONT spot. Sprites are random (more art = more variety).
+const CUST_DOOR  = { x: 16, y: 71, w: 5.6 }    // entry, at the doorway (small/far)
+const CUST_LINE  = { x: 30, y: 81, w: 7.2 }    // waiting spot, beside the front
+const CUST_FRONT = { x: 42, y: 82, w: 7.6 }    // serving spot, in front of the counter
+const CUST_OUT   = { x: 4,  y: 67, w: 4.8 }    // exit, back out the door (fades)
+const CUST_WALK_SECS = 3.5     // door → a spot
+const CUST_ADV_SECS = 1.5      // line → front
+const CUST_LEAVE_SECS = 3.0    // front → out
+const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp']   // drop in more for variety
 
-function ShopFront({ art, jarCounts = {}, tableCards = {} }) {
+function ShopFront({ art, jarCounts = {}, tableCards = {}, onSell }) {
   // One tinted jar per banked unit, in the order strains were planted, capped at
   // the shelf's slot count so the stock never overflows the cabinet.
   const placedIds = [...new Set(Object.values(tableCards))].filter(id => PLANTS.find(p => p.id === id))
@@ -457,33 +483,164 @@ function ShopFront({ art, jarCounts = {}, tableCards = {} }) {
           </div>
         </div>
 
-        {/* A gnome customer walks in the front door and stops at the counter. The
-            outer layer carries him along the floor (left/top) and grows him as he
-            comes forward; the inner img waddles (bob + tilt) for the walk's length
-            then settles. He's in front of the counter, so he sits above everything. */}
-        <style>{`
-          @keyframes gnomeWalk {
-            0%   { left:${GNOME_DOOR.x}%;    top:${GNOME_DOOR.y}%;    width:${GNOME_DOOR.w}%; }
-            100% { left:${GNOME_COUNTER.x}%; top:${GNOME_COUNTER.y}%; width:${GNOME_COUNTER.w}%; }
-          }
-          @keyframes gnomeWaddle {
-            0%,50%,100% { transform: translateY(0) rotate(0deg); }
-            25% { transform: translateY(-4%) rotate(2.5deg); }
-            75% { transform: translateY(-4%) rotate(-2.5deg); }
-          }
-        `}</style>
-        <div style={{
-          position: 'absolute', transform: 'translate(-50%, -100%)', zIndex: 20, pointerEvents: 'none',
-          filter: 'drop-shadow(0 6px 9px rgba(0,0,0,0.4))',
-          animation: `gnomeWalk ${GNOME_WALK_SECS}s ease-out forwards`,
-        }}>
-          <img src="/gnome.webp" alt="" aria-hidden style={{
-            display: 'block', width: '100%', transformOrigin: '50% 100%',
-            animation: `gnomeWaddle 0.5s ease-in-out ${Math.round(GNOME_WALK_SECS / 0.5)}`,
-          }} />
-        </div>
+        {/* Customer queue — shoppers walk in the door, line up, and buy jars. */}
+        <ShopCustomers onSell={onSell} jarCount={placedIds.reduce((s, id) => s + Math.floor(jarCounts[id] || 0), 0)} />
       </div>
     </div>
+  )
+}
+
+// The keyframes that move a customer between the door / line / front / exit spots.
+// Each is fill-forwards and its 0% matches the previous move's end, so swapping the
+// animation on the same element (e.g. line→front) is seamless. The inner img runs
+// `custWaddle` while walking. Built from the CUST_* constants so they stay in sync.
+function CustomerKeyframes() {
+  const f = (p) => `left:${p.x}%; top:${p.y}%; width:${p.w}%;`
+  return (
+    <style>{`
+      @keyframes custWalkInFront { 0% { ${f(CUST_DOOR)} } 100% { ${f(CUST_FRONT)} } }
+      @keyframes custWalkInLine  { 0% { ${f(CUST_DOOR)} } 100% { ${f(CUST_LINE)} } }
+      @keyframes custAdvance     { 0% { ${f(CUST_LINE)} } 100% { ${f(CUST_FRONT)} } }
+      @keyframes custLeaveFront  { 0% { ${f(CUST_FRONT)}; opacity:1; } 80% { opacity:1; } 100% { ${f(CUST_OUT)}; opacity:0; } }
+      @keyframes custWaddle {
+        0%,50%,100% { transform: translateY(0) rotate(0deg); }
+        25% { transform: translateY(-4%) rotate(2.5deg); }
+        75% { transform: translateY(-4%) rotate(-2.5deg); }
+      }
+      @keyframes custBubblePop { 0% { transform: translate(-50%,-100%) scale(0.5); opacity:0; } 100% { transform: translate(-50%,-100%) scale(1); opacity:1; } }
+    `}</style>
+  )
+}
+
+const CUST_ANIM = {
+  custWalkInFront: `custWalkInFront ${CUST_WALK_SECS}s ease-out forwards`,
+  custWalkInLine:  `custWalkInLine ${CUST_WALK_SECS}s ease-out forwards`,
+  custAdvance:     `custAdvance ${CUST_ADV_SECS}s ease-in-out forwards`,
+  custLeaveFront:  `custLeaveFront ${CUST_LEAVE_SECS}s ease-in forwards`,
+}
+
+// One customer sprite: positioned/scaled by its current move animation; the inner
+// img waddles while walking; a bubble pops over its head when it buys or is angry.
+function CustomerSprite({ c }) {
+  const walking = c.phase === 'enter' || c.phase === 'leave'
+  return (
+    <div style={{
+      position: 'absolute', transform: 'translate(-50%, -100%)', zIndex: 20, pointerEvents: 'none',
+      filter: 'drop-shadow(0 6px 9px rgba(0,0,0,0.4))',
+      animation: CUST_ANIM[c.anim],
+    }}>
+      {(c.phase === 'buy' || c.phase === 'angry') && <CustomerBubble angry={c.phase === 'angry'} value={c.value} />}
+      <img src={c.sprite} alt="" aria-hidden style={{
+        display: 'block', width: '100%', transformOrigin: '50% 100%',
+        animation: walking ? 'custWaddle 0.5s ease-in-out infinite' : 'none',
+      }} />
+    </div>
+  )
+}
+
+// Speech bubble over a customer's head — green "+$X" on a sale, red anger on an
+// empty shelf. Sized in px so it stays readable regardless of the sprite scale.
+function CustomerBubble({ angry, value }) {
+  return (
+    <div style={{
+      position: 'absolute', left: '50%', top: '-4%', transformOrigin: '50% 100%',
+      background: '#fff', border: '2px solid #1a1206', borderRadius: 10, padding: '4px 9px',
+      whiteSpace: 'nowrap', zIndex: 21, boxShadow: '0 3px 7px rgba(0,0,0,0.45)',
+      animation: 'custBubblePop 0.25s ease-out forwards',
+    }}>
+      <span style={{ fontSize: 13, fontWeight: 800, color: angry ? '#c0392b' : '#1f7a33' }}>
+        {angry ? '😠 No jars?!' : `🛒 +$${value.toLocaleString()}`}
+      </span>
+      <div style={{
+        position: 'absolute', left: '50%', bottom: -7, transform: 'translateX(-50%)', width: 0, height: 0,
+        borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '8px solid #1a1206',
+      }} />
+    </div>
+  )
+}
+
+// The customer pipeline. At most two on screen: one at FRONT (being served) and one
+// in LINE. The FRONT customer only buys once the LINE customer has arrived ("don't
+// buy until the next is beside you"); on leaving, the LINE customer advances into the
+// FRONT spot and a fresh customer is scheduled into the LINE after a jar-stock-scaled
+// delay (2s when fully stocked → ~60s when empty). State lives in a ref (the single
+// source of truth for the timer-driven machine); `bump` just forces a re-render.
+function ShopCustomers({ onSell, jarCount = 0 }) {
+  const [, bump] = useState(0)
+  const modelRef = useRef([])
+  const onSellRef = useRef(onSell); onSellRef.current = onSell
+  const jarsRef = useRef(jarCount); jarsRef.current = jarCount
+
+  useEffect(() => {
+    let alive = true
+    const timers = new Set()
+    const after = (ms, fn) => { const t = setTimeout(() => { timers.delete(t); if (alive) fn() }, ms); timers.add(t) }
+    modelRef.current = []
+    let n = 0, spawnPending = false
+    const commit = () => { if (alive) bump(v => v + 1) }
+    const at = (slot) => modelRef.current.find(c => c.slot === slot)
+    const byKey = (key) => modelRef.current.find(c => c.key === key)
+
+    const maybeSpawn = () => {
+      if (spawnPending) return
+      if (at('front') && at('line')) return                 // pipeline full
+      spawnPending = true
+      const ratio = Math.min(1, (jarsRef.current || 0) / 12) // ~12 jars in stock = fully busy
+      const sec = Math.min(60, Math.max(2, (2 + (1 - ratio) * 58) * (0.75 + Math.random() * 0.5)))
+      after(sec * 1000, () => { spawnPending = false; spawn() })
+    }
+    const spawn = () => {
+      const slot = at('front') ? 'line' : 'front'
+      if (at(slot)) { maybeSpawn(); return }
+      const key = ++n
+      const sprite = CUSTOMER_SPRITES[Math.floor(Math.random() * CUSTOMER_SPRITES.length)]
+      modelRef.current.push({
+        key, sprite, slot, phase: 'enter', value: 0,
+        anim: slot === 'front' ? 'custWalkInFront' : 'custWalkInLine',
+      })
+      commit()
+      after(CUST_WALK_SECS * 1000, () => arrive(key))
+      maybeSpawn()                                           // keep feeding the line
+    }
+    const arrive = (key) => {
+      const c = byKey(key); if (!c) return
+      c.phase = 'wait'; commit()
+      tryBuy()
+    }
+    const tryBuy = () => {
+      const front = at('front'), line = at('line')
+      if (front && front.phase === 'wait' && line && line.phase === 'wait') {
+        front.phase = 'pause'; commit()                      // don't buy until line is beside
+        after(2000, () => resolveBuy(front.key))             // 2s pause at the counter
+      }
+    }
+    const resolveBuy = (key) => {
+      const c = byKey(key); if (!c || c.phase !== 'pause') return
+      const value = onSellRef.current ? onSellRef.current() : 0
+      c.phase = value > 0 ? 'buy' : 'angry'; c.value = value; commit()
+      after(1700, () => startLeave(key))
+    }
+    const startLeave = (key) => {
+      const c = byKey(key); if (!c) return
+      c.phase = 'leave'; c.anim = 'custLeaveFront'; c.slot = 'gone'; commit()
+      after(CUST_LEAVE_SECS * 1000, () => { modelRef.current = modelRef.current.filter(x => x.key !== key); commit() })
+      const line = at('line')                                // line advances into the vacated front
+      if (line) {
+        line.slot = 'front'; line.anim = 'custAdvance'; line.phase = 'enter'; commit()
+        after(CUST_ADV_SECS * 1000, () => arrive(line.key))
+      }
+      maybeSpawn()                                           // refill the line
+    }
+
+    after(800, spawn)                                        // first customer arrives promptly
+    return () => { alive = false; timers.forEach(clearTimeout) }
+  }, [])
+
+  return (
+    <>
+      <CustomerKeyframes />
+      {modelRef.current.map(c => <CustomerSprite key={c.key} c={c} />)}
+    </>
   )
 }
 
