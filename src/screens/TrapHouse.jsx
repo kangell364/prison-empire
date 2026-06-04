@@ -126,8 +126,11 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   // Live refs so the timers/intervals read current values without re-subscribing.
   const plantedRef = useRef(planted)
   useEffect(() => { plantedRef.current = planted }, [planted])
+  // SYNCHRONOUS source of truth for the accumulator. advanceNow + haul write it
+  // immediately (not via an effect) so several bud-landings firing in the same frame
+  // each build on the latest value instead of a stale render snapshot — otherwise
+  // back-to-back landings would overwrite each other and the counter would stall.
   const budCountsRef = useRef(budCounts)
-  useEffect(() => { budCountsRef.current = budCounts }, [budCounts])
   const tableCardsRef = useRef(tableCards)
   useEffect(() => { tableCardsRef.current = tableCards }, [tableCards])
   const lastTickRef = useRef(typeof saved.lastTick === 'number' ? saved.lastTick : Date.now())
@@ -144,6 +147,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
       now,
     )
     lastTickRef.current = next.lastTick
+    budCountsRef.current = next.budCounts   // synchronous — next call builds on this
     setBudCounts(next.budCounts)
   }, [])
   useEffect(() => {
@@ -172,6 +176,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
           const id = tableCardsRef.current[tbl]
           const n = budCountsRef.current[tbl] || 0
           if (id && n) carryRef.current[id] = (carryRef.current[id] || 0) + n
+          budCountsRef.current = { ...budCountsRef.current, [tbl]: 0 }  // empty (sync) so advanceNow sees 0
           setBudCounts(c => ({ ...c, [tbl]: 0 }))                   // empty the grow counter on pass
           setBudResync(r => r + 1)                                  // re-lock belt-bud phase to 0
         }, passTimeMs((x0 + x1) / 2, SKATE_MS.B))
@@ -717,10 +722,11 @@ const BUD_PATHS = {
 }
 const BUD_W = 5.7       // bud width, % of room-art box width (rotated art, 25% smaller)
 const BUD_SECS = 25.6   // seconds for one full run down the path (higher = slower)
-// Keyframe % for the 6 waypoints. Belt travel (pts 0–3) takes ~98.9% of the run
-// (slow); the drop into the box (pts 3→4→5) is squeezed into the last ~1.1% so
-// the bud snaps into the box fast once it hits the belt edge.
-const BUD_PCTS = [0, 33, 66, 98.9, 99.45, 100]
+// Keyframe % for the 6 waypoints. The waypoints are equally spaced down the path,
+// so spacing them evenly in time (every 20%) gives CONSTANT speed all the way into
+// the box — no snap/teleport at the end — which keeps the staggered buds evenly
+// spaced through the whole run, including the drop into the bin.
+const BUD_PCTS = [0, 20, 40, 60, 80, 100]
 
 // Per-table box ladders, in placement order. The FIRST slot (P4) is filled by
 // adding a Grow Card via the "+ Add" slot (see GrowRoom) — no cost. The
