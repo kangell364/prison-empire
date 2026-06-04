@@ -242,30 +242,27 @@ export default function TrapHouse({ onBack, isOwner = true }) {
     }
   }, [skate.phase])
 
-  // MACHINE: turns raw buds into jars. Every tick, each strain holding ≥ JAR_FILL
-  // raw buds in the right box pops ONE jar — the right counter drops by JAR_FILL
-  // and a jar count is banked (the belt-jar animation + left $ counter follow it
-  // in PackingRoom). One jar per strain per tick so they come out one at a time.
-  // The two setters are kept separate (no nested setState) — decide which strains
-  // pop from a ref, then update each counter with its own pure updater.
+  // MACHINE: turns raw buds into jars. Each tick it pops just ONE jar, cycling
+  // round-robin through the strains that have ≥ JAR_FILL raw buds — so jars come off
+  // the belt one at a time, ALTERNATING colours instead of several at once. (One
+  // strain per tick means lower total throughput, which is the intended trade.)
   const packCountsRef = useRef(packCounts)
   useEffect(() => { packCountsRef.current = packCounts }, [packCounts])
+  const machineCursorRef = useRef(0)
   useEffect(() => {
     const id = setInterval(() => {
       const pc = packCountsRef.current
-      const popped = []
-      for (const strain in pc) { if ((pc[strain] || 0) >= JAR_FILL) popped.push(strain) }
-      if (!popped.length) return
-      setPackCounts(prev => {
-        const next = { ...prev }
-        popped.forEach(s => { if ((next[s] || 0) >= JAR_FILL) next[s] -= JAR_FILL })
-        return next
-      })
-      setJarCounts(prev => {
-        const nj = { ...prev }
-        popped.forEach(s => { nj[s] = (nj[s] || 0) + 1 })
-        return nj
-      })
+      const strains = Object.keys(pc)
+      if (!strains.length) return
+      // Next eligible strain starting from the cursor, so it alternates evenly.
+      let pick = null
+      for (let i = 0; i < strains.length; i++) {
+        const idx = (machineCursorRef.current + i) % strains.length
+        if ((pc[strains[idx]] || 0) >= JAR_FILL) { pick = strains[idx]; machineCursorRef.current = (idx + 1) % strains.length; break }
+      }
+      if (!pick) return
+      setPackCounts(prev => { const next = { ...prev }; if ((next[pick] || 0) >= JAR_FILL) next[pick] -= JAR_FILL; return next })
+      setJarCounts(prev => ({ ...prev, [pick]: (prev[pick] || 0) + 1 }))
     }, MACHINE_MS)
     return () => clearInterval(id)
   }, [])
