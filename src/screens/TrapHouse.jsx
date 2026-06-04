@@ -811,7 +811,7 @@ function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBud
               <img src="/sloth-arm.webp" alt="" aria-hidden style={{
                 position: 'absolute', left: 0, top: 0, width: '100%',
                 transformOrigin: SLOTH_PIVOT,
-                animation: swinging ? `slothSlice 1.5s ease-in-out ${SLOTH_ARM_DELAYS[i]} infinite` : 'none',
+                animation: swinging ? `slothSlice 1.8s ease-in-out ${SLOTH_ARM_DELAYS[i]} infinite` : 'none',
               }} />
             </div>
           )
