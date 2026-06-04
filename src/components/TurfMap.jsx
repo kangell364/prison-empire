@@ -17,7 +17,7 @@ const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.pn
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
 const GOLD = '#c9a84c'
 
-export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse, onTrapHouseTap, otherHouses, myUserId }) {
+export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse, trapHouseName, onTrapHouseTap, otherHouses, myUserId }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const onBlockTapRef = useRef(onBlockTap)
@@ -96,17 +96,19 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
   useEffect(() => {
     const map = mapRef.current
     if (!map || tLat == null || tLng == null) return
+    const myName = String(trapHouseName || 'You').replace(/[<>]/g, '')
     const icon = L.divIcon({
-      className: '', iconSize: [44, 52], iconAnchor: [22, 46],
+      className: '', iconSize: [44, 64], iconAnchor: [22, 46],
       html: `<div style="text-align:center;cursor:pointer">
         <div style="width:38px;height:38px;border-radius:11px;background:#1a1510;border:2px solid ${GOLD};display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 2px 8px rgba(0,0,0,.7);margin:0 auto">🏚️</div>
         <div style="margin:2px auto 0;width:8px;height:8px;background:${GOLD};transform:rotate(45deg);box-shadow:0 1px 3px rgba(0,0,0,.6)"></div>
+        <div style="margin:3px auto 0;font-size:9px;font-weight:700;color:${GOLD};background:rgba(0,0,0,.62);border-radius:4px;padding:1px 4px;white-space:normal;max-width:120px;line-height:1.2;display:inline-block">${myName}</div>
       </div>`,
     })
     const m = L.marker([tLat, tLng], { icon, zIndexOffset: 1000 }).addTo(map)
     m.on('click', () => onTrapTapRef.current && onTrapTapRef.current())
     return () => { try { map.removeLayer(m) } catch {} }
-  }, [tLat, tLng])
+  }, [tLat, tLng, trapHouseName])
 
   // OTHER players' trap houses (the shared world). Red-tinted house pins with
   // the owner's name; excludes your own (which has its own gold pin above).
@@ -122,7 +124,7 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
       const name = String(h.name || 'Player').replace(/[<>]/g, '')
       const icon = L.divIcon({ className: '', iconSize: [40, 48], iconAnchor: [20, 42], html: `<div style="text-align:center">
         <div style="width:32px;height:32px;border-radius:10px;background:#1a1015;border:2px solid #e74c3c;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 2px 8px rgba(0,0,0,.7);margin:0 auto">🏚️</div>
-        <div style="margin-top:2px;font-size:9px;color:#fff;background:rgba(0,0,0,.62);border-radius:4px;padding:1px 4px;white-space:nowrap;max-width:84px;overflow:hidden;text-overflow:ellipsis">${name}</div>
+        <div style="margin-top:2px;font-size:9px;color:#fff;background:rgba(0,0,0,.62);border-radius:4px;padding:1px 4px;white-space:normal;max-width:120px;line-height:1.2;margin-left:auto;margin-right:auto;display:inline-block">${name}</div>
       </div>` })
       L.marker([h.lat, h.lng], { icon }).addTo(layer)
     })
