@@ -453,7 +453,7 @@ const QUEUE_SPOTS = [
 ]
 const CUST_SPEED = 11          // walk speed, % of room width per second (constant pace)
 const moveSecs = (ax, bx) => Math.max(0.6, Math.abs(ax - bx) / CUST_SPEED)
-const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp', '/gnome-6.webp', '/gnome-7.webp', '/gnome-8.webp', '/gnome-9.webp']
+const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp', '/gnome-6.webp', '/gnome-7.webp', '/gnome-8.webp', '/gnome-9.webp', '/gnome-10.webp']
 const CUST_SIZE = {                            // per-sprite size multipliers
   '/gnome-2.webp': 1,
   '/gnome-5.webp': 1.2,
