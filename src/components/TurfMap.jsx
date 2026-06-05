@@ -168,9 +168,18 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
       return L.marker([lat, lng], { icon, zIndexOffset: 2000, interactive: false }).addTo(map)
     }
     const removeMarker = () => { if (marker) { try { map.removeLayer(marker) } catch {} ; marker = null } }
+    let pathLine = null
+    const removePath = () => { if (pathLine) { try { map.removeLayer(pathLine) } catch {} ; pathLine = null } }
 
     // Frame both endpoints so the whole round trip stays in view.
     try { map.fitBounds([[from.lat, from.lng], [to.lat, to.lng]], { padding: [90, 90], maxZoom: 15, animate: true }) } catch {}
+
+    // Pulsing dotted path from attacker -> defender for the duration of the raid run.
+    pathLine = L.polyline([[from.lat, from.lng], [to.lat, to.lng]], {
+      color: '#e74c3c', weight: 2.5, dashArray: '2 9', lineCap: 'round',
+      className: 'raid-path-line', interactive: false,
+    }).addTo(map)
+
     marker = makeMarker(from.lat, from.lng, outRight)
 
     let raf = null, startTs = null, done = false
@@ -197,11 +206,12 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
         // arrived home — vanish + notify
         done = true
         removeMarker()
+        removePath()
         onRaidArriveRef.current && onRaidArriveRef.current()
       }
     }
     raf = requestAnimationFrame(step)
-    return () => { if (raf) cancelAnimationFrame(raf); removeMarker() }
+    return () => { if (raf) cancelAnimationFrame(raf); removeMarker(); removePath() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raidDriveId])
 
