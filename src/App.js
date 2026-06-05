@@ -21,6 +21,7 @@ import { usePlayerCard } from './state/profileStore'
 import { useUnreadCount } from './state/fightLogStore'
 import { NotificationsModal } from './components/NotificationsModal'
 import { InstallPrompt } from './components/InstallPrompt'
+import { RaidHud } from './components/RaidHud'
 // NOTE: AR camera encounter (src/components/CameraEncounter.jsx) is built but
 // parked — re-import + re-add the header button below to bring it back.
 
@@ -143,6 +144,11 @@ export default function App() {
           <i className="ti ti-chevron-right" style={{ color: '#e74c3c', fontSize: 18 }} />
         </div>
       )}
+
+      {/* Global PvP raid alerts — incoming/outgoing banners + landing modal,
+          shown on every screen (an incoming raid is urgent). The attack-car
+          animation itself stays on the turf map. */}
+      <RaidHud onGoToMap={() => setScreen('map')} />
 
       {/* Screen Content */}
       {renderScreen()}
