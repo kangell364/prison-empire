@@ -301,6 +301,18 @@ body {
   100% { transform: scale(2.2);  opacity: 0; }
 }
 
+/* MENU board attention — a pulsing gold ring + glow framing the price board so
+   players notice they can set prices there. */
+@keyframes menuGlow {
+  0%, 100% { box-shadow: 0 0 0 1.5px rgba(201,168,76,0.25), 0 0 8px 1px rgba(201,168,76,0.20); }
+  50%      { box-shadow: 0 0 0 2.5px rgba(201,168,76,0.95), 0 0 20px 5px rgba(201,168,76,0.70); }
+}
+/* Little "Set Prices" hint chip that bobs to catch the eye. */
+@keyframes menuBob {
+  0%, 100% { transform: translate(-50%, 0); }
+  50%      { transform: translate(-50%, -3px); }
+}
+
 /* Pulsing dotted raid path — attacker -> defender while a raid is in flight.
    Pulses opacity and marches the dashes toward the target. */
 .raid-path-line {
