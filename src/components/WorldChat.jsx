@@ -20,11 +20,14 @@ export function ChatScreen() {
   const [busy, setBusy] = useState(false)
   const scrollRef = useRef(null)
 
-  // Auto-scroll to the newest message on open + whenever a message arrives.
+  // Feed runs newest-first under the input bar, so snap to the TOP when a new
+  // message arrives (your just-sent message shows right under the composer).
   useEffect(() => {
     const el = scrollRef.current
-    if (el) el.scrollTop = el.scrollHeight
+    if (el) el.scrollTop = 0
   }, [msgs])
+
+  const feed = msgs.slice().reverse()   // newest first
 
   const send = async () => {
     const text = draft.trim()
@@ -43,19 +46,33 @@ export function ChatScreen() {
       paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
 
       {/* Title row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderBottom: '0.5px solid #1e1e2a', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px 8px', flexShrink: 0 }}>
         <i className="ti ti-world" style={{ color: GOLD, fontSize: 18 }} />
         <div style={{ color: '#fff', fontSize: 15, fontWeight: 800 }}>World Chat</div>
         <div style={{ color: DIM, fontSize: 11, marginLeft: 'auto' }}>everyone, everywhere</div>
       </div>
 
-      {/* Messages */}
+      {/* Composer — at the TOP */}
+      <div style={{ display: 'flex', gap: 8, padding: '0 12px 10px', borderBottom: '0.5px solid #1e1e2a', flexShrink: 0 }}>
+        <input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={onKey} maxLength={280}
+          placeholder="Message the world…" style={{
+            flex: 1, background: '#0c0c14', border: '1px solid #2a2a3a', borderRadius: 11,
+            padding: '11px 13px', color: '#fff', fontSize: 14, outline: 'none' }} />
+        <button onClick={send} disabled={busy || !draft.trim()} aria-label="Send" style={{
+          width: 44, borderRadius: 11, border: 'none', cursor: draft.trim() ? 'pointer' : 'default',
+          background: draft.trim() ? GOLD : '#1c1c2a', color: draft.trim() ? '#1a1206' : '#555',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <i className="ti ti-send" style={{ fontSize: 18 }} />
+        </button>
+      </div>
+
+      {/* Feed — BELOW the bar, newest first */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {msgs.length === 0 ? (
+        {feed.length === 0 ? (
           <div style={{ color: DIM, fontSize: 12.5, textAlign: 'center', margin: 'auto', lineHeight: 1.5 }}>
             No messages yet.<br />Say something to the whole world.
           </div>
-        ) : msgs.map(m => {
+        ) : feed.map(m => {
           const mine = m.user_id === auth.userId
           const prof = players[m.user_id] || {}
           const look = resolveLook(prof.player_look_id)
@@ -76,20 +93,6 @@ export function ChatScreen() {
             </div>
           )
         })}
-      </div>
-
-      {/* Composer */}
-      <div style={{ display: 'flex', gap: 8, padding: '10px 12px', borderTop: '0.5px solid #1e1e2a', flexShrink: 0 }}>
-        <input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={onKey} maxLength={280}
-          placeholder="Message the world…" style={{
-            flex: 1, background: '#0c0c14', border: '1px solid #2a2a3a', borderRadius: 11,
-            padding: '11px 13px', color: '#fff', fontSize: 14, outline: 'none' }} />
-        <button onClick={send} disabled={busy || !draft.trim()} aria-label="Send" style={{
-          width: 44, borderRadius: 11, border: 'none', cursor: draft.trim() ? 'pointer' : 'default',
-          background: draft.trim() ? GOLD : '#1c1c2a', color: draft.trim() ? '#1a1206' : '#555',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <i className="ti ti-send" style={{ fontSize: 18 }} />
-        </button>
       </div>
     </div>
   )
