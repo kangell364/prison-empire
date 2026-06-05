@@ -138,40 +138,70 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [othersKey])
 
-  // Attack-car drive — the raid "en route" flourish. Animates the lowrider
-  // sprite from the attacker's trap house to the defender's along a straight
-  // line, flipped to face the direction of travel, then clears itself and
-  // notifies the parent (where damage/landing will resolve once the backend is in).
+  // Attack-car drive — the raid "en route" flourish, in three beats:
+  //   1. OUT  — lowrider drives attacker -> defender (the hit going out)
+  //   2. HOLD — car vanishes at the defender's house (the attack is happening)
+  //   3. BACK — car returns defender -> attacker, then vanishes at home
+  // The sprite faces LEFT by default, so it's flipped to face each leg's
+  // travel direction. On completion it notifies the parent (where damage/
+  // landing will resolve once the backend is in).
   const raidDriveId = raidDrive && raidDrive.id
   useEffect(() => {
     const map = mapRef.current
     if (!map || !raidDrive) return
     const { from, to } = raidDrive
     if (from == null || to == null) return
-    const facingRight = to.lng > from.lng    // sprite faces LEFT by default
-    const icon = L.divIcon({
-      className: '', iconSize: [100, 42], iconAnchor: [50, 21],
-      html: `<div style="transform:scaleX(${facingRight ? -1 : 1});filter:drop-shadow(0 4px 7px rgba(0,0,0,.65))">
-        <img src="/attack-car.png" alt="" style="width:100px;display:block" />
-      </div>`,
-    })
-    const marker = L.marker([from.lat, from.lng], { icon, zIndexOffset: 2000, interactive: false }).addTo(map)
-    // Frame both endpoints so the whole drive is visible.
-    try { map.fitBounds([[from.lat, from.lng], [to.lat, to.lng]], { padding: [90, 90], maxZoom: 15, animate: true }) } catch {}
 
-    const DURATION = 6500
-    let raf = null, startTs = null, done = false
+    const OUT = 5000, HOLD = 1800, BACK = 5000
     const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2   // easeInOutQuad
+    const outRight  = to.lng > from.lng       // heading toward defender
+    const backRight = from.lng > to.lng       // heading back toward attacker
+
+    let marker = null
+    const makeMarker = (lat, lng, facingRight) => {
+      const icon = L.divIcon({
+        className: '', iconSize: [100, 42], iconAnchor: [50, 21],
+        html: `<div style="transform:scaleX(${facingRight ? -1 : 1});filter:drop-shadow(0 4px 7px rgba(0,0,0,.65))">
+          <img src="/attack-car.png" alt="" style="width:100px;display:block" />
+        </div>`,
+      })
+      return L.marker([lat, lng], { icon, zIndexOffset: 2000, interactive: false }).addTo(map)
+    }
+    const removeMarker = () => { if (marker) { try { map.removeLayer(marker) } catch {} ; marker = null } }
+
+    // Frame both endpoints so the whole round trip stays in view.
+    try { map.fitBounds([[from.lat, from.lng], [to.lat, to.lng]], { padding: [90, 90], maxZoom: 15, animate: true }) } catch {}
+    marker = makeMarker(from.lat, from.lng, outRight)
+
+    let raf = null, startTs = null, done = false
     const step = ts => {
       if (startTs == null) startTs = ts
-      const k = Math.min(1, (ts - startTs) / DURATION)
-      const e = ease(k)
-      marker.setLatLng([from.lat + (to.lat - from.lat) * e, from.lng + (to.lng - from.lng) * e])
-      if (k < 1) { raf = requestAnimationFrame(step) }
-      else if (!done) { done = true; try { map.removeLayer(marker) } catch {}; onRaidArriveRef.current && onRaidArriveRef.current() }
+      const t = ts - startTs
+      if (t < OUT) {
+        // 1. drive out to the defender
+        if (!marker) marker = makeMarker(from.lat, from.lng, outRight)
+        const e = ease(t / OUT)
+        marker.setLatLng([from.lat + (to.lat - from.lat) * e, from.lng + (to.lng - from.lng) * e])
+        raf = requestAnimationFrame(step)
+      } else if (t < OUT + HOLD) {
+        // 2. the attack — car is gone while the hit goes down
+        removeMarker()
+        raf = requestAnimationFrame(step)
+      } else if (t < OUT + HOLD + BACK) {
+        // 3. drive back home
+        if (!marker) marker = makeMarker(to.lat, to.lng, backRight)
+        const e = ease((t - OUT - HOLD) / BACK)
+        marker.setLatLng([to.lat + (from.lat - to.lat) * e, to.lng + (from.lng - to.lng) * e])
+        raf = requestAnimationFrame(step)
+      } else if (!done) {
+        // arrived home — vanish + notify
+        done = true
+        removeMarker()
+        onRaidArriveRef.current && onRaidArriveRef.current()
+      }
     }
     raf = requestAnimationFrame(step)
-    return () => { if (raf) cancelAnimationFrame(raf); try { map.removeLayer(marker) } catch {} }
+    return () => { if (raf) cancelAnimationFrame(raf); removeMarker() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raidDriveId])
 
