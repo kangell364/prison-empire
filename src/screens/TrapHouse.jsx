@@ -602,6 +602,7 @@ const CUST_SIZE = {                            // per-sprite size multipliers
   '/gnome-8.webp': 1.2,
   '/gnome-9.webp': 2,
   '/gnome-14.webp': 1.2,                       // tall, lanky sprite — 2× the prior 0.6 size
+  '/gnome-16.webp': 2.5,                       // clown — 2.5× size
 }
 // A customer's personal price tolerance (1.0 = pays the street price exactly). ~95%
 // happily pay street or more; ~5% are picky and balk even at street price.
