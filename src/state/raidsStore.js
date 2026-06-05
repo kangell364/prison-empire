@@ -125,6 +125,16 @@ async function loadRaids() {
   raidsListeners.forEach(fn => fn(raidsCache))
 }
 
+// Defensive: drop any pre-existing channel with this topic so a re-entry can't
+// hit "cannot add postgres_changes callbacks after subscribe()".
+function freshRaidsChannel(topic) {
+  try {
+    const existing = supabase.getChannels ? supabase.getChannels() : []
+    existing.forEach(c => { if (c.topic === `realtime:${topic}`) { try { supabase.removeChannel(c) } catch {} } })
+  } catch {}
+  return supabase.channel(topic)
+}
+
 function startRaidsSync() {
   if (!isSupabaseConfigured) return
   const uid = getUserId()
@@ -133,7 +143,7 @@ function startRaidsSync() {
   raidsUid = uid
   raidsCache = { incoming: [], outgoing: [] }
   loadRaids()
-  raidsChannel = supabase.channel(`raids:${uid}`)
+  raidsChannel = freshRaidsChannel(`raids:${uid}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'raids', filter: `defender_id=eq.${uid}` }, loadRaids)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'raids', filter: `attacker_id=eq.${uid}` }, loadRaids)
     .subscribe()
