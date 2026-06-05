@@ -13,6 +13,7 @@ import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { SwapLookModal } from '../components/SwapLookModal'
 import { StoreModal } from '../components/StoreModal'
 import { useGang } from '../state/gangStore'
+import { useRoomBank } from '../state/roomBankStore'
 import { sfx } from '../sounds'
 
 export default function Dashboard({ onNavigate }) {
@@ -23,6 +24,7 @@ export default function Dashboard({ onNavigate }) {
   const prog = useProgress()
   const xpNeed = xpForLevel(prog.level)
   const xpPct = Math.round((prog.xp / xpNeed) * 100)
+  const trapBank = useRoomBank()           // same BANK shown in the trap house first room
   // Live "Your Turf" block economy — re-renders when blocks change (recruit /
   // poach / collect / AI poach).
   useBlocksVersion()
@@ -175,6 +177,15 @@ export default function Dashboard({ onNavigate }) {
         >
           <img src="/grow-room.webp" alt="Trap House"
             style={{ display: 'block', width: '100%', height: 'auto' }} />
+          {/* BANK — same balance shown in the trap house's first room. */}
+          <div style={{
+            position: 'absolute', top: 10, right: 10,
+            display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
+            background: 'rgba(26,21,16,0.85)', border: '0.5px solid #c9a84c55', borderRadius: 11, padding: '5px 12px',
+          }}>
+            <span style={{ color: '#9a8', fontSize: 9, fontWeight: 700, letterSpacing: 1 }}>BANK</span>
+            <span style={{ color: '#2ecc71', fontWeight: 800, fontSize: 18, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>${trapBank.toLocaleString()}</span>
+          </div>
           <div style={{
             position: 'absolute', left: 0, right: 0, bottom: 0,
             padding: '20px 14px 11px',

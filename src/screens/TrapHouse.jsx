@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { sfx } from '../sounds'
 import { PLANTS, plantCashValue, RARITY_COLORS } from '../data/gameData'
 import { getOwnedPlantTuples } from '../state/plantCardsStore'
+import { setRoomBank } from '../state/roomBankStore'
 import { Avatar } from '../components/Avatar'
 
 const GOLD = '#c9a84c'
@@ -95,6 +96,8 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   const [saved] = useState(loadSaved)
   const [planted, setPlanted] = useState(() => Array.isArray(saved.planted) ? saved.planted : [])  // placed plant slots (each brings its bud + path)
   const [bank, setBank] = useState(() => typeof saved.bank === 'number' ? saved.bank : 200000)      // this store's bank balance ($) — full bank for testing
+  // Mirror the bank to roomBankStore so the home-screen trap-house card shows the same number.
+  useEffect(() => { setRoomBank(bank) }, [bank])
   // Shop reputation (0–100) — drives the customer arrival rate.
   const [rep, setRep] = useState(() => typeof saved.rep === 'number' ? saved.rep : REP_START)
   // Per-strain popularity multiplier (a rotating "hot strain" sits above 1) — weights
