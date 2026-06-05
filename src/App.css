@@ -301,6 +301,16 @@ body {
   100% { transform: scale(2.2);  opacity: 0; }
 }
 
+/* Pulsing dotted raid path — attacker -> defender while a raid is in flight.
+   Pulses opacity and marches the dashes toward the target. */
+.raid-path-line {
+  animation: raidPathPulse 1.1s ease-in-out infinite;
+}
+@keyframes raidPathPulse {
+  0%, 100% { opacity: 0.30; stroke-dashoffset: 28; }
+  50%      { opacity: 0.95; stroke-dashoffset: 0; }
+}
+
 /* Card battle animations */
 @keyframes battleCardInLeft {
   from { transform: translateX(-50px); opacity: 0; }

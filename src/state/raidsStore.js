@@ -13,11 +13,11 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { supabase, isSupabaseConfigured } from '../supabase'
-import { getUserId, spendSteel, addSteel } from './profileStore'
+import { getUserId, spendHustle, addHustle, spendSteel, addSteel } from './profileStore'
 
 const COUNTY_FIPS = '48201'                       // Harris (MVP single county)
 
-export const RAID_STEEL_COST  = 200               // cost to send a raid
+export const RAID_HUSTLE_COST = 200               // Hustle to send a raid
 export const REINFORCE_COST   = 120               // Steel to patch your own house
 export const REINFORCE_AMOUNT = 30                // HP restored per reinforce
 
@@ -31,7 +31,7 @@ export function raidDamageFor(power) {
   return Math.max(15, Math.min(80, Math.round((power || 0) * 0.4)))
 }
 
-// Launch a raid. Spends Steel up front (refunded if the insert fails) and
+// Launch a raid. Spends Hustle up front (refunded if the insert fails) and
 // returns { ok, raid? , error? }.
 export async function launchRaid({ targetHouse, power }) {
   if (!isSupabaseConfigured) return { ok: false, error: 'Raids need an account connection.' }
@@ -39,7 +39,7 @@ export async function launchRaid({ targetHouse, power }) {
   if (!uid) return { ok: false, error: 'no-auth' }
   if (!targetHouse || !targetHouse.id) return { ok: false, error: 'no-target' }
   if (targetHouse.owner_id === uid) return { ok: false, error: 'self' }
-  if (!spendSteel(RAID_STEEL_COST)) return { ok: false, error: 'broke' }
+  if (!spendHustle(RAID_HUSTLE_COST)) return { ok: false, error: 'broke' }
 
   const ends_at = new Date(Date.now() + RAID_DURATION_MS).toISOString()
   const { data, error } = await supabase.from('raids').insert({
@@ -51,7 +51,7 @@ export async function launchRaid({ targetHouse, power }) {
   }).select().single()
 
   if (error) {
-    addSteel(RAID_STEEL_COST)                     // refund — the raid never launched
+    addHustle(RAID_HUSTLE_COST)                   // refund — the raid never launched
     return { ok: false, error: error.message }
   }
   return { ok: true, raid: data }

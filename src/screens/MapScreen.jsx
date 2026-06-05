@@ -10,9 +10,9 @@ import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks, s
 import { useMapData, buildCityCountyMap, buildUnlockedCountyTest, UNLOCKED_COUNTY_FIPS, HARRIS_CENTER, STATE_CODE_TO_FIPS, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
 import { knockOut } from '../state/vitalsStore'
 import { getBounty } from '../state/bountyStore'
-import { useDisplayName, useAuth, resolveLook, useSteel } from '../state/profileStore'
+import { useDisplayName, useAuth, resolveLook, useHustle } from '../state/profileStore'
 import { usePlayers } from '../state/playersStore'
-import { useActiveRaids, useRaidResolver, launchRaid, reinforceMyHouse, RAID_STEEL_COST, REINFORCE_COST, RAID_DURATION_MS } from '../state/raidsStore'
+import { useActiveRaids, useRaidResolver, launchRaid, reinforceMyHouse, RAID_HUSTLE_COST, REINFORCE_COST, RAID_DURATION_MS } from '../state/raidsStore'
 import { usePlayerStats } from '../state/statsStore'
 import { Avatar } from '../components/Avatar'
 import { ensureMyHouse, useSharedHouses, harrisSpotFor } from '../state/sharedHousesStore'
@@ -1039,8 +1039,8 @@ function PlayButton({ emoji, label, sub, tint, onClick, disabled }) {
 // "Send the Hit" launch. Launch spends Steel + creates the timed raid row
 // (raidsStore.launchRaid, run by the parent) and fires the attack-car drive.
 function AttackPlan({ house, name, myPower, hp, hpMax, onBack, onClose, onLaunch }) {
-  const steel = useSteel()
-  const broke = steel < RAID_STEEL_COST
+  const hustle = useHustle()
+  const broke = hustle < RAID_HUSTLE_COST
   // Visual estimate only — real damage is computed server-side at landing.
   const estDamage = Math.max(15, Math.min(80, Math.round(myPower * 0.4)))
 
@@ -1060,12 +1060,12 @@ function AttackPlan({ house, name, myPower, hp, hpMax, onBack, onClose, onLaunch
       </div>
 
       <div style={{ marginTop: 12, background: '#0e0e16', border: '1px solid #22222e', borderRadius: 12, padding: 12, fontSize: 12, color: '#aaa', lineHeight: 1.5 }}>
-        Send the crew on {name}'s trap house. They'll be <span style={{ color: '#fff' }}>en route</span> — once the car lands it hits the house. Knock it to <span style={{ color: RED }}>0</span> and you loot their Hustle. They can reinforce before you arrive.
+        Send the crew on {name}'s trap house. They'll be <span style={{ color: '#fff' }}>en route</span> — once the car lands it hits the house. Knock it to <span style={{ color: RED }}>0</span> to bust it down. They can reinforce before you arrive.
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, fontSize: 12 }}>
         <span style={{ color: DIM }}>COST</span>
-        <span style={{ color: broke ? RED : '#fff', fontWeight: 700 }}>{RAID_STEEL_COST} Steel{broke ? ' — not enough' : ''}</span>
+        <span style={{ color: broke ? RED : '#fff', fontWeight: 700 }}>{RAID_HUSTLE_COST} Hustle{broke ? ' — not enough' : ''}</span>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
@@ -1222,7 +1222,6 @@ function PvpRaidLandedModal({ entry, myUserId, onClose }) {
   const iAttacked = raid.attacker_id === myUserId
   const other = name(iAttacked ? raid.defender_id : raid.attacker_id)
   const outcome = result?.outcome
-  const stolen = result?.stolen || 0
   const damage = result?.damage || 0
 
   let accent = GOLD, title = '', body = ''
@@ -1230,8 +1229,8 @@ function PvpRaidLandedModal({ entry, myUserId, onClose }) {
     accent = iAttacked ? '#2ecc71' : RED
     title = iAttacked ? 'House Knocked Over!' : 'Trap House Knocked Over'
     body = iAttacked
-      ? `You broke into ${other}'s trap house and looted $${stolen.toLocaleString()} Hustle.`
-      : `${other} knocked over your trap house and looted $${stolen.toLocaleString()} Hustle.`
+      ? `You busted down ${other}'s trap house. They'll have to rebuild.`
+      : `${other} busted down your trap house. Reinforce to lock it back up.`
   } else if (outcome === 'held') {
     accent = iAttacked ? GOLD : '#2ecc71'
     title = iAttacked ? 'Defense Held' : 'You Held the Line'
@@ -1255,11 +1254,6 @@ function PvpRaidLandedModal({ entry, myUserId, onClose }) {
         <div style={{ color: accent, fontSize: 11, letterSpacing: 2, fontWeight: 700, marginTop: 8 }}>RAID {iAttacked ? 'OUTGOING' : 'INCOMING'}</div>
         <div style={{ color: '#fff', fontSize: 20, fontWeight: 700, marginTop: 4 }}>{title}</div>
         <div style={{ color: '#aaa', fontSize: 13, lineHeight: 1.55, marginTop: 10 }}>{body}</div>
-        {stolen > 0 && (
-          <div style={{ marginTop: 14, background: '#0e0e16', borderRadius: 12, padding: '10px 14px', color: iAttacked ? '#2ecc71' : RED, fontSize: 18, fontWeight: 700 }}>
-            {iAttacked ? '+' : '−'}${stolen.toLocaleString()} Hustle
-          </div>
-        )}
         <button className="btn btn-gold" style={{ width: '100%', padding: 12, marginTop: 18 }} onClick={onClose}>OK</button>
       </div>
     </div>
