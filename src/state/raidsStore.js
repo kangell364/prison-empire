@@ -14,6 +14,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase, isSupabaseConfigured } from '../supabase'
 import { getUserId, useAuth, spendHustle, addHustle, spendSteel, addSteel } from './profileStore'
+import { harrisSpotFor } from './sharedHousesStore'
 
 const COUNTY_FIPS = '48201'                       // Harris (MVP single county)
 
@@ -21,9 +22,30 @@ export const RAID_HUSTLE_COST = 200               // Hustle to send a raid
 export const REINFORCE_COST   = 120               // Steel to patch your own house
 export const REINFORCE_AMOUNT = 30                // HP restored per reinforce
 
-// Shorter timer in test mode (?test=1) so the en-route flow is quick to verify.
+// Attack travel time scales with the DISTANCE between the two trap houses:
+// closer rival = faster hit, farther = longer (gives distant defenders more
+// time to reinforce). Mapped into a 2–8 min window (15–45s with ?test=1 so the
+// en-route flow is quick to verify).
 const TEST = typeof window !== 'undefined' && /(?:\?|&)test=1/.test(window.location.search)
-export const RAID_DURATION_MS = TEST ? 30_000 : 15 * 60_000
+export const RAID_MIN_MS = TEST ? 15_000 : 2 * 60_000
+export const RAID_MAX_MS = TEST ? 45_000 : 8 * 60_000
+// Widest two houses can sit apart inside Harris (SPREAD 0.18° box → ~0.255° diagonal).
+const MAX_SEP_DEG = 0.26
+
+// Straight-line separation between two {lat,lng} points, in degrees (good enough
+// for a single county — no need for haversine at this scale).
+export function raidSeparationDeg(a, b) {
+  if (!a || !b) return 0
+  const dLat = (a.lat || 0) - (b.lat || 0)
+  const dLng = (a.lng || 0) - (b.lng || 0)
+  return Math.sqrt(dLat * dLat + dLng * dLng)
+}
+
+// Map a separation to the en-route duration (ms), clamped to [MIN, MAX].
+export function raidDurationMs(from, to) {
+  const t = Math.max(0, Math.min(1, raidSeparationDeg(from, to) / MAX_SEP_DEG))
+  return Math.round(RAID_MIN_MS + t * (RAID_MAX_MS - RAID_MIN_MS))
+}
 
 // Damage scales with the attacker's combat power, clamped so no single raid is
 // trivial or instantly fatal to a full house.
@@ -41,7 +63,10 @@ export async function launchRaid({ targetHouse, power }) {
   if (targetHouse.owner_id === uid) return { ok: false, error: 'self' }
   if (!spendHustle(RAID_HUSTLE_COST)) return { ok: false, error: 'broke' }
 
-  const ends_at = new Date(Date.now() + RAID_DURATION_MS).toISOString()
+  // Duration scales with how far the target sits from your trap house.
+  const from = harrisSpotFor(uid)
+  const to = { lat: targetHouse.lat, lng: targetHouse.lng }
+  const ends_at = new Date(Date.now() + raidDurationMs(from, to)).toISOString()
   const { data, error } = await supabase.from('raids').insert({
     defender_id:     targetHouse.owner_id,
     target_house_id: targetHouse.id,
