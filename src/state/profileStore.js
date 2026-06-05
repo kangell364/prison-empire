@@ -52,6 +52,34 @@ export function useAuth() {
   return s
 }
 
+// ---- password recovery ---------------------------------------------
+// When a player opens the reset link from their email, Supabase parses the
+// recovery token out of the URL and fires a PASSWORD_RECOVERY event. We surface
+// that so the app can pop a "set a new password" screen (otherwise the link just
+// signs them in with the OLD password still set, and they're stuck).
+const recoveryListeners = new Set()
+export function onPasswordRecovery(fn) { recoveryListeners.add(fn); return () => recoveryListeners.delete(fn) }
+if (isSupabaseConfigured) {
+  supabase.auth.onAuthStateChange((event) => {
+    if (event === 'PASSWORD_RECOVERY') recoveryListeners.forEach(fn => fn())
+  })
+}
+
+// Set a new password for the signed-in (or recovery) session. Used by the reset
+// flow after the email link, and could back an in-app "change password" later.
+export async function updatePassword(newPassword) {
+  if (!isSupabaseConfigured) return { ok: false, error: 'Accounts are unavailable right now.' }
+  if (!newPassword || newPassword.length < PASSWORD_MIN) return { ok: false, error: `Password must be at least ${PASSWORD_MIN} characters.` }
+  try {
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) return { ok: false, error: friendlyAuthError(error) }
+    await loadProfileForSession()          // adopt the now-permanent session + profile
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: 'Something went wrong. Try again.' }
+  }
+}
+
 // ---- public API ----------------------------------------------------
 
 export function getProfile()      { return state }
