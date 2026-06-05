@@ -9,6 +9,7 @@
 // in gameData stay as the leaderboard's flavor; this fills the actual fight list.
 
 import { playerCombatStats } from './bossLadder'
+import { PLAYER_LOOKS } from './gameData'
 
 export const POOL_PER_LEVEL = 50   // depth available at each level (ids 0..49)
 
@@ -56,11 +57,16 @@ export function generateOpponent(level, index) {
   const def = Math.round(base.def * vDef)
   const hp  = Math.round(base.hp  * vHp)
   const handle = `${pick(HANDLE_PREFIX, h)}${pick(HANDLE_CORE, h >> 5)}${pick(HANDLE_TAIL, h >> 10)}`
+  // Give each AI rival a random player-card look (the same SWAP cards the player
+  // uses), so they show a real portrait instead of a bare emoji. Stable per rival.
+  const look = pick(PLAYER_LOOKS, hash(`look:${level}:${index}`))
 
   return {
     id: `ai-${level}-${index}`,
     name: handle,
-    emoji: pick(EMOJIS, h >> 14),
+    avatar: look.avatar,
+    lookId: look.id,
+    emoji: pick(EMOJIS, h >> 14),                  // emoji kept as a fallback
     level,
     atk, def, hp,
     power: atk + def,                              // drives the dice modal's skill loadout
