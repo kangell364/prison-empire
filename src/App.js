@@ -13,7 +13,8 @@ import Nurse from './screens/Nurse'
 import { isMuted, setMuted, subscribeMuted, sfx } from './sounds'
 import { useVitals, onOpenNurse } from './state/vitalsStore'
 import { KoOverlay, KO_FILTER } from './components/Avatar'
-import { ensureAuth } from './state/profileStore'
+import { ensureAuth, onPasswordRecovery } from './state/profileStore'
+import { SetPasswordModal } from './components/SetPasswordModal'
 import { ensureCardsLoaded } from './state/cardsStore'
 import { ensureUpgradesLoaded } from './state/upgradesStore'
 import { useBlockPayoutTicker } from './state/blocksStore'
@@ -46,6 +47,7 @@ export default function App() {
   const [trapFrom, setTrapFrom] = useState('home')
   const [muted, setMutedState] = useState(isMuted())
   const [showNotifs, setShowNotifs] = useState(false)
+  const [showSetPassword, setShowSetPassword] = useState(false)
   const unread = useUnreadCount()
 
   // Global hourly block-income payout — runs app-wide regardless of screen.
@@ -64,6 +66,9 @@ export default function App() {
   // Any component can call openNurse() (e.g. the fight's "DEFEATED — SEE NURSE"
   // button) to jump straight to the Nurse view.
   useEffect(() => onOpenNurse(() => setScreen('nurse')), [])
+  // When a player returns from the password-reset email link, prompt them to
+  // set a new password.
+  useEffect(() => onPasswordRecovery(() => setShowSetPassword(true)), [])
 
   const toggleMute = () => {
     const next = !muted
@@ -157,6 +162,10 @@ export default function App() {
 
       {showNotifs && (
         <NotificationsModal onClose={() => setShowNotifs(false)} onNavigate={setScreen} />
+      )}
+
+      {showSetPassword && (
+        <SetPasswordModal onClose={() => setShowSetPassword(false)} />
       )}
 
       {/* Bottom Navigation */}
