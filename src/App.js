@@ -13,7 +13,8 @@ import Nurse from './screens/Nurse'
 import { isMuted, setMuted, subscribeMuted, sfx } from './sounds'
 import { useVitals, onOpenNurse } from './state/vitalsStore'
 import { KoOverlay, KO_FILTER } from './components/Avatar'
-import { ensureAuth, onPasswordRecovery } from './state/profileStore'
+import { ensureAuth, onPasswordRecovery, useAuth } from './state/profileStore'
+import { ensureMyHouse } from './state/sharedHousesStore'
 import { SetPasswordModal } from './components/SetPasswordModal'
 import { ensureCardsLoaded } from './state/cardsStore'
 import { ensureUpgradesLoaded } from './state/upgradesStore'
@@ -54,6 +55,14 @@ export default function App() {
   useBlockPayoutTicker()
   // Live player card (look + name) for the header avatar — stays in sync with SWAP.
   const playerCard = usePlayerCard()
+  // Keep the player's shared-world trap-house name in sync with their display
+  // name app-wide (not just on the map), so a rename shows on everyone's map
+  // immediately — even if they renamed from the home screen and never opened the
+  // map. ensureMyHouse is idempotent + only re-pushes when the name changes.
+  const auth = useAuth()
+  useEffect(() => {
+    if (auth.userId && playerCard.name) ensureMyHouse(playerCard.name)
+  }, [auth.userId, playerCard.name])
   const initials = (playerCard.name || 'SR').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
   // Live KO state — drives the global "DEFEATED — SEE NURSE" banner shown on
   // every screen while the player is knocked out.
