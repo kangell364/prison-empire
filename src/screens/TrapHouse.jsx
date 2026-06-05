@@ -719,9 +719,9 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, cardLevels = {}, pric
             Sits above the shelved jars (he's in front of the cabinet). */}
         <div style={{ position: 'absolute', inset: 0, clipPath: 'inset(0 0 50% 0)', zIndex: PROP_Z + 1, pointerEvents: 'none' }}>
           <div style={{
-            position: 'absolute', left: '50%', bottom: '5%',
+            position: 'absolute', left: '50%', bottom: '15%',
             transform: 'translateX(-50%)',
-            height: '59%', aspectRatio: '229 / 581',
+            height: '53.1%', aspectRatio: '229 / 581',
             filter: 'drop-shadow(0 6px 10px rgba(0,0,0,0.45))',
           }}>
             <img src="/thug-4-body.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain' }} />
