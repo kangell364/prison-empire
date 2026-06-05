@@ -13,7 +13,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { supabase, isSupabaseConfigured } from '../supabase'
-import { getUserId, spendHustle, addHustle, spendSteel, addSteel } from './profileStore'
+import { getUserId, useAuth, spendHustle, addHustle, spendSteel, addSteel } from './profileStore'
 
 const COUNTY_FIPS = '48201'                       // Harris (MVP single county)
 
@@ -80,29 +80,49 @@ export async function reinforceMyHouse(house) {
 }
 
 // Live unresolved raids I'm part of, split into incoming (I'm the defender) and
-// outgoing (I'm the attacker). Re-fetches on any raids change touching me.
+// outgoing (I'm the attacker). SINGLETON — one fetch + one channel shared by
+// every consumer (the map's car watcher AND the global raid HUD). Re-keys when
+// the signed-in user changes.
+let raidsCache = { incoming: [], outgoing: [] }
+let raidsUid = null
+let raidsChannel = null
+const raidsListeners = new Set()
+
+async function loadRaids() {
+  const uid = getUserId()
+  if (!uid) return
+  const { data } = await supabase.from('raids').select('*').eq('resolved', false)
+  if (!data) return
+  raidsCache = {
+    incoming: data.filter(r => r.defender_id === uid),
+    outgoing: data.filter(r => r.attacker_id === uid),
+  }
+  raidsListeners.forEach(fn => fn(raidsCache))
+}
+
+function startRaidsSync() {
+  if (!isSupabaseConfigured) return
+  const uid = getUserId()
+  if (!uid || raidsUid === uid) return        // not ready, or already syncing this user
+  if (raidsChannel) { try { supabase.removeChannel(raidsChannel) } catch {} ; raidsChannel = null }
+  raidsUid = uid
+  raidsCache = { incoming: [], outgoing: [] }
+  loadRaids()
+  raidsChannel = supabase.channel(`raids:${uid}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'raids', filter: `defender_id=eq.${uid}` }, loadRaids)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'raids', filter: `attacker_id=eq.${uid}` }, loadRaids)
+    .subscribe()
+}
+
 export function useActiveRaids() {
-  const [raids, setRaids] = useState({ incoming: [], outgoing: [] })
+  const { userId } = useAuth()
+  const [raids, setRaids] = useState(raidsCache)
   useEffect(() => {
-    if (!isSupabaseConfigured) return
-    const uid = getUserId()
-    if (!uid) return
-    let alive = true
-    const load = async () => {
-      const { data } = await supabase.from('raids').select('*').eq('resolved', false)
-      if (!alive || !data) return
-      setRaids({
-        incoming: data.filter(r => r.defender_id === uid),
-        outgoing: data.filter(r => r.attacker_id === uid),
-      })
-    }
-    load()
-    const ch = supabase.channel(`raids:${uid}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'raids', filter: `defender_id=eq.${uid}` }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'raids', filter: `attacker_id=eq.${uid}` }, load)
-      .subscribe()
-    return () => { alive = false; try { supabase.removeChannel(ch) } catch {} }
-  }, [])
+    raidsListeners.add(setRaids)
+    startRaidsSync()
+    setRaids(raidsCache)
+    return () => { raidsListeners.delete(setRaids) }
+  }, [userId])
   return raids
 }
 

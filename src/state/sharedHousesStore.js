@@ -55,23 +55,36 @@ export async function ensureMyHouse(name) {
   }
 }
 
-// Live list of every trap house in the open county. Re-fetches on any insert/
-// update/delete via realtime so new players + relocations appear immediately.
+// Live list of every trap house in the open county. SINGLETON — one fetch +
+// one realtime channel shared by every consumer (the map AND the global raid
+// HUD both read this). Subscribing per-hook would create duplicate channels
+// with the same topic, and Supabase throws on the second .subscribe().
+let housesCache = []
+let housesStarted = false
+const housesListeners = new Set()
+
+async function loadHouses() {
+  const { data } = await supabase.from('houses').select('*').eq('county_fips', COUNTY_FIPS)
+  if (data) { housesCache = data; housesListeners.forEach(fn => fn(housesCache)) }
+}
+
+function startHousesSync() {
+  if (housesStarted || !isSupabaseConfigured) return
+  housesStarted = true
+  loadHouses()
+  supabase
+    .channel(`houses:${COUNTY_FIPS}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'houses', filter: `county_fips=eq.${COUNTY_FIPS}` }, loadHouses)
+    .subscribe()
+}
+
 export function useSharedHouses() {
-  const [houses, setHouses] = useState([])
+  const [houses, setHouses] = useState(housesCache)
   useEffect(() => {
-    if (!isSupabaseConfigured) return
-    let alive = true
-    const load = async () => {
-      const { data } = await supabase.from('houses').select('*').eq('county_fips', COUNTY_FIPS)
-      if (alive && data) setHouses(data)
-    }
-    load()
-    const ch = supabase
-      .channel(`houses:${COUNTY_FIPS}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'houses', filter: `county_fips=eq.${COUNTY_FIPS}` }, load)
-      .subscribe()
-    return () => { alive = false; try { supabase.removeChannel(ch) } catch {} }
+    housesListeners.add(setHouses)
+    startHousesSync()
+    setHouses(housesCache)
+    return () => { housesListeners.delete(setHouses) }
   }, [])
   return houses
 }
