@@ -458,7 +458,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
         {cur.key === 'shop' && <ShopFront art={cur.art} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} prices={prices} popularity={popularity} rep={rep} onSetPrice={setStrainPrice} onSell={sellJar} />}
         {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} packCounts={packCounts} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} />}
-        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} budResync={budResync} onBudLand={advanceNow} tableCards={tableCards} onAdd={setPicking} onUproot={uprootTable} skatePhase={skate.phase} skateStart={skate.start} />}
+        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} budResync={budResync} onBudLand={advanceNow} tableCards={tableCards} onAdd={setPicking} onUproot={uprootTable} skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} />}
       </div>
 
       {/* Arrows — step between rooms. Left = toward the front, right = deeper. */}
@@ -1217,6 +1217,14 @@ function PackingRoom({ skatePhase = 'idle', skateStart = 0, onSkateClick, packCo
           </div>
         )}
 
+        {/* Tap the LEFT box to send the skater monkey on his haul route (same as
+            tapping him). Only while idle. */}
+        {skatePhase === 'idle' && onSkateClick && (
+          <div onClick={() => { sfx.tap?.(); onSkateClick() }}
+            style={{ position: 'absolute', left: `${lx0}%`, top: `${lyTop - 3}%`,
+              width: `${lx1 - lx0}%`, height: '24%', zIndex: 3, cursor: 'pointer' }} />
+        )}
+
         {/* Jars riding the belt down into the left box (cosmetic deliveries). */}
         {jars.map(j => (
           <div key={j.key} onAnimationEnd={() => setJars(list => list.filter(x => x.key !== j.key))}
@@ -1419,7 +1427,7 @@ const SLOTH_CENTERS = [27.0, 51.5, 78.0]   // one sloth per table (over the plan
 const SLOTH_PIVOT = '19.7% 53%'                  // arm shoulder (% of the sloth canvas)
 const SLOTH_ARM_DELAYS = ['0s', '-0.55s', '-1.05s']
 
-function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBudLand, tableCards = {}, onAdd, onUproot, skatePhase = 'idle', skateStart = 0 }) {
+function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBudLand, tableCards = {}, onAdd, onUproot, skatePhase = 'idle', skateStart = 0, onSkateClick }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the plant overlays stay glued to the benches
@@ -1472,6 +1480,18 @@ function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBud
               style={{ position: 'absolute', left: `${x0 + bw * xf}%`, top: `${yTop + dy}%`, width: `${(wf * bw).toFixed(2)}%`,
                 transform: 'translate(-50%, -100%)', pointerEvents: 'none' }} />
           ))
+        })}
+
+        {/* Tap any of the 3 grow boxes to send the skater monkey on his haul
+            route (same as tapping him in the packing room). Only while he's idle;
+            sits BELOW the Add/Upgrade buttons (z4) so those still work. */}
+        {skatePhase === 'idle' && onSkateClick && [1, 2, 3].map(tbl => {
+          const [x0, x1, yTop] = BINS[tbl]
+          return (
+            <div key={`skatehot${tbl}`} onClick={() => { sfx.tap?.(); onSkateClick() }}
+              style={{ position: 'absolute', left: `${x0}%`, top: `${yTop - 3}%`,
+                width: `${x1 - x0}%`, height: '22%', zIndex: 3, cursor: 'pointer' }} />
+          )
         })}
 
         {/* Box slots — one per table. An empty table shows a "+ Add" slot that
