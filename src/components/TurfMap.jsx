@@ -16,6 +16,9 @@ import { GRID, getBlock, subscribeBlocks, CREW_COLORS } from '../state/blocksSto
 const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
 const GOLD = '#c9a84c'
+// Zoom the turf map opens at when entering a county — a metro-wide view (your
+// trap house + surrounding turf in frame), NOT street level. Tune to taste.
+const OPEN_ZOOM = 11
 
 export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse, trapHouseName, onTrapHouseTap, onHouseTap, otherHouses, myUserId, raidDrive, onRaidArrive }) {
   const containerRef = useRef(null)
@@ -32,9 +35,12 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
+    // Open centered on the player's own trap house (so it's in view) at a
+    // metro-wide zoom; fall back to the county center, then the US view.
+    const openCenter = (trapHouse && trapHouse.lat != null) ? [trapHouse.lat, trapHouse.lng] : center
     const map = L.map(containerRef.current, {
-      center: center || [39.8283, -98.5795],
-      zoom: center ? 14 : 5,
+      center: openCenter || [39.8283, -98.5795],
+      zoom: openCenter ? OPEN_ZOOM : 5,
       minZoom: 4, maxZoom: 18,
       maxBounds: [[15, -170], [72, -50]], maxBoundsViscosity: 0.7,
       zoomControl: true, attributionControl: false,
