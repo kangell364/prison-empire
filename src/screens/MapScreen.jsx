@@ -12,6 +12,7 @@ import { knockOut } from '../state/vitalsStore'
 import { getBounty } from '../state/bountyStore'
 import { useDisplayName, useAuth, resolveLook, useSteel } from '../state/profileStore'
 import { usePlayers } from '../state/playersStore'
+import { useActiveRaids, useRaidResolver, launchRaid, reinforceMyHouse, RAID_STEEL_COST, REINFORCE_COST, RAID_DURATION_MS } from '../state/raidsStore'
 import { usePlayerStats } from '../state/statsStore'
 import { Avatar } from '../components/Avatar'
 import { ensureMyHouse, useSharedHouses, harrisSpotFor } from '../state/sharedHousesStore'
@@ -310,6 +311,7 @@ export default function MapScreen({ onNavigate }) {
   const [houseSel, setHouseSel] = useState(null)            // tapped rival trap house (shared-world house row)
   const [carDrive, setCarDrive] = useState(null)            // attack-car animation { id, from:{lat,lng}, to:{lat,lng} }
   const carIdRef = useRef(0)
+  const [pvpLanded, setPvpLanded] = useState([])             // queue of { raid, result } PvP landing modals
   const [selectedFacility, setSelectedFacility] = useState(null)
   const [relocating, setRelocating] = useState(false)       // picking a relocate target
   const [moveConfirm, setMoveConfirm] = useState(null)      // { fips, name, state, miles, sec }
@@ -343,6 +345,28 @@ export default function MapScreen({ onNavigate }) {
   useEffect(() => { if (auth.userId && mapData) initSharedBlocks() }, [auth.userId, mapData])
   // My trap house's spot in the open county (matches the row others see).
   const myHouseCoords = useMemo(() => (auth.userId ? harrisSpotFor(auth.userId) : null), [auth.userId])
+
+  // ---- Real PvP raids (shared world) -------------------------------
+  const activeRaids = useActiveRaids()                       // { incoming, outgoing } live
+  const myHouse = useMemo(() => (sharedHouses || []).find(h => h.owner_id === auth.userId) || null, [sharedHouses, auth.userId])
+  useRaidResolver(activeRaids, (raid, result) => {
+    setPvpLanded(q => [...q, { raid, result }])
+    sfx.boom?.()
+  })
+  const currentPvpLanded = pvpLanded[0] || null
+  // Tick once a second while raids are in flight so the banner countdowns move.
+  const [, setRaidTick] = useState(0)
+  useEffect(() => {
+    if (!activeRaids.incoming.length && !activeRaids.outgoing.length) return
+    const iv = setInterval(() => setRaidTick(t => t + 1), 1000)
+    return () => clearInterval(iv)
+  }, [activeRaids])
+  const doReinforce = async () => {
+    if (!myHouse) return
+    const r = await reinforceMyHouse(myHouse)
+    if (r.ok) sfx.buy?.(); else sfx.deny?.()
+  }
+
   const territories = useTerritories()
   const world = useWorld()
   const cityById = useMemo(() => new Map(ALL_CITIES.map(c => [c.id, c])), [])
@@ -581,6 +605,18 @@ export default function MapScreen({ onNavigate }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 16px 0' }}>
           {attacks.map(a => (
             <AttackBanner key={a.id} attack={a} facility={FACILITY_BY_ID.get(a.facilityId)} city={cityById.get(FACILITY_BY_ID.get(a.facilityId)?.cityId)} />
+          ))}
+        </div>
+      )}
+
+      {/* Real PvP raids — incoming (someone's hitting YOUR house) + outgoing */}
+      {(activeRaids.incoming.length > 0 || activeRaids.outgoing.length > 0) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 16px 0' }}>
+          {activeRaids.incoming.map(r => (
+            <PvpIncomingBanner key={r.id} raid={r} myHouse={myHouse} onReinforce={doReinforce} />
+          ))}
+          {activeRaids.outgoing.map(r => (
+            <PvpOutgoingBanner key={r.id} raid={r} />
           ))}
         </div>
       )}
@@ -864,15 +900,26 @@ export default function MapScreen({ onNavigate }) {
         <BlockSheet gx={blockSel.gx} gy={blockSel.gy} homeTurf={blockHomeTurf} onClose={() => setBlockSel(null)} />
       )}
 
+      {currentPvpLanded && (
+        <PvpRaidLandedModal
+          entry={currentPvpLanded}
+          myUserId={auth.userId}
+          onClose={() => setPvpLanded(q => q.slice(1))}
+        />
+      )}
+
       {houseSel && (
         <RivalHouseSheet
           house={houseSel}
           onClose={() => setHouseSel(null)}
-          onLaunch={(target) => {
+          onLaunch={async (target, power) => {
             const from = myHouseCoords || (homeCoords ? { lat: homeCoords[1], lng: homeCoords[0] } : null)
-            if (!from || target.lat == null || target.lng == null) return
-            carIdRef.current += 1
-            setCarDrive({ id: carIdRef.current, from, to: { lat: target.lat, lng: target.lng } })
+            const r = await launchRaid({ targetHouse: target, power })
+            if (!r.ok) { if (r.error !== 'self' && r.error !== 'broke') console.warn('[raid] launch failed', r.error); return }
+            if (from && target.lat != null && target.lng != null) {
+              carIdRef.current += 1
+              setCarDrive({ id: carIdRef.current, from, to: { lat: target.lat, lng: target.lng } })
+            }
           }}
         />
       )}
@@ -989,21 +1036,18 @@ function PlayButton({ emoji, label, sub, tint, onClick, disabled }) {
 }
 
 // The Attack plan — your muscle vs their house, the Steel cost, and the
-// "Send the Hit" launch. Launch is stubbed for the visual pass; the timed
-// raid (attack-car drive + server damage) wires in next.
-const RAID_STEEL_COST = 200
+// "Send the Hit" launch. Launch spends Steel + creates the timed raid row
+// (raidsStore.launchRaid, run by the parent) and fires the attack-car drive.
 function AttackPlan({ house, name, myPower, hp, hpMax, onBack, onClose, onLaunch }) {
   const steel = useSteel()
   const broke = steel < RAID_STEEL_COST
   // Visual estimate only — real damage is computed server-side at landing.
-  const estDamage = Math.max(10, Math.min(hpMax, Math.round(myPower * 0.4)))
+  const estDamage = Math.max(15, Math.min(80, Math.round(myPower * 0.4)))
 
   const launch = () => {
     if (broke) { sfx.deny?.(); return }
     sfx.launch?.()
-    // Kick off the attack-car drive (attacker base -> defender base). The Steel
-    // spend + server damage at landing wire in with the raids backend next.
-    onLaunch && onLaunch(house)
+    onLaunch && onLaunch(house, myPower)
     onClose()
   }
 
@@ -1100,6 +1144,124 @@ function RaidBanner({ raid, facility, city, onDefend, isHome }) {
         <div style={{ color: GOLD, fontSize: 10, fontWeight: 600 }}>{isHome ? 'Tap to relocate — dodge the hit' : 'Tap to reinforce — hold your ground'}</div>
       </div>
       <i className={`ti ${isHome ? 'ti-home-bolt' : 'ti-shield-half-filled'}`} style={{ color: RED, fontSize: 20 }} />
+    </div>
+  )
+}
+
+// ---- Real PvP raid banners + landing -------------------------------
+
+function pvpRemaining(raid) {
+  return Math.max(0, Math.ceil((new Date(raid.ends_at).getTime() - Date.now()) / 1000))
+}
+
+// Defender view: someone is raiding YOUR trap house. Shows the countdown + a
+// reinforce button (spend Steel to patch HP before the hit lands).
+function PvpIncomingBanner({ raid, myHouse, onReinforce }) {
+  const { name } = usePlayers()
+  const total = Math.ceil(RAID_DURATION_MS / 1000)
+  const remaining = pvpRemaining(raid)
+  const hp = myHouse?.hp != null ? myHouse.hp : 100
+  const hpMax = myHouse?.hp_max != null ? myHouse.hp_max : 100
+  const full = hp >= hpMax
+
+  return (
+    <div className="attack-banner-in" style={{
+      background: 'linear-gradient(135deg, #2a0a0a 0%, #100404 100%)',
+      border: `1px solid ${RED}88`, borderRadius: 16, padding: 14, display: 'flex', alignItems: 'center', gap: 14,
+    }}>
+      <CountdownRing remaining={remaining} total={total} size={64} strokeWidth={4} variant="incoming" />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ color: RED, fontSize: 13, fontWeight: 600, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <i className="ti ti-alert-triangle-filled" /> Trap House Under Fire
+        </div>
+        <div style={{ color: '#fff', fontSize: 13, marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {name(raid.attacker_id)} is rolling on you — {hp}/{hpMax} HP
+        </div>
+        <button className="btn" onClick={onReinforce} disabled={full} style={{
+          background: full ? '#1a1a28' : GOLD, color: full ? DIM : '#1a1205', border: 'none',
+          borderRadius: 8, padding: '5px 12px', fontSize: 11, fontWeight: 700, cursor: full ? 'default' : 'pointer',
+        }}>
+          <i className="ti ti-shield-half-filled" style={{ marginRight: 5 }} />
+          {full ? 'House at full HP' : `Reinforce · ${REINFORCE_COST} Steel`}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Attacker view: your crew is en route to a rival's house.
+function PvpOutgoingBanner({ raid }) {
+  const { name } = usePlayers()
+  const total = Math.ceil(RAID_DURATION_MS / 1000)
+  const remaining = pvpRemaining(raid)
+  const isClose = remaining <= Math.min(60, Math.floor(total / 3))
+
+  return (
+    <div className="attack-banner-in" style={{
+      background: isClose ? 'linear-gradient(135deg, #2a0a0a 0%, #100404 100%)' : 'linear-gradient(135deg, #1a0d00 0%, #100a02 100%)',
+      border: `1px solid ${isClose ? RED + '88' : GOLD + '44'}`, borderRadius: 16, padding: 14,
+      display: 'flex', alignItems: 'center', gap: 14, transition: 'background 0.5s, border-color 0.5s',
+    }}>
+      <CountdownRing remaining={remaining} total={total} size={64} strokeWidth={4} variant={isClose ? 'incoming' : 'outbound'} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ color: isClose ? RED : GOLD, fontSize: 13, fontWeight: 600, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <i className="ti ti-sword" /> {isClose ? 'Raid Closing In' : 'Raid En Route'}
+        </div>
+        <div style={{ color: '#fff', fontSize: 13, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>→ {name(raid.defender_id)}'s trap house</div>
+        <div style={{ color: DIM, fontSize: 10 }}>{isClose ? 'Almost on them' : 'Crew is moving — they may reinforce'}</div>
+      </div>
+    </div>
+  )
+}
+
+// Both sides see this when a raid lands. Copy flips on whether I attacked or
+// got hit, and on the outcome (knocked over / held / fizzled).
+function PvpRaidLandedModal({ entry, myUserId, onClose }) {
+  const { name } = usePlayers()
+  const { raid, result } = entry
+  const iAttacked = raid.attacker_id === myUserId
+  const other = name(iAttacked ? raid.defender_id : raid.attacker_id)
+  const outcome = result?.outcome
+  const stolen = result?.stolen || 0
+  const damage = result?.damage || 0
+
+  let accent = GOLD, title = '', body = ''
+  if (outcome === 'knocked_over') {
+    accent = iAttacked ? '#2ecc71' : RED
+    title = iAttacked ? 'House Knocked Over!' : 'Trap House Knocked Over'
+    body = iAttacked
+      ? `You broke into ${other}'s trap house and looted $${stolen.toLocaleString()} Hustle.`
+      : `${other} knocked over your trap house and looted $${stolen.toLocaleString()} Hustle.`
+  } else if (outcome === 'held') {
+    accent = iAttacked ? GOLD : '#2ecc71'
+    title = iAttacked ? 'Defense Held' : 'You Held the Line'
+    body = iAttacked
+      ? `${other}'s house took ${damage} damage but didn't fall. Hit again to break it.`
+      : `${other} chipped ${damage} HP off your house but it held. Reinforce to stay strong.`
+  } else if (outcome === 'immune') {
+    accent = DIM
+    title = 'Raid Fizzled'
+    body = iAttacked
+      ? `${other}'s house was still locked down from a recent hit. No damage.`
+      : `Your house was still locked down from a recent hit — the raid fizzled.`
+  } else {
+    accent = DIM; title = 'Raid Over'; body = 'The target was gone.'
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 290 }} onClick={onClose}>
+      <div className="animate-in" style={{ background: '#13131f', borderRadius: 18, padding: 24, width: '100%', maxWidth: 340, margin: 16, textAlign: 'center', border: `1px solid ${accent}55` }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 44 }}>{outcome === 'knocked_over' ? '💥' : outcome === 'held' ? '🛡️' : '🚗'}</div>
+        <div style={{ color: accent, fontSize: 11, letterSpacing: 2, fontWeight: 700, marginTop: 8 }}>RAID {iAttacked ? 'OUTGOING' : 'INCOMING'}</div>
+        <div style={{ color: '#fff', fontSize: 20, fontWeight: 700, marginTop: 4 }}>{title}</div>
+        <div style={{ color: '#aaa', fontSize: 13, lineHeight: 1.55, marginTop: 10 }}>{body}</div>
+        {stolen > 0 && (
+          <div style={{ marginTop: 14, background: '#0e0e16', borderRadius: 12, padding: '10px 14px', color: iAttacked ? '#2ecc71' : RED, fontSize: 18, fontWeight: 700 }}>
+            {iAttacked ? '+' : '−'}${stolen.toLocaleString()} Hustle
+          </div>
+        )}
+        <button className="btn btn-gold" style={{ width: '100%', padding: 12, marginTop: 18 }} onClick={onClose}>OK</button>
+      </div>
     </div>
   )
 }

@@ -1,0 +1,132 @@
+-- ===================================================================
+-- Prison Empire - Multiplayer: REAL PvP RAIDS
+-- Paste this whole thing into the Supabase SQL Editor and press Run.
+-- Safe to run more than once.
+--
+-- Model (decided with the user):
+--   * TIMED en-route raid (15 min) so the defender gets a reinforce window.
+--   * On knockover (house HP -> 0) the attacker STEALS Hustle from the
+--     defender. The steal MUST be server-side (profiles RLS is self-only),
+--     so it runs inside the resolve_raid() SECURITY DEFINER function.
+-- ===================================================================
+
+-- ---- HOUSES: add a post-knockover immunity window -----------------
+alter table public.houses add column if not exists raid_immune_until timestamptz;
+
+-- ---- RAIDS: one row per in-flight / resolved attack ---------------
+create table if not exists public.raids (
+  id              uuid primary key default gen_random_uuid(),
+  attacker_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  defender_id     uuid not null references auth.users(id) on delete cascade,
+  target_house_id uuid not null references public.houses(id) on delete cascade,
+  county_fips     text,
+  damage          int  not null default 25,
+  started_at      timestamptz not null default now(),
+  ends_at         timestamptz not null,
+  resolved        boolean not null default false,
+  outcome         text,                 -- 'held' | 'knocked_over' | 'immune' | 'gone'
+  stolen          int  not null default 0,
+  created_at      timestamptz not null default now()
+);
+create index if not exists raids_defender_idx on public.raids (defender_id) where resolved = false;
+create index if not exists raids_attacker_idx on public.raids (attacker_id) where resolved = false;
+
+alter table public.raids enable row level security;
+
+drop policy if exists raids_read   on public.raids;
+drop policy if exists raids_insert on public.raids;
+
+-- you can see raids you're part of (as attacker or defender)
+create policy raids_read on public.raids for select to authenticated
+  using (attacker_id = auth.uid() or defender_id = auth.uid());
+-- you can launch a raid only AS yourself, and never on your own house
+create policy raids_insert on public.raids for insert to authenticated
+  with check (attacker_id = auth.uid() and defender_id <> auth.uid());
+-- NOTE: no update/delete policy on purpose. Resolution happens only through
+-- resolve_raid() below (SECURITY DEFINER), so clients can't fake an outcome.
+
+-- ---- resolve_raid(): apply damage + steal at landing --------------
+-- Idempotent. Callable by either participant once now() >= ends_at.
+-- Returns json: { outcome, damage, new_hp, stolen }.
+create or replace function public.resolve_raid(p_raid_id uuid)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  r          public.raids;
+  h          public.houses;
+  v_new_hp   int;
+  v_stolen   int := 0;
+  v_outcome  text;
+  v_floor    constant int := 30;        -- HP a house resets to after being knocked over
+  v_immune   constant interval := '10 minutes';
+  v_steal_pct constant numeric := 0.20; -- attacker loots 20% of the defender's Hustle
+begin
+  select * into r from public.raids where id = p_raid_id for update;
+  if not found then return json_build_object('error', 'not_found'); end if;
+
+  -- only the two participants may trigger resolution
+  if auth.uid() <> r.attacker_id and auth.uid() <> r.defender_id then
+    return json_build_object('error', 'forbidden');
+  end if;
+
+  -- already resolved -> replay the stored outcome (idempotent)
+  if r.resolved then
+    return json_build_object('outcome', r.outcome, 'stolen', r.stolen, 'damage', r.damage, 'replay', true);
+  end if;
+
+  -- not landed yet
+  if now() < r.ends_at then
+    return json_build_object('error', 'too_early');
+  end if;
+
+  select * into h from public.houses where id = r.target_house_id for update;
+  if not found then
+    update public.raids set resolved = true, outcome = 'gone' where id = r.id;
+    return json_build_object('outcome', 'gone');
+  end if;
+
+  -- house under post-knockover immunity -> the raid fizzles
+  if h.raid_immune_until is not null and h.raid_immune_until > now() then
+    update public.raids set resolved = true, outcome = 'immune' where id = r.id;
+    return json_build_object('outcome', 'immune', 'new_hp', h.hp);
+  end if;
+
+  v_new_hp := h.hp - r.damage;
+
+  if v_new_hp <= 0 then
+    -- KNOCKED OVER: loot a cut of the defender's Hustle, attacker <- defender
+    select greatest(0, floor(p.hustle * v_steal_pct))::int into v_stolen
+      from public.profiles p where p.id = r.defender_id;
+    if v_stolen > 0 then
+      update public.profiles set hustle = hustle - v_stolen where id = r.defender_id;
+      update public.profiles set hustle = hustle + v_stolen where id = r.attacker_id;
+    end if;
+    update public.houses
+      set hp = v_floor, raid_immune_until = now() + v_immune, updated_at = now()
+      where id = h.id;
+    v_outcome := 'knocked_over';
+    v_new_hp  := v_floor;
+  else
+    -- chipped: house just takes damage
+    update public.houses set hp = v_new_hp, updated_at = now() where id = h.id;
+    v_outcome := 'held';
+  end if;
+
+  update public.raids set resolved = true, outcome = v_outcome, stolen = v_stolen where id = r.id;
+  return json_build_object('outcome', v_outcome, 'damage', r.damage, 'new_hp', v_new_hp, 'stolen', v_stolen);
+end;
+$$;
+
+grant execute on function public.resolve_raid(uuid) to authenticated;
+
+-- ---- REALTIME: stream raid rows so banners appear live ------------
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'raids') then
+    alter publication supabase_realtime add table public.raids;
+  end if;
+end $$;
