@@ -24,7 +24,7 @@ import { useUnreadCount } from './state/fightLogStore'
 import { NotificationsModal } from './components/NotificationsModal'
 import { InstallPrompt } from './components/InstallPrompt'
 import { RaidHud } from './components/RaidHud'
-import { WorldChat } from './components/WorldChat'
+import { ChatScreen } from './components/WorldChat'
 // NOTE: AR camera encounter (src/components/CameraEncounter.jsx) is built but
 // parked — re-import + re-add the header button below to bring it back.
 
@@ -36,6 +36,7 @@ const NAV_ITEMS = [
   { id: 'cards',    icon: 'ti-cards',    label: 'Cards'   },
   { id: 'yard',     icon: 'ti-trophy',   label: 'Yard'    },
   { id: 'property', icon: 'ti-building', label: 'Property'},
+  { id: 'chat',     icon: 'ti-message-2', label: 'Chat'   },
 ]
 
 export default function App() {
@@ -113,6 +114,7 @@ export default function App() {
       case 'gang':     return <Gang onBack={() => setScreen('home')} onNavigate={navigateTo} />
       case 'traphouse': return <TrapHouse onBack={() => setScreen(trapFrom)} />
       case 'nurse':    return <Nurse onBack={() => setScreen('home')} />
+      case 'chat':     return <ChatScreen />
       case 'profile':  return <Profile onBack={() => setScreen('home')} />
       default:         return <Dashboard onNavigate={navigateTo} />
     }
@@ -167,9 +169,6 @@ export default function App() {
 
       {/* Screen Content */}
       {renderScreen()}
-
-      {/* Global world chat — floating button + panel, reachable everywhere. */}
-      <WorldChat />
 
       <InstallPrompt />
 
