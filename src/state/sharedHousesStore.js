@@ -73,12 +73,23 @@ async function loadHouses() {
   if (data) { housesCache = data; housesListeners.forEach(fn => fn(housesCache)) }
 }
 
+// Defensive: tear down any pre-existing channel with this topic before creating
+// a fresh one, so we can never hit Supabase's "cannot add postgres_changes
+// callbacks after subscribe()" (which crashes the app) if this somehow runs more
+// than once (a stray re-eval, double-mount, etc.).
+function freshChannel(topic) {
+  try {
+    const existing = supabase.getChannels ? supabase.getChannels() : []
+    existing.forEach(c => { if (c.topic === `realtime:${topic}`) { try { supabase.removeChannel(c) } catch {} } })
+  } catch {}
+  return supabase.channel(topic)
+}
+
 function startHousesSync() {
   if (housesStarted || !isSupabaseConfigured) return
   housesStarted = true
   loadHouses()
-  supabase
-    .channel(`houses:${COUNTY_FIPS}`)
+  freshChannel(`houses:${COUNTY_FIPS}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'houses', filter: `county_fips=eq.${COUNTY_FIPS}` }, loadHouses)
     .subscribe()
 }
