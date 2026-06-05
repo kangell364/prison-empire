@@ -10,7 +10,10 @@ import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks, s
 import { useMapData, buildCityCountyMap, buildUnlockedCountyTest, UNLOCKED_COUNTY_FIPS, HARRIS_CENTER, STATE_CODE_TO_FIPS, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
 import { knockOut } from '../state/vitalsStore'
 import { getBounty } from '../state/bountyStore'
-import { useDisplayName, useAuth } from '../state/profileStore'
+import { useDisplayName, useAuth, resolveLook, useSteel } from '../state/profileStore'
+import { usePlayers } from '../state/playersStore'
+import { usePlayerStats } from '../state/statsStore'
+import { Avatar } from '../components/Avatar'
 import { ensureMyHouse, useSharedHouses, harrisSpotFor } from '../state/sharedHousesStore'
 import { TurfLeaderboard, ActivityFeed } from '../components/TurfLeaderboard'
 import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
@@ -304,6 +307,9 @@ export default function MapScreen({ onNavigate }) {
   const [stateView, setStateView] = useState(null)          // null = country view
   const [turfView, setTurfView] = useState(null)            // Map 2 (turf map): { center:[lat,lng], label }
   const [blockSel, setBlockSel] = useState(null)            // tapped block { gx, gy }
+  const [houseSel, setHouseSel] = useState(null)            // tapped rival trap house (shared-world house row)
+  const [carDrive, setCarDrive] = useState(null)            // attack-car animation { id, from:{lat,lng}, to:{lat,lng} }
+  const carIdRef = useRef(0)
   const [selectedFacility, setSelectedFacility] = useState(null)
   const [relocating, setRelocating] = useState(false)       // picking a relocate target
   const [moveConfirm, setMoveConfirm] = useState(null)      // { fips, name, state, miles, sec }
@@ -846,13 +852,29 @@ export default function MapScreen({ onNavigate }) {
           trapHouse={myHouseCoords || (homeCoords ? { lat: homeCoords[1], lng: homeCoords[0] } : null)}
           trapHouseName={myName}
           onTrapHouseTap={() => onNavigate && onNavigate('traphouse')}
+          onHouseTap={(h) => setHouseSel(h)}
           otherHouses={sharedHouses}
           myUserId={auth.userId}
+          raidDrive={carDrive}
+          onRaidArrive={() => setCarDrive(null)}
         />
       )}
 
       {blockSel && (
         <BlockSheet gx={blockSel.gx} gy={blockSel.gy} homeTurf={blockHomeTurf} onClose={() => setBlockSel(null)} />
+      )}
+
+      {houseSel && (
+        <RivalHouseSheet
+          house={houseSel}
+          onClose={() => setHouseSel(null)}
+          onLaunch={(target) => {
+            const from = myHouseCoords || (homeCoords ? { lat: homeCoords[1], lng: homeCoords[0] } : null)
+            if (!from || target.lat == null || target.lng == null) return
+            carIdRef.current += 1
+            setCarDrive({ id: carIdRef.current, from, to: { lat: target.lat, lng: target.lng } })
+          }}
+        />
       )}
 
       {selectedFacility && (
@@ -892,6 +914,134 @@ export default function MapScreen({ onNavigate }) {
 // ---------------------------------------------------------------------
 // Subcomponents
 // ---------------------------------------------------------------------
+
+// Tapping a RIVAL's trap-house pin opens this action sheet. Three plays:
+// Snoop (recon), Attack (the raid), RAT (snitch). Attack is the one we're
+// building out — Snoop/RAT are stubbed until their systems land.
+function RivalHouseSheet({ house, onClose, onLaunch }) {
+  const [mode, setMode] = useState('menu')          // 'menu' | 'attack'
+  const { players } = usePlayers()
+  const stats = usePlayerStats()
+  const myPower = stats.atk + stats.def
+
+  const prof = players[house.owner_id] || {}
+  const look = resolveLook(prof.player_look_id)
+  const name = prof.display_name || house.name || 'Rival'
+  const hp = house.hp != null ? house.hp : 100
+  const hpMax = house.hp_max != null ? house.hp_max : 100
+  const hpPct = Math.max(0, Math.min(100, Math.round((hp / hpMax) * 100)))
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 280 }} onClick={onClose}>
+      <div className="animate-in" style={{ background: '#13131f', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, width: '100%', maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+
+        {/* Target header — who + their trap-house HP */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Avatar src={look.avatar} emoji={look.emoji} size={52} radius={12} style={{ border: `2px solid ${RED}` }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ color: DIM, fontSize: 10, letterSpacing: 1.5, fontWeight: 600 }}>RIVAL TRAP HOUSE</div>
+            <div style={{ color: '#fff', fontSize: 18, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
+          </div>
+          <div style={{ fontSize: 30 }}>🏚️</div>
+        </div>
+
+        {/* HP bar */}
+        <div style={{ marginTop: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: DIM, letterSpacing: 0.5, marginBottom: 4 }}>
+            <span>HOUSE INTEGRITY</span><span style={{ color: hpPct > 33 ? '#2ecc71' : RED }}>{hp} / {hpMax}</span>
+          </div>
+          <div style={{ height: 8, borderRadius: 5, background: '#0a0a12', overflow: 'hidden' }}>
+            <div style={{ width: `${hpPct}%`, height: '100%', background: hpPct > 33 ? 'linear-gradient(90deg,#2ecc71,#27ae60)' : 'linear-gradient(90deg,#e74c3c,#c0392b)', transition: 'width .4s' }} />
+          </div>
+        </div>
+
+        {mode === 'menu' ? (
+          <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+            <PlayButton emoji="🔍" label="Snoop" sub="Soon" tint="#4a9eff" disabled onClick={() => {}} />
+            <PlayButton emoji="💥" label="Attack" sub="Raid" tint={RED} onClick={() => { sfx.tap?.(); setMode('attack') }} />
+            <PlayButton emoji="🐀" label="RAT" sub="Soon" tint="#c9a84c" disabled onClick={() => {}} />
+          </div>
+        ) : (
+          <AttackPlan house={house} name={name} myPower={myPower} hp={hp} hpMax={hpMax}
+            onBack={() => setMode('menu')} onClose={onClose} onLaunch={onLaunch} />
+        )}
+
+        {mode === 'menu' && (
+          <button className="btn btn-dark" style={{ width: '100%', padding: 12, marginTop: 10 }} onClick={onClose}>Close</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function PlayButton({ emoji, label, sub, tint, onClick, disabled }) {
+  return (
+    <button onClick={disabled ? undefined : onClick} disabled={disabled} style={{
+      flex: 1, background: disabled ? '#0e0e16' : '#1a1a28', border: `1px solid ${disabled ? '#22222e' : tint + '66'}`,
+      borderRadius: 14, padding: '14px 6px', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+    }}>
+      <span style={{ fontSize: 24 }}>{emoji}</span>
+      <span style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>{label}</span>
+      <span style={{ color: tint, fontSize: 9, letterSpacing: 1, textTransform: 'uppercase' }}>{sub}</span>
+    </button>
+  )
+}
+
+// The Attack plan — your muscle vs their house, the Steel cost, and the
+// "Send the Hit" launch. Launch is stubbed for the visual pass; the timed
+// raid (attack-car drive + server damage) wires in next.
+const RAID_STEEL_COST = 200
+function AttackPlan({ house, name, myPower, hp, hpMax, onBack, onClose, onLaunch }) {
+  const steel = useSteel()
+  const broke = steel < RAID_STEEL_COST
+  // Visual estimate only — real damage is computed server-side at landing.
+  const estDamage = Math.max(10, Math.min(hpMax, Math.round(myPower * 0.4)))
+
+  const launch = () => {
+    if (broke) { sfx.deny?.(); return }
+    sfx.launch?.()
+    // Kick off the attack-car drive (attacker base -> defender base). The Steel
+    // spend + server damage at landing wire in with the raids backend next.
+    onLaunch && onLaunch(house)
+    onClose()
+  }
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 10 }}>
+        <MiniStat label="YOUR MUSCLE" value={myPower} color={GOLD} />
+        <div style={{ display: 'flex', alignItems: 'center', color: RED, fontSize: 20 }}>⚔️</div>
+        <MiniStat label="EST. DAMAGE" value={`-${estDamage}`} color={RED} />
+      </div>
+
+      <div style={{ marginTop: 12, background: '#0e0e16', border: '1px solid #22222e', borderRadius: 12, padding: 12, fontSize: 12, color: '#aaa', lineHeight: 1.5 }}>
+        Send the crew on {name}'s trap house. They'll be <span style={{ color: '#fff' }}>en route</span> — once the car lands it hits the house. Knock it to <span style={{ color: RED }}>0</span> and you loot their Hustle. They can reinforce before you arrive.
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, fontSize: 12 }}>
+        <span style={{ color: DIM }}>COST</span>
+        <span style={{ color: broke ? RED : '#fff', fontWeight: 700 }}>{RAID_STEEL_COST} Steel{broke ? ' — not enough' : ''}</span>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+        <button className="btn btn-dark" style={{ flex: '0 0 90px', padding: 12 }} onClick={onBack}>Back</button>
+        <button className="btn btn-gold" style={{ flex: 1, padding: 12, opacity: broke ? 0.5 : 1 }} onClick={launch} disabled={broke}>
+          <i className="ti ti-car" style={{ marginRight: 6 }} /> Send the Hit
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function MiniStat({ label, value, color }) {
+  return (
+    <div style={{ flex: 1, background: '#0e0e16', border: '1px solid #22222e', borderRadius: 12, padding: '10px 6px', textAlign: 'center' }}>
+      <div style={{ color, fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{value}</div>
+      <div style={{ color: DIM, fontSize: 9, marginTop: 5, letterSpacing: 0.8 }}>{label}</div>
+    </div>
+  )
+}
 
 function SummaryStat({ label, value, color }) {
   return (

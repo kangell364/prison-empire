@@ -17,14 +17,18 @@ const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.pn
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
 const GOLD = '#c9a84c'
 
-export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse, trapHouseName, onTrapHouseTap, otherHouses, myUserId }) {
+export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse, trapHouseName, onTrapHouseTap, onHouseTap, otherHouses, myUserId, raidDrive, onRaidArrive }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const onBlockTapRef = useRef(onBlockTap)
   const onTrapTapRef = useRef(onTrapHouseTap)
+  const onHouseTapRef = useRef(onHouseTap)
+  const onRaidArriveRef = useRef(onRaidArrive)
   const [countyName, setCountyName] = useState(label || '')   // live "which county am I in" HUD
   onBlockTapRef.current = onBlockTap
   onTrapTapRef.current = onTrapHouseTap
+  onHouseTapRef.current = onHouseTap
+  onRaidArriveRef.current = onRaidArrive
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
@@ -122,15 +126,54 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
     const layer = L.layerGroup().addTo(map)
     houses.forEach(h => {
       const name = String(h.name || 'Player').replace(/[<>]/g, '')
-      const icon = L.divIcon({ className: '', iconSize: [40, 48], iconAnchor: [20, 42], html: `<div style="text-align:center">
+      const icon = L.divIcon({ className: '', iconSize: [40, 48], iconAnchor: [20, 42], html: `<div style="text-align:center;cursor:pointer">
         <div style="width:32px;height:32px;border-radius:10px;background:#1a1015;border:2px solid #e74c3c;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 2px 8px rgba(0,0,0,.7);margin:0 auto">🏚️</div>
         <div style="margin-top:2px;font-size:9px;color:#fff;background:rgba(0,0,0,.62);border-radius:4px;padding:1px 4px;white-space:normal;max-width:120px;line-height:1.2;margin-left:auto;margin-right:auto;display:inline-block">${name}</div>
       </div>` })
-      L.marker([h.lat, h.lng], { icon }).addTo(layer)
+      L.marker([h.lat, h.lng], { icon })
+        .on('click', () => onHouseTapRef.current && onHouseTapRef.current(h))
+        .addTo(layer)
     })
     return () => { try { map.removeLayer(layer) } catch {} }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [othersKey])
+
+  // Attack-car drive — the raid "en route" flourish. Animates the lowrider
+  // sprite from the attacker's trap house to the defender's along a straight
+  // line, flipped to face the direction of travel, then clears itself and
+  // notifies the parent (where damage/landing will resolve once the backend is in).
+  const raidDriveId = raidDrive && raidDrive.id
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !raidDrive) return
+    const { from, to } = raidDrive
+    if (from == null || to == null) return
+    const facingRight = to.lng > from.lng    // sprite faces LEFT by default
+    const icon = L.divIcon({
+      className: '', iconSize: [100, 42], iconAnchor: [50, 21],
+      html: `<div style="transform:scaleX(${facingRight ? -1 : 1});filter:drop-shadow(0 4px 7px rgba(0,0,0,.65))">
+        <img src="/attack-car.png" alt="" style="width:100px;display:block" />
+      </div>`,
+    })
+    const marker = L.marker([from.lat, from.lng], { icon, zIndexOffset: 2000, interactive: false }).addTo(map)
+    // Frame both endpoints so the whole drive is visible.
+    try { map.fitBounds([[from.lat, from.lng], [to.lat, to.lng]], { padding: [90, 90], maxZoom: 15, animate: true }) } catch {}
+
+    const DURATION = 6500
+    let raf = null, startTs = null, done = false
+    const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2   // easeInOutQuad
+    const step = ts => {
+      if (startTs == null) startTs = ts
+      const k = Math.min(1, (ts - startTs) / DURATION)
+      const e = ease(k)
+      marker.setLatLng([from.lat + (to.lat - from.lat) * e, from.lng + (to.lng - from.lng) * e])
+      if (k < 1) { raf = requestAnimationFrame(step) }
+      else if (!done) { done = true; try { map.removeLayer(marker) } catch {}; onRaidArriveRef.current && onRaidArriveRef.current() }
+    }
+    raf = requestAnimationFrame(step)
+    return () => { if (raf) cancelAnimationFrame(raf); try { map.removeLayer(marker) } catch {} }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raidDriveId])
 
   // County borders + the live "which county am I in" HUD. Faint outlines for the
   // counties in view (so you can see where the lines are as you roam), the
