@@ -24,6 +24,7 @@ import { useUnreadCount } from './state/fightLogStore'
 import { NotificationsModal } from './components/NotificationsModal'
 import { InstallPrompt } from './components/InstallPrompt'
 import { RaidHud } from './components/RaidHud'
+import { WorldChat } from './components/WorldChat'
 // NOTE: AR camera encounter (src/components/CameraEncounter.jsx) is built but
 // parked — re-import + re-add the header button below to bring it back.
 
@@ -166,6 +167,9 @@ export default function App() {
 
       {/* Screen Content */}
       {renderScreen()}
+
+      {/* Global world chat — floating button + panel, reachable everywhere. */}
+      <WorldChat />
 
       <InstallPrompt />
 
