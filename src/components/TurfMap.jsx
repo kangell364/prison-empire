@@ -117,7 +117,7 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
   // OTHER players' trap houses (the shared world). Red-tinted house pins with
   // the owner's name; excludes your own (which has its own gold pin above).
   const othersKey = (otherHouses || [])
-    .filter(h => h.owner_id !== myUserId).map(h => `${h.id}:${h.lat}:${h.lng}`).join('|')
+    .filter(h => h.owner_id !== myUserId).map(h => `${h.id}:${h.lat}:${h.lng}:${h.name}`).join('|')
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
