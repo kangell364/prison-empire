@@ -30,14 +30,19 @@ export function harrisSpotFor(userId) {
   }
 }
 
-// Create (or refresh the name on) the caller's trap house. Idempotent per
-// session — safe to call on every mount. No-op without a backend / user.
+// Create (or refresh the name on) the caller's trap house. Safe to call on
+// every mount. Re-runs when the NAME changes (so a rename updates the row and
+// streams the new name onto everyone's map), but skips redundant calls for the
+// same user+name. No-op without a backend / user.
 let ensuredFor = null
+let ensuredName = null
 export async function ensureMyHouse(name) {
   if (!isSupabaseConfigured) return
   const uid = getUserId()
-  if (!uid || ensuredFor === uid) return
+  if (!uid) return
+  if (ensuredFor === uid && ensuredName === name) return   // nothing changed
   ensuredFor = uid
+  ensuredName = name
   try {
     const { data: existing } = await supabase
       .from('houses').select('id').eq('owner_id', uid).eq('kind', 'personal').maybeSingle()
@@ -50,7 +55,7 @@ export async function ensureMyHouse(name) {
       })
     }
   } catch (e) {
-    ensuredFor = null   // let a later mount retry
+    ensuredFor = null; ensuredName = null   // let a later mount retry
     console.warn('[sharedHouses] ensure failed', e)
   }
 }
