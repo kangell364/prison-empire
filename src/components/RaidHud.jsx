@@ -9,7 +9,7 @@ import { CountdownRing } from './CountdownRing'
 import { usePlayers } from '../state/playersStore'
 import { useAuth } from '../state/profileStore'
 import { useSharedHouses } from '../state/sharedHousesStore'
-import { useActiveRaids, useRaidResolver, reinforceMyHouse, REINFORCE_COST, RAID_DURATION_MS } from '../state/raidsStore'
+import { useActiveRaids, useRaidResolver, reinforceMyHouse, REINFORCE_COST } from '../state/raidsStore'
 import { sfx } from '../sounds'
 
 const GOLD = '#c9a84c'
@@ -68,11 +68,16 @@ export function RaidHud({ onGoToMap }) {
 function remainingOf(raid) {
   return Math.max(0, Math.ceil((new Date(raid.ends_at).getTime() - Date.now()) / 1000))
 }
+// Each raid has its own (distance-based) duration, so the ring total comes from
+// the raid's own started_at → ends_at span, not a fixed constant.
+function totalOf(raid) {
+  return Math.max(1, Math.round((new Date(raid.ends_at).getTime() - new Date(raid.started_at).getTime()) / 1000))
+}
 
 // Defender: someone is raiding YOUR trap house. Reinforce or ride it out.
 function IncomingBanner({ raid, myHouse, onReinforce, onTap }) {
   const { name } = usePlayers()
-  const total = Math.ceil(RAID_DURATION_MS / 1000)
+  const total = totalOf(raid)
   const remaining = remainingOf(raid)
   const hp = myHouse?.hp != null ? myHouse.hp : 100
   const hpMax = myHouse?.hp_max != null ? myHouse.hp_max : 100
@@ -106,7 +111,7 @@ function IncomingBanner({ raid, myHouse, onReinforce, onTap }) {
 // Attacker: your crew is en route.
 function OutgoingBanner({ raid, onTap }) {
   const { name } = usePlayers()
-  const total = Math.ceil(RAID_DURATION_MS / 1000)
+  const total = totalOf(raid)
   const remaining = remainingOf(raid)
   const isClose = remaining <= Math.min(60, Math.floor(total / 3))
 

@@ -152,7 +152,11 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
     const { from, to } = raidDrive
     if (from == null || to == null) return
 
-    const OUT = 5000, HOLD = 1800, BACK = 5000
+    // Car drive speed is LINKED to distance: constant map-speed, so a farther
+    // target takes proportionally longer to reach (matches the longer raid).
+    const sepDeg = Math.sqrt((to.lat - from.lat) ** 2 + (to.lng - from.lng) ** 2)
+    const leg = Math.round(Math.max(2500, Math.min(11000, (sepDeg / 0.26) * 11000)))
+    const OUT = leg, HOLD = 1800, BACK = leg
     const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2   // easeInOutQuad
     const outRight  = to.lng > from.lng       // heading toward defender
     const backRight = from.lng > to.lng       // heading back toward attacker
