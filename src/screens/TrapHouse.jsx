@@ -735,11 +735,23 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, cardLevels = {}, pric
         {/* Customer queue — shoppers walk in the door, line up, and buy jars. */}
         <ShopCustomers onSell={handleSell} rep={rep} />
 
-        {/* The MENU board on the wall is the price editor — tap to set sell prices. */}
+        {/* The MENU board on the wall is the price editor — tap to set sell prices.
+            Glows + shows a bobbing hint chip when you have strains to price. */}
         <button onClick={() => setMenuOpen(true)} aria-label="Edit menu prices"
           style={{ position: 'absolute', left: '27%', top: '26%', width: '8.5%', height: '19%',
-            zIndex: 6, background: 'transparent', border: 'none', cursor: 'pointer',
-            animation: placedIds.length ? 'menuGlow 2.2s ease-in-out infinite' : 'none' }} />
+            zIndex: 6, background: 'transparent', border: 'none', borderRadius: 4, cursor: 'pointer',
+            animation: placedIds.length ? 'menuGlow 1.8s ease-in-out infinite' : 'none' }} />
+        {placedIds.length > 0 && (
+          <div onClick={() => setMenuOpen(true)}
+            style={{ position: 'absolute', left: '31.25%', top: '46.5%', transform: 'translate(-50%, 0)',
+              zIndex: 7, cursor: 'pointer', whiteSpace: 'nowrap',
+              background: GOLD, color: '#1a1206', fontSize: 9, fontWeight: 900, letterSpacing: 0.5,
+              padding: '3px 8px', borderRadius: 999, boxShadow: '0 2px 8px rgba(0,0,0,0.6)',
+              display: 'flex', alignItems: 'center', gap: 4,
+              animation: 'menuBob 1.1s ease-in-out infinite' }}>
+            <i className="ti ti-tag" style={{ fontSize: 11 }} /> Set Prices
+          </div>
+        )}
       </div>
 
       {menuOpen && (
