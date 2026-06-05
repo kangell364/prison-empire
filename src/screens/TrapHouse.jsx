@@ -746,8 +746,9 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, cardLevels = {}, pric
         <div aria-hidden style={{ position: 'absolute', left: '28.4%', top: '18.8%', width: '10.6%', height: '26%',
           zIndex: 6, border: `2px solid ${GOLD}`, borderRadius: 5, pointerEvents: 'none',
           animation: 'menuGlow 1.5s ease-in-out infinite' }} />
+        {/* Hint chip moved to top-center, just under the bank / top bar. */}
         <div onClick={() => setMenuOpen(true)}
-          style={{ position: 'absolute', left: '33.7%', top: '46.5%', transform: 'translate(-50%, 0)',
+          style={{ position: 'absolute', left: '50%', top: '2.5%', transform: 'translate(-50%, 0)',
             zIndex: 7, cursor: 'pointer', whiteSpace: 'nowrap',
             background: GOLD, color: '#1a1206', fontSize: 10, fontWeight: 900, letterSpacing: 0.5,
             padding: '3px 9px', borderRadius: 999, boxShadow: '0 2px 8px rgba(0,0,0,0.6)',
