@@ -953,7 +953,9 @@ function RivalHouseSheet({ house, onClose, onLaunch }) {
 
   const prof = players[house.owner_id] || {}
   const look = resolveLook(prof.player_look_id)
-  const name = prof.display_name || house.name || 'Rival'
+  // Prefer the house row's name — it updates live via the houses realtime stream
+  // on a rename, whereas the players directory (public_profiles) is cached.
+  const name = house.name || prof.display_name || 'Rival'
   const hp = house.hp != null ? house.hp : 100
   const hpMax = house.hp_max != null ? house.hp_max : 100
   const hpPct = Math.max(0, Math.min(100, Math.round((hp / hpMax) * 100)))
