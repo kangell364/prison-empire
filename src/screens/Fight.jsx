@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react'
-import { PLAYER, PVP_LEVEL_RANGE, PVP_FIGHT_COST } from '../data/gameData'
+import { PLAYER, PVP_FIGHT_COST } from '../data/gameData'
 import { generateOpponents, generateOpponent, opponentFromId } from '../data/pvpLadder'
+import { sfx } from '../sounds'
 import { Avatar } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { PvpBattleModal, XP_WIN, XP_LOSE, RECLAIM_MULT } from '../components/PvpBattleModal'
@@ -85,6 +86,9 @@ function PlayersScreen() {
   const [target, setTarget]         = useState(null)
   const [detailPlayer, setDetailPlayer] = useState(null)
   const [bountyTarget, setBountyTarget] = useState(null)
+  // Opponent-list seed — random on mount (fresh faces each visit) and bumped by
+  // the Shuffle button, so the lineup rotates instead of being the same rivals.
+  const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9))
 
   // Revenge targets (rivals who KO'd you) — regenerated from their stable ids so
   // they're always fightable and pinned to the top, even if they've since
@@ -97,10 +101,10 @@ function PlayersScreen() {
   ), [fightLog.revenge])
 
   const targets = useMemo(() => {
-    const base = generateOpponents(playerLevel)
+    const base = generateOpponents(playerLevel, seed)
     const ids = new Set(revengeTargets.map(t => t.id))
     return [...revengeTargets, ...base.filter(t => !ids.has(t.id))]
-  }, [playerLevel, revengeTargets])
+  }, [playerLevel, revengeTargets, seed])
 
   const onFightOpened = (opp) => {
     if (stamina < PVP_FIGHT_COST) return
@@ -120,7 +124,7 @@ function PlayersScreen() {
             <div>
               <div style={{ color: '#fff', fontSize: 16, fontWeight: 600 }}>Player vs Player</div>
               <div style={{ color: '#888', fontSize: 11, marginTop: 2, lineHeight: 1.4 }}>
-                Pick your fights — rivals from your level up to +{PVP_LEVEL_RANGE} above.
+                Pick your fights — rivals around your level. Shuffle for a fresh lineup.
               </div>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -165,7 +169,14 @@ function PlayersScreen() {
 
       {/* Player list */}
       <div className="section" style={{ marginTop: 14 }}>
-        <div className="section-label">Available Targets ({targets.length})</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="section-label">Available Targets ({targets.length})</div>
+          <button onClick={() => { sfx.tap?.(); setSeed(Math.floor(Math.random() * 1e9)) }}
+            style={{ background: '#1a1a28', border: '1px solid #2a2a3a', borderRadius: 8, color: GOLD,
+              fontSize: 11, fontWeight: 700, padding: '5px 11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <i className="ti ti-refresh" /> Shuffle
+          </button>
+        </div>
         {targets.length === 0 ? (
           <div className="card card-pad" style={{ textAlign: 'center', color: DIM, fontSize: 12 }}>
             No targets in range. Level up to see more inmates.
