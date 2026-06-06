@@ -619,7 +619,14 @@ const QUEUE_SPOTS = [
 const CUST_SPEED = 11          // walk speed, % of room width per second (constant pace)
 const moveSecs = (ax, bx) => Math.max(0.6, Math.abs(ax - bx) / CUST_SPEED)
 // Paying customers for the line pool. GNOME 10 is NOT here — he's the bum (below).
-const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp', '/gnome-6.webp', '/gnome-7.webp', '/gnome-8.webp', '/gnome-9.webp', '/gnome-11.webp', '/gnome-12.webp', '/gnome-14.webp', '/gnome-15.webp', '/gnome-16.webp', '/gnome-17.webp', '/gnome-18.webp', '/gnome-21.webp', '/gnome-22.webp']
+const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp', '/gnome-6.webp', '/gnome-7.webp', '/gnome-8.webp', '/gnome-9.webp', '/gnome-11.webp', '/gnome-12.webp', '/gnome-13.webp', '/gnome-14.webp', '/gnome-15.webp', '/gnome-16.webp', '/gnome-17.webp', '/gnome-18.webp', '/gnome-21.webp', '/gnome-22.webp']
+// Sprites split into a body + a separate head layer so the head can bobble like a
+// bobblehead toy. The base sprite (in CUSTOMER_SPRITES) is the body; the head
+// image overlays it and rotates around the neck `pivot`. GNOME 13's big
+// caricature head is built for it.
+const HEAD_OVERLAY = {
+  '/gnome-13.webp': { src: '/gnome-13-head.webp', pivot: '50% 45%' },
+}
 const CUST_SIZE = {                            // per-sprite size multipliers
   '/gnome-2.webp': 1,
   '/gnome-5.webp': 1.2,
@@ -875,7 +882,9 @@ function CustomerKeyframes() {
   kf += `@keyframes custBegIn  { 0% { ${f(CUST_DOOR)} } 100% { ${f(BEG_SPOT)} } }\n`
   kf += `@keyframes custBegOut { 0% { ${f(BEG_SPOT)}; opacity:1; } 80% { opacity:1; } 100% { ${f(CUST_OUT)}; opacity:0; } }\n`
   kf += `@keyframes custWaddle { 0%,50%,100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-4%) rotate(2.5deg); } 75% { transform: translateY(-4%) rotate(-2.5deg); } }\n`
-  kf += `@keyframes custBubblePop { 0% { transform: translate(-50%,-100%) scale(0.5); opacity:0; } 100% { transform: translate(-50%,-100%) scale(1); opacity:1; } }`
+  kf += `@keyframes custBubblePop { 0% { transform: translate(-50%,-100%) scale(0.5); opacity:0; } 100% { transform: translate(-50%,-100%) scale(1); opacity:1; } }\n`
+  // Bobblehead rock — a damped wobble that overshoots then settles, on loop.
+  kf += `@keyframes bobbleHead { 0% { transform: rotate(0deg); } 20% { transform: rotate(6deg); } 45% { transform: rotate(-5deg); } 65% { transform: rotate(3deg); } 82% { transform: rotate(-1.5deg); } 100% { transform: rotate(0deg); } }`
   return <style>{kf}</style>
 }
 
@@ -887,6 +896,7 @@ function CustomerSprite({ c }) {
   const walking = c.phase === 'enter' || c.phase === 'leave'
   const ease = c.anim === 'custOut' ? 'ease-in' : c.anim.startsWith('custAdv') ? 'ease-in-out' : 'ease-out'
   const size = CUST_SIZE[c.sprite] || 1
+  const head = HEAD_OVERLAY[c.sprite]
   // Later rows are nearer the viewer, so they paint IN FRONT of earlier rows; within a
   // row the front-of-line sits on top. A leaving customer crosses in front of everyone.
   const inLine = typeof c.pos === 'number'
@@ -900,10 +910,16 @@ function CustomerSprite({ c }) {
     }}>
       {(c.phase === 'buy' || c.phase === 'angry') && <CustomerBubble reaction={c.reaction} value={c.value} size={size} />}
       <div style={{ width: '100%', transform: `scale(${size})`, transformOrigin: '50% 100%' }}>
-        <img src={c.sprite} alt="" aria-hidden style={{
-          display: 'block', width: '100%', transformOrigin: '50% 100%',
-          animation: walking ? 'custWaddle 0.5s ease-in-out infinite' : 'none',
-        }} />
+        {/* Body + (optional) bobbling head waddle together while walking; the head
+            additionally rocks on its neck pivot like a bobblehead toy. */}
+        <div style={{ position: 'relative', width: '100%', transformOrigin: '50% 100%',
+          animation: walking ? 'custWaddle 0.5s ease-in-out infinite' : 'none' }}>
+          <img src={c.sprite} alt="" aria-hidden style={{ display: 'block', width: '100%' }} />
+          {head && <img src={head.src} alt="" aria-hidden style={{
+            position: 'absolute', left: 0, top: 0, width: '100%', transformOrigin: head.pivot,
+            animation: 'bobbleHead 1.7s ease-in-out infinite',
+          }} />}
+        </div>
       </div>
     </div>
   )
