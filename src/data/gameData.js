@@ -150,28 +150,26 @@ export const LEADERBOARD = [
   { rank: 5, name: 'HoustonKing',   emoji: '🏙️', facility: 'State Prison', state: 'Texas', level: 47, isYou: false },
 ].map(withCombat)
 
+// CREW CARDS — the 100-common collection from CREW LIST.txt. Each is one
+// street-gang member with an explicit ATK/DEF (baseAtk/baseDef in crewStore read
+// `atk`/`def` directly when present, instead of deriving from traits). Crew ids
+// are offset +100 from their CREW LIST number (CARD 1 -> id 101) so they never
+// collide with the legacy player-card ids (1-8) sitting in old saves. `archetype`,
+// `bonus`, `weakness` are flavor for now; they wire into combat later.
 export const CARDS_COLLECTION = [
-  { id: 1,  name: 'Slick Rico',      emoji: '🤵', avatar: '/slickrico.jpg', rarity: 'epic',      hustle: 15, muscle: 6,  smarts: 14, cred: 12, special: 'Con Artist',
-    bio: 'Three-piece-suit charm, federal-grade rap sheet. Could sell snow to penguins and bail bonds to monks. Your front man and your closer.' },
-  { id: 2,  name: 'Big T',           emoji: '💪', rarity: 'rare',      hustle: 4,  muscle: 18, smarts: 3,  cred: 9,  special: 'Intimidation',
-    bio: 'Two-time Golden Gloves before the system caught him. Speaks four words a day, throws five hundred punches.' },
-  { id: 3,  name: 'The Professor',   emoji: '🧠', rarity: 'uncommon',  hustle: 6,  muscle: 2,  smarts: 15, cred: 3,  special: 'Legal Eagle',
-    bio: 'Was a high school chemistry teacher. Now runs the prison\'s underground GED program and a few... extracurricular ventures.' },
-  { id: 4,  name: 'OG Marcus',       emoji: '👴', rarity: 'uncommon',  hustle: 5,  muscle: 7,  smarts: 8,  cred: 12, special: 'Respect',
-    bio: 'Did 22 years at three different facilities. Knows every guard, every shortcut, every weak spot. Respected by every crew on every block.' },
-  { id: 5,  name: 'Tiny',            emoji: '🤏', rarity: 'common',    hustle: 7,  muscle: 6,  smarts: 7,  cred: 6,  special: 'Underestimated',
-    bio: '5\'4" and underestimated daily. Last guy who underestimated him woke up in the infirmary missing teeth and dignity.' },
-  { id: 6,  name: 'Fresh Fish Fred', emoji: '😰', rarity: 'common',    hustle: 8,  muscle: 4,  smarts: 6,  cred: 2,  special: 'First Timer',
-    bio: 'Just got off the bus. Doesn\'t know which way is up. Surprisingly good at running errands and not asking questions.' },
-  { id: 7,  name: 'Contraband Carl', emoji: '📦', rarity: 'rare',      hustle: 12, muscle: 5,  smarts: 10, cred: 8,  special: 'Black Market',
-    bio: 'Can get you anything for a price. Phones, blades, candy bars, hope. The price varies. Everything is negotiable.' },
-  { id: 8,  name: 'Yard King',       emoji: '👑', rarity: 'legendary', hustle: 18, muscle: 16, smarts: 14, cred: 18, special: 'Yard Advantage',
-    bio: 'Legendary. Last seen running a cell block from a cot in the medical wing. They say he\'s still in there. They say a lot of things.' },
+  { id: 101, no: 1, name: 'Lil Smoke', emoji: '🚬', avatar: '/crew-1.webp', rarity: 'common',
+    archetype: 'BRUISER', atk: 44, def: 18, special: 'Outnumber',
+    bonus: '+8% ATK when his crew outnumbers the enemy',
+    weakness: '-10% DEF when fighting alone',
+    bio: 'Short, wiry, hood up, blunt tucked behind the ear and smoke always curling. Hits harder when the block has his back — and folds a little when he is left holding it alone.' },
 ]
 
-// Cards a new player starts with. Mirrored in the SQL signup trigger
-// (supabase/migrations/0002_owned_cards.sql) — keep these in sync.
-export const STARTER_CARD_IDS = [1, 2, 3, 4, 5, 6]
+// Cards a new player starts with. Empty for the crew-card era: My Crew starts
+// empty until you collect crew cards (via the Commissary pull). The SQL signup
+// trigger (supabase/migrations/0002_owned_cards.sql) still seeds the legacy ids
+// 1-6, but those are no longer in CARDS_COLLECTION so they resolve to nothing in
+// the UI — update that migration when the backend crew-card table lands.
+export const STARTER_CARD_IDS = [101]
 
 // Player "look" cards — purely cosmetic skins for the home-screen player card.
 // ISOLATED from CARDS_COLLECTION on purpose: these are NOT earned in-game and

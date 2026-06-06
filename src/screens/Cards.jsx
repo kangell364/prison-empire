@@ -253,7 +253,7 @@ export default function Cards({ initialTab = 'player' }) {
         return (
           <CharacterDetailModal
             character={card}
-            cardType="PLAYER"
+            cardType="CREW"
             count={liveCount}
             cardLevel={cardLevel}
             upgrades={readUpgrade(upgradesMap, card.id, cardLevel)}
@@ -553,7 +553,7 @@ function CollectionTile({ card, cardLevel, count, inCrew, upgrades, onTap }) {
       <div style={{
         position: 'absolute', top: 6, left: 8,
         color: '#888', fontSize: 8, fontWeight: 700, letterSpacing: 1.5,
-      }}>PLAYER</div>
+      }}>CREW</div>
 
       {/* CARDS:N badge (top-right) */}
       <div style={{
@@ -662,7 +662,7 @@ function LockedTile({ card }) {
       <div style={{
         position: 'absolute', top: 6, left: 8,
         color: '#555', fontSize: 8, fontWeight: 700, letterSpacing: 1.5,
-      }}>PLAYER</div>
+      }}>CREW</div>
       <div style={{
         position: 'absolute', top: 6, right: 8,
         color: '#555', fontSize: 9, fontWeight: 700, letterSpacing: 1,
@@ -687,7 +687,7 @@ function TabSwitcher({ tab, onTab }) {
   // loadout views (Crew + Skills). Kept in separate grids so the collections
   // share one 3-up row regardless of how many loadout tabs there are.
   const COLLECTION_TABS = [
-    { id: 'player', label: 'Player Cards', icon: 'ti-user' },
+    { id: 'player', label: 'Crew Cards',   icon: 'ti-users' },
     { id: 'skill',  label: 'Skill Cards',  icon: 'ti-cards' },
     { id: 'grow',   label: 'Grow Cards',   icon: 'ti-plant-2' },
   ]

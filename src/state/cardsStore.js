@@ -18,11 +18,17 @@
 import { useEffect, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../supabase'
 import { ensureAuth, getUserId } from './profileStore'
-import { STARTER_CARD_IDS } from '../data/gameData'
+import { STARTER_CARD_IDS, CARDS_COLLECTION } from '../data/gameData'
 
 const STORAGE_KEY    = 'pe_card_collection_v1'
 const MERGE_COST     = 20    // cards consumed per merge
 export const STACK_SIZE = 20 // one "stack" for UI display purposes
+
+// Ids that exist in the current catalog. Old saves from the legacy player-card
+// era hold retired ids (1-8) that are no longer in CARDS_COLLECTION; we treat a
+// save that owns NONE of the current catalog as un-seeded and drop the starter
+// crew card in, so the Crew Cards tab is never empty after the migration.
+const CATALOG_IDS = new Set(CARDS_COLLECTION.map(c => c.id))
 
 let state = readLocalSeed()      // Map<"id:level", count>
 const listeners = new Set()
@@ -32,6 +38,14 @@ let initPromise = null
 
 function keyOf(id, level)  { return `${id}:${level}` }
 function parseKey(k)       { const [a, b] = k.split(':'); return [Number(a), Number(b)] }
+
+// Does this collection own at least one card that's in the current catalog?
+function ownsCatalogCard(m) {
+  for (const [k, v] of m.entries()) {
+    if (v > 0 && CATALOG_IDS.has(parseKey(k)[0])) return true
+  }
+  return false
+}
 
 // ---- public API ----------------------------------------------------
 
@@ -156,6 +170,9 @@ function readLocalSeed() {
       for (const [k, v] of Object.entries(obj)) {
         if (typeof v === 'number' && v > 0) m.set(k, v)
       }
+      // Migrate legacy-only saves: if nothing owned is in the current catalog,
+      // seed the starter crew card so the tab isn't empty.
+      if (!ownsCatalogCard(m)) STARTER_CARD_IDS.forEach(id => m.set(keyOf(id, 1), 1))
       return m
     }
   } catch {}
@@ -183,9 +200,9 @@ async function bootSupabase() {
   for (const row of data || []) {
     if (row.count > 0) next.set(keyOf(row.card_id, row.card_level), row.count)
   }
-  // If the server has nothing (rare — trigger should have populated), fall
-  // back to starter seed so the UI isn't empty.
-  if (next.size === 0) {
+  // If the server holds nothing in the current catalog (empty, or only legacy
+  // retired ids), fall back to the starter seed so the Crew Cards tab isn't empty.
+  if (!ownsCatalogCard(next)) {
     STARTER_CARD_IDS.forEach(id => next.set(keyOf(id, 1), 1))
   }
   commit(next)
