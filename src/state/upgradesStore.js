@@ -56,6 +56,26 @@ export function getUpgrade(cardId, cardLevel = 1) {
   return state.get(keyOf(cardId, cardLevel)) || ZERO
 }
 
+// BANKED total — sum of every upgrade point bought across card levels 1..upto.
+// The card's effective ATK/DEF bonus is this sum × per-level. Each card level
+// has its own 0..MAX track; merging to the next level leaves the lower level's
+// bought points banked here and opens a fresh 0/MAX track. Points you never
+// bought at a level are simply never counted — "missed upgrades are lost".
+export function totalUpgrade(map, cardId, uptoLevel = 1) {
+  let atk = 0, def = 0
+  for (let lvl = 1; lvl <= uptoLevel; lvl++) {
+    const v = map.get(keyOf(cardId, lvl)) || ZERO
+    atk += v.atk || 0
+    def += v.def || 0
+  }
+  return { atk, def }
+}
+
+// Module read of the banked total — for non-render call sites (crew/battle).
+export function getTotalUpgrade(cardId, uptoLevel = 1) {
+  return totalUpgrade(state, cardId, uptoLevel)
+}
+
 // Flatten one level into a { [cardId]: {atk,def} } map — for crew/battle
 // code that operates on a single (Level 1) view keyed by card_id.
 export function flatAtLevel(map, level = 1) {

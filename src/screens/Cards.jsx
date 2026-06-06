@@ -5,6 +5,10 @@ import {
   baseAtk, baseDef, useCrew,
   ATK_PER_LEVEL, DEF_PER_LEVEL,
 } from '../state/crewStore'
+import {
+  useUpgrades, readUpgrade, getUpgrade, upgradeStat, totalUpgrade,
+  HUSTLE_COST_PER_LEVEL, MAX_UPGRADE_LEVEL,
+} from '../state/upgradesStore'
 import { useHustle, spendHustle } from '../state/playerStore'
 import {
   useSkillCardCounts, getOwnedSkillTuples, mergeSkillCard, SKILL_STACK_SIZE,
@@ -66,6 +70,7 @@ export default function Cards({ initialTab = 'player' }) {
   const [filter, setFilter] = useState('All')
   const counts = useCardCounts()
   const crew   = useCrew()
+  const upgradesMap = useUpgrades()
   const hustle = useHustle()
   const skillCounts     = useSkillCardCounts()
   const skillUpgradeMap = useSkillUpgrades()
@@ -106,9 +111,21 @@ export default function Cards({ initialTab = 'player' }) {
     return s
   }, [crew.leader, crew.members])
 
-  // Crew cards have NO point-buy upgrade: their ATK/DEF come from CREW LIST and
-  // rise with the card's LEVEL, which you raise by stacking + merging (20 ->
-  // next level). So no per-stat hustle-spend handler here.
+  // Spend Hustle to buy one ATK/DEF point on a crew card AT ITS CURRENT LEVEL.
+  // Each level has its own 0..MAX track; the points you buy are banked (summed
+  // across levels via totalUpgrade) so they survive merging. Missed points on a
+  // level you've merged past can't be bought retroactively — they're lost.
+  const handleUpgrade = (cardId, cardLevel) => (stat) => {
+    const current = getUpgrade(cardId, cardLevel)[stat] || 0
+    if (current >= MAX_UPGRADE_LEVEL) return
+    const cost = HUSTLE_COST_PER_LEVEL(current)
+    if (spendHustle(cost)) {
+      upgradeStat(cardId, cardLevel, stat)
+      sfx.buy()
+    } else {
+      sfx.deny?.()
+    }
+  }
 
   // Crew tab swaps in the standalone Crew screen so all of its layout
   // (header stats, slot grid, slot editor) renders without the pack banner
@@ -170,6 +187,7 @@ export default function Cards({ initialTab = 'player' }) {
                       cardLevel={t.level}
                       count={t.count}
                       inCrew={inCrewSet.has(t.id)}
+                      upgradeTotal={totalUpgrade(upgradesMap, t.id, t.level)}
                       onTap={() => setSelectedCard({ card, cardLevel: t.level, count: t.count })}
                     />
                   )
@@ -242,12 +260,22 @@ export default function Cards({ initialTab = 'player' }) {
             cardType="CREW"
             count={liveCount}
             cardLevel={cardLevel}
+            // Current-level 0/20 track (what you're actively buying)...
+            upgrades={readUpgrade(upgradesMap, card.id, cardLevel)}
+            // ...plus the banked sum across all levels (what the stats show).
+            upgradeTotal={totalUpgrade(upgradesMap, card.id, cardLevel)}
+            hustle={hustle}
+            onUpgrade={handleUpgrade(card.id, cardLevel)}
             atkPerLevel={ATK_PER_LEVEL}
             defPerLevel={DEF_PER_LEVEL}
+            maxUpgradeLevel={MAX_UPGRADE_LEVEL}
+            costForLevel={HUSTLE_COST_PER_LEVEL}
             canMerge={liveCount >= STACK_SIZE}
             onMerge={() => {
-              // Stacking + merging is the ONLY way crew cards level up; the new
-              // level carries the higher ATK/DEF automatically (no point-buy).
+              // Merging banks the points you bought at THIS level (they stay in
+              // the per-level upgrade store) and mints the card at the next
+              // level with a fresh 0/20 track. No carry call needed — the banked
+              // total sums across levels. Points you skipped here are now lost.
               mergeCard(card.id, cardLevel)
               setSelectedCard(null)
               setMergeReveal({ card, toLevel: cardLevel + 1 })
@@ -504,11 +532,12 @@ function MergeRevealModal({ card, toLevel, onDone }) {
 // where upgrades and the MERGE action live.
 // `inCrew` dims the tile and shows an IN CREW badge so you can see at a
 // glance which cards are slotted vs. on the bench.
-function CollectionTile({ card, cardLevel, count, inCrew, onTap }) {
+function CollectionTile({ card, cardLevel, count, inCrew, upgradeTotal, onTap }) {
   const rarityColor = RARITY_COLORS[card.rarity]
-  // ATK/DEF rise with the card's LEVEL (from merging) — no point-buy upgrades.
-  const atk = baseAtk(card) + (cardLevel - 1) * ATK_PER_LEVEL
-  const def = baseDef(card) + (cardLevel - 1) * DEF_PER_LEVEL
+  // Effective ATK/DEF = base + the banked upgrade points bought across all
+  // levels (point-buy, summed in totalUpgrade) × per-level.
+  const atk = baseAtk(card) + (upgradeTotal?.atk || 0) * ATK_PER_LEVEL
+  const def = baseDef(card) + (upgradeTotal?.def || 0) * DEF_PER_LEVEL
   // Cards pile into stacks of STACK_SIZE; extras spill into the next stack.
   const fullStacks = Math.floor(count / STACK_SIZE)
   const remainder  = count % STACK_SIZE

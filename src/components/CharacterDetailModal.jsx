@@ -24,8 +24,12 @@ export function CharacterDetailModal({
   cardLevel,
   // Upgrade props — only rendered together. When supplied, the modal
   // shows the ATK/DEF upgrade panel under Combat Stats. `upgrades` is
-  // { atk: number, def: number }; `onUpgrade(stat)` is the click handler.
+  // { atk: number, def: number } — the CURRENT level's 0..max track that the
+  // upgrade rows buy against. `onUpgrade(stat)` is the click handler.
   upgrades,
+  // Banked total across all levels — drives the displayed ATK/DEF stats.
+  // Defaults to `upgrades` so callers that don't bank (skill/plant) still work.
+  upgradeTotal,
   hustle,
   onUpgrade,
   atkPerLevel = 10,
@@ -245,8 +249,8 @@ export function CharacterDetailModal({
           <div style={{ padding: '16px 18px 0' }}>
             <SectionLabel>Combat Stats</SectionLabel>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <StatTile icon="ti-sword"  label="Attack"  value={derivedAtk(c, cardLevel, atkPerLevel)}  color={RED} />
-              <StatTile icon="ti-shield" label="Defense" value={derivedDef(c, cardLevel, defPerLevel)} color={BLUE} />
+              <StatTile icon="ti-sword"  label="Attack"  value={derivedAtk(c, upgradeTotal || upgrades, atkPerLevel)}  color={RED} />
+              <StatTile icon="ti-shield" label="Defense" value={derivedDef(c, upgradeTotal || upgrades, defPerLevel)} color={BLUE} />
             </div>
             {c.special && (
               <div style={{
@@ -538,16 +542,16 @@ function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
 }
 
-// Derived ATK/DEF including upgrade levels. Matches the formula used in
-// crewStore — base from muscle/cred, +perLevel per upgrade level.
-// ATK/DEF scale with the card's LEVEL (raised by merging), not point-buy.
-function derivedAtk(c, cardLevel = 1, perLevel) {
+// Derived ATK/DEF including banked upgrade points. Matches the formula used in
+// crewStore — base from explicit atk/def (or muscle/cred), +perLevel per banked
+// upgrade point. `up` is the banked total { atk, def } summed across levels.
+function derivedAtk(c, up, perLevel) {
   const base = c.atk != null ? c.atk : (c.muscle * 5 + 15)   // crew cards carry explicit ATK
-  return (base + Math.max(0, cardLevel - 1) * perLevel).toLocaleString()
+  return (base + (up?.atk || 0) * perLevel).toLocaleString()
 }
-function derivedDef(c, cardLevel = 1, perLevel) {
+function derivedDef(c, up, perLevel) {
   const base = c.def != null ? c.def : (c.cred * 5 + 10)
-  return (base + Math.max(0, cardLevel - 1) * perLevel).toLocaleString()
+  return (base + (up?.def || 0) * perLevel).toLocaleString()
 }
 
 function UpgradeRow({ label, color, stat, level, perLevel, maxLevel, cost, hustle, onUpgrade }) {
