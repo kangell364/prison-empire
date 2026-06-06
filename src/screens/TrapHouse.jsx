@@ -469,6 +469,24 @@ export default function TrapHouse({ onBack, isOwner = true }) {
     <div style={containerStyle} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <Keyframes />
 
+      {/* Attack warning — first room (Shop Front) only, centered at the top of
+          the screen. Always shown for now; wire to live raids later. zIndex above
+          the top bar so it reads clearly over the chrome. */}
+      {cur.key === 'shop' && (
+        <div style={{
+          position: 'absolute', top: 'calc(8px + env(safe-area-inset-top))',
+          left: '50%', transform: 'translateX(-50%)', zIndex: 6,
+          display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap',
+          background: 'rgba(120,20,20,0.92)', border: '1px solid #e74c3c',
+          borderRadius: 12, padding: '7px 14px',
+          color: '#fff', fontSize: 12, fontWeight: 800, letterSpacing: 1,
+          boxShadow: '0 2px 12px rgba(0,0,0,0.55)',
+        }}>
+          <i className="ti ti-alert-triangle-filled" style={{ color: '#ffd24a', fontSize: 15 }} />
+          TRAP HOUSE UNDER FIRE
+        </div>
+      )}
+
       {/* Room fills the whole screen as a backdrop — so it grows to fill the
           display when the phone is turned sideways. Controls float on top.
           zIndex:0 makes this its own stacking context, so the monkey's high
