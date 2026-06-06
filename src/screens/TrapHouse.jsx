@@ -1478,8 +1478,15 @@ function DustRoom({ art }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ position: 'relative', aspectRatio: '1600 / 900', maxWidth: '100%', maxHeight: '100%' }}>
+        {/* Layer 1 — room backdrop (ROOM 4). */}
         <img src={art} alt="Dust Room" style={{ display: 'block', width: '100%', height: '100%' }} />
-        <div style={{ position: 'absolute', left: '50%', top: '64%', transform: 'translate(-50%, -50%)',
+        {/* Layer 2 — the table, kept as its own overlay so it can be moved or
+            swapped independently of the backdrop. Sits on the floor, full-width. */}
+        <img src="/dust-table.webp" alt="" aria-hidden
+          style={{ position: 'absolute', left: '50%', bottom: '4%', transform: 'translateX(-50%)',
+            width: '94%', zIndex: 1, pointerEvents: 'none',
+            filter: 'drop-shadow(0 8px 10px rgba(0,0,0,0.4))' }} />
+        <div style={{ position: 'absolute', left: '50%', top: '38%', transform: 'translate(-50%, -50%)', zIndex: 2,
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, pointerEvents: 'none' }}>
           <i className="ti ti-sparkles" style={{ color: '#d9a8ee', fontSize: 30, filter: 'drop-shadow(0 2px 6px #000)' }} />
           <span style={{ color: '#fff', fontWeight: 800, fontSize: 14, letterSpacing: 1.5,
