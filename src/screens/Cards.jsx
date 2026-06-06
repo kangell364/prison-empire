@@ -532,6 +532,10 @@ function MergeRevealModal({ card, toLevel, onDone }) {
 // where upgrades and the MERGE action live.
 // `inCrew` dims the tile and shows an IN CREW badge so you can see at a
 // glance which cards are slotted vs. on the bench.
+// Tile art size — the picture (and its stack-back layers). The collection grid
+// is 2 columns, so tiles are wide enough for a big portrait.
+const ART_SIZE = 120
+
 function CollectionTile({ card, cardLevel, count, inCrew, upgradeTotal, onTap }) {
   const rarityColor = RARITY_COLORS[card.rarity]
   // Effective ATK/DEF = base + the banked upgrade points bought across all
@@ -578,15 +582,16 @@ function CollectionTile({ card, cardLevel, count, inCrew, upgradeTotal, onTap })
 
       {/* Card art — sits on offset 'card-back' layers, one per full stack, so
           a deeper pile reads as more stacks at a glance. Extra top margin keeps
-          it clear of the PLAYER / CARDS badges. */}
+          it clear of the PLAYER / CARDS badges. ART_SIZE keeps the image and the
+          stack-back layers in sync. */}
       <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 6px' }}>
-        <div style={{ position: 'relative', width: 56, height: 56 }}>
+        <div style={{ position: 'relative', width: ART_SIZE, height: ART_SIZE }}>
           {Array.from({ length: Math.min(fullStacks, 3) }).map((_, i) => {
-            const off = (i + 1) * 3
+            const off = (i + 1) * 4
             return (
               <div key={i} aria-hidden="true" style={{
                 position: 'absolute', top: 0, left: 0, zIndex: 0,
-                width: 56, height: 56, borderRadius: 8,
+                width: ART_SIZE, height: ART_SIZE, borderRadius: 10,
                 background: '#181826',
                 border: `0.5px solid ${rarityColor}55`,
                 transform: `translate(${-off}px, ${-off}px)`,
@@ -597,7 +602,7 @@ function CollectionTile({ card, cardLevel, count, inCrew, upgradeTotal, onTap })
             {/* Face close-up on the tile (`face`); the full card art shows when
                 the card is opened. Player cards have no `face`, so they keep
                 using their portrait avatar. */}
-            <Avatar src={card.face || card.avatar} emoji={card.emoji} size={56} radius={8} />
+            <Avatar src={card.face || card.avatar} emoji={card.emoji} size={ART_SIZE} radius={10} />
           </div>
         </div>
       </div>
