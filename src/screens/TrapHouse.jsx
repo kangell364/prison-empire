@@ -619,7 +619,7 @@ const QUEUE_SPOTS = [
 const CUST_SPEED = 11          // walk speed, % of room width per second (constant pace)
 const moveSecs = (ax, bx) => Math.max(0.6, Math.abs(ax - bx) / CUST_SPEED)
 // Paying customers for the line pool. GNOME 10 is NOT here — he's the bum (below).
-const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp', '/gnome-6.webp', '/gnome-7.webp', '/gnome-8.webp', '/gnome-9.webp', '/gnome-11.webp', '/gnome-12.webp', '/gnome-13.webp', '/gnome-14.webp', '/gnome-15.webp', '/gnome-16.webp', '/gnome-17.webp', '/gnome-18.webp', '/gnome-21.webp', '/gnome-22.webp']
+const CUSTOMER_SPRITES = ['/gnome.webp', '/gnome-2.webp', '/gnome-3.webp', '/gnome-4.webp', '/gnome-5.webp', '/gnome-6.webp', '/gnome-7.webp', '/gnome-8.webp', '/gnome-9.webp', '/gnome-11.webp', '/gnome-12.webp', '/gnome-13.webp', '/gnome-14.webp', '/gnome-15.webp', '/gnome-16.webp', '/gnome-17.webp', '/gnome-18.webp', '/gnome-21.webp', '/gnome-23.webp']
 // Sprites split into a body + a separate head layer so the head can bobble like a
 // bobblehead toy. The base sprite (in CUSTOMER_SPRITES) is the body; the head
 // image overlays it and rotates around the neck `pivot`. GNOME 13's big
