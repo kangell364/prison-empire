@@ -3,6 +3,7 @@ import { sfx } from '../sounds'
 import { PLANTS, plantCashValue, RARITY_COLORS } from '../data/gameData'
 import { getOwnedPlantTuples } from '../state/plantCardsStore'
 import { setRoomBank } from '../state/roomBankStore'
+import { useActiveRaids } from '../state/raidsStore'
 import { Avatar } from '../components/Avatar'
 
 const GOLD = '#c9a84c'
@@ -90,6 +91,9 @@ const ROOMS = [
 // `isOwner` is the owner-vs-visitor split. Only the owner walks the back rooms;
 // the visitor view is a separate build (coming later). For now always owner.
 export default function TrapHouse({ onBack, isOwner = true }) {
+  // Incoming raids where I'm the defender = the trap house is under attack.
+  const raids = useActiveRaids()
+  const underAttack = (raids.incoming?.length || 0) > 0
   const [room, setRoom] = useState(0)
   const [land, setLand] = useState(isLandscape())
   const [rotated, setRotated] = useState(false)  // manual CSS rotate (works even with iOS orientation-lock on)
@@ -469,21 +473,31 @@ export default function TrapHouse({ onBack, isOwner = true }) {
     <div style={containerStyle} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <Keyframes />
 
-      {/* Attack warning — first room (Shop Front) only, centered at the top of
-          the screen. Always shown for now; wire to live raids later. zIndex above
-          the top bar so it reads clearly over the chrome. */}
+      {/* Status banner — first room (Shop Front) only, centered at the top of
+          the screen. Red UNDER FIRE while a raid targets you (incoming raids),
+          green SAFE otherwise. zIndex above the top bar so it reads clearly. */}
       {cur.key === 'shop' && (
         <div style={{
           position: 'absolute', top: 'calc(8px + env(safe-area-inset-top))',
           left: '50%', transform: 'translateX(-50%)', zIndex: 6,
           display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap',
-          background: 'rgba(120,20,20,0.92)', border: '1px solid #e74c3c',
+          background: underAttack ? 'rgba(120,20,20,0.92)' : 'rgba(18,70,40,0.9)',
+          border: `1px solid ${underAttack ? '#e74c3c' : GREEN}`,
           borderRadius: 12, padding: '7px 14px',
           color: '#fff', fontSize: 12, fontWeight: 800, letterSpacing: 1,
           boxShadow: '0 2px 12px rgba(0,0,0,0.55)',
         }}>
-          <i className="ti ti-alert-triangle-filled" style={{ color: '#ffd24a', fontSize: 15 }} />
-          TRAP HOUSE UNDER FIRE
+          {underAttack ? (
+            <>
+              <i className="ti ti-alert-triangle-filled" style={{ color: '#ffd24a', fontSize: 15 }} />
+              TRAP HOUSE UNDER FIRE
+            </>
+          ) : (
+            <>
+              <i className="ti ti-shield-check-filled" style={{ color: GREEN, fontSize: 15 }} />
+              TRAP HOUSE SAFE
+            </>
+          )}
         </div>
       )}
 
@@ -1521,7 +1535,19 @@ function DustRoom({ art }) {
           style={{ position: 'absolute', left: '50%', top: '52%', transform: 'translateX(-50%)',
             width: '94%', zIndex: 1, pointerEvents: 'none',
             filter: 'drop-shadow(0 8px 10px rgba(0,0,0,0.4))' }} />
-        <div style={{ position: 'absolute', left: '50%', top: '38%', transform: 'translate(-50%, -50%)', zIndex: 2,
+        {/* Three INDEPENDENT dust piles resting on the tabletop — each is its own
+            element with its own left/top/width so any one can be moved or resized
+            without affecting the others. */}
+        <img src="/dust.webp" alt="" aria-hidden
+          style={{ position: 'absolute', left: '30%', top: '58%', transform: 'translate(-50%, -100%)',
+            width: '17%', zIndex: 2, pointerEvents: 'none', filter: 'drop-shadow(0 4px 5px rgba(0,0,0,0.5))' }} />
+        <img src="/dust.webp" alt="" aria-hidden
+          style={{ position: 'absolute', left: '50%', top: '58%', transform: 'translate(-50%, -100%)',
+            width: '17%', zIndex: 2, pointerEvents: 'none', filter: 'drop-shadow(0 4px 5px rgba(0,0,0,0.5))' }} />
+        <img src="/dust.webp" alt="" aria-hidden
+          style={{ position: 'absolute', left: '70%', top: '58%', transform: 'translate(-50%, -100%)',
+            width: '17%', zIndex: 2, pointerEvents: 'none', filter: 'drop-shadow(0 4px 5px rgba(0,0,0,0.5))' }} />
+        <div style={{ position: 'absolute', left: '50%', top: '38%', transform: 'translate(-50%, -50%)', zIndex: 3,
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, pointerEvents: 'none' }}>
           <i className="ti ti-sparkles" style={{ color: '#d9a8ee', fontSize: 30, filter: 'drop-shadow(0 2px 6px #000)' }} />
           <span style={{ color: '#fff', fontWeight: 800, fontSize: 14, letterSpacing: 1.5,
