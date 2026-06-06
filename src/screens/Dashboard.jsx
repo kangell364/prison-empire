@@ -258,7 +258,7 @@ export default function Dashboard({ onNavigate }) {
             <div style={{ color: '#555', fontSize: 10, marginTop: 5, letterSpacing: 0.5 }}>Crew DEF</div>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
           {crewSlots.map((slot, i) => {
             const c = slot.card
             const rc = c ? (RARITY_COLORS[c.rarity] || '#c9a84c') : '#1e1e2a'
@@ -280,8 +280,12 @@ export default function Dashboard({ onNavigate }) {
                     <i className="ti ti-crown" style={{ color: '#0a0a0f', fontSize: 12 }} />
                   </div>
                 )}
-                <div style={{ width: 40, height: 40, borderRadius: 12, background: '#1e1e2a', margin: '0 auto 6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, overflow: 'hidden' }}>
-                  {c ? <Avatar src={c.avatar} emoji={c.emoji} size={40} radius={12} /> : <i className="ti ti-plus" style={{ color: '#333' }} />}
+                {/* Card art fills the slot as a square, using the face crop so
+                    it reads like the collection / My Crew card art. */}
+                <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 12, background: '#1e1e2a', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                  {c
+                    ? <img src={c.face || c.avatar} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    : <i className="ti ti-plus" style={{ color: '#333', fontSize: 24 }} />}
                 </div>
                 <div style={{ color: c ? '#888' : '#333', fontSize: 9, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {c ? c.name : (slot.isLeader ? 'Leader' : 'Empty')}
