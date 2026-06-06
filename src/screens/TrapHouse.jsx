@@ -84,6 +84,7 @@ const ROOMS = [
   { key: 'shop', name: 'Shop Front', art: '/shop-front.webp', accent: GOLD, hint: 'Customers buy here. Sales bank cash.' },
   { key: 'pack', name: 'Packing',    art: '/packing-room.webp', accent: BLUE, hint: 'Raw product gets cut & packed into sellable units.' },
   { key: 'grow', name: 'Grow Room',  art: '/grow-room.webp',  accent: GREEN, hint: 'Plants grow product that travels down to the bins.' },
+  { key: 'dust', name: 'Dust Room',  art: '/dust-room.webp',  accent: '#b06ad0', hint: 'Premium dust — coming soon.' },
 ]
 
 // `isOwner` is the owner-vs-visitor split. Only the owner walks the back rooms;
@@ -437,6 +438,24 @@ export default function TrapHouse({ onBack, isOwner = true }) {
     sfx.tap?.(); setRoom(next)
   }
 
+  // Swipe left/right to step between rooms (like the arrows / dots). When the
+  // interior is CSS-rotated for fullscreen, the room reads sideways, so a
+  // horizontal room swipe is a vertical drag in page coords — map to the right
+  // axis. Ignore short or mostly-cross-axis drags so taps/scrolls don't fire.
+  const swipe = useRef(null)
+  const onTouchStart = (e) => { const t = e.touches[0]; swipe.current = { x: t.clientX, y: t.clientY } }
+  const onTouchEnd = (e) => {
+    if (!swipe.current) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - swipe.current.x
+    const dy = t.clientY - swipe.current.y
+    swipe.current = null
+    const along = rotated ? dy : dx          // displacement along the room's horizontal axis
+    const cross = rotated ? dx : dy
+    if (Math.abs(along) < 45 || Math.abs(along) < Math.abs(cross)) return
+    go(along < 0 ? 1 : -1)                   // swipe left → deeper room, right → toward the front
+  }
+
   // When the phone won't auto-rotate (iOS orientation lock), the rotate button
   // CSS-spins the whole interior 90° and swaps its dimensions, so holding the
   // phone sideways shows a true fullscreen landscape room.
@@ -447,7 +466,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
     : { position: 'fixed', inset: 0, zIndex: 400, background: '#0c0a08', overflow: 'hidden' }
 
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <Keyframes />
 
       {/* Room fills the whole screen as a backdrop — so it grows to fill the
@@ -459,6 +478,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
         {cur.key === 'shop' && <ShopFront art={cur.art} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} prices={prices} popularity={popularity} rep={rep} onSetPrice={setStrainPrice} onSell={sellJar} />}
         {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} packCounts={packCounts} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} />}
         {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} budResync={budResync} onBudLand={advanceNow} tableCards={tableCards} onAdd={setPicking} onUproot={uprootTable} skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} />}
+        {cur.key === 'dust' && <DustRoom art={cur.art} />}
       </div>
 
       {/* Arrows — step between rooms. Left = toward the front, right = deeper. */}
@@ -477,19 +497,25 @@ export default function TrapHouse({ onBack, isOwner = true }) {
           <div style={{ color: '#fff', fontSize: 15, fontWeight: 700, lineHeight: 1.1, textShadow: '0 1px 4px #000' }}>{cur.name}</div>
         </div>
         <div style={{ flex: 1 }} />
-        {/* Shop reputation — drives how fast customers come in. */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(26,21,16,0.85)', border: `0.5px solid ${GOLD}55`, borderRadius: 13, padding: '7px 12px' }}>
-          <span style={{ color: DIM, fontSize: 11, fontWeight: 700, letterSpacing: 1 }}>REP</span>
-          <span style={{ color: rep >= 66 ? GREEN : rep >= 33 ? '#e0a93f' : '#c0392b', fontWeight: 800, fontSize: 20, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
-            <i className="ti ti-star-filled" style={{ fontSize: 13 }} /> {Math.round(rep)}
-          </span>
-        </div>
+        {/* Shop reputation + bank — only shown in the shop, where they apply.
+            The back rooms (packing, grow) hide them to keep the focus on
+            production. */}
+        {cur.key === 'shop' && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(26,21,16,0.85)', border: `0.5px solid ${GOLD}55`, borderRadius: 13, padding: '7px 12px' }}>
+            <span style={{ color: DIM, fontSize: 11, fontWeight: 700, letterSpacing: 1 }}>REP</span>
+            <span style={{ color: rep >= 66 ? GREEN : rep >= 33 ? '#e0a93f' : '#c0392b', fontWeight: 800, fontSize: 20, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+              <i className="ti ti-star-filled" style={{ fontSize: 13 }} /> {Math.round(rep)}
+            </span>
+          </div>
+        )}
         {/* Bank balance for this store — sits left of the rotate button, sized up
             so the take reads at a glance. */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', background: 'rgba(26,21,16,0.85)', border: `0.5px solid ${GOLD}55`, borderRadius: 13, padding: '7px 18px' }}>
-          <span style={{ color: DIM, fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>BANK</span>
-          <span style={{ color: GREEN, fontWeight: 800, fontSize: 26, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>${bank.toLocaleString()}</span>
-        </div>
+        {cur.key === 'shop' && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', background: 'rgba(26,21,16,0.85)', border: `0.5px solid ${GOLD}55`, borderRadius: 13, padding: '7px 18px' }}>
+            <span style={{ color: DIM, fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>BANK</span>
+            <span style={{ color: GREEN, fontWeight: 800, fontSize: 26, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>${bank.toLocaleString()}</span>
+          </div>
+        )}
         {/* Rotate to fullscreen landscape — only when the browser isn't already
             landscape (otherwise it'd double-rotate). Works with iOS lock on. */}
         {!land && (
@@ -1445,7 +1471,30 @@ const SLOTH_CENTERS = [27.0, 51.5, 78.0]   // one sloth per table (over the plan
 const SLOTH_PIVOT = '19.7% 53%'                  // arm shoulder (% of the sloth canvas)
 const SLOTH_ARM_DELAYS = ['0s', '-0.55s', '-1.05s']
 
+// Dust Room — the deepest back room (4th). Visual-only placeholder for now: an
+// aspect-locked backdrop so it's navigable today, with a "coming soon" tag. The
+// production loop (premium dust) gets wired up once the real art lands.
+function DustRoom({ art }) {
+  return (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ position: 'relative', aspectRatio: '1600 / 900', maxWidth: '100%', maxHeight: '100%' }}>
+        <img src={art} alt="Dust Room" style={{ display: 'block', width: '100%', height: '100%' }} />
+        <div style={{ position: 'absolute', left: '50%', top: '64%', transform: 'translate(-50%, -50%)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, pointerEvents: 'none' }}>
+          <i className="ti ti-sparkles" style={{ color: '#d9a8ee', fontSize: 30, filter: 'drop-shadow(0 2px 6px #000)' }} />
+          <span style={{ color: '#fff', fontWeight: 800, fontSize: 14, letterSpacing: 1.5,
+            background: 'rgba(10,8,14,0.7)', borderRadius: 999, padding: '6px 16px',
+            border: '1px solid #b06ad055', textShadow: '0 1px 3px #000' }}>PREMIUM DUST — COMING SOON</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBudLand, tableCards = {}, onAdd, onUproot, skatePhase = 'idle', skateStart = 0, onSkateClick }) {
+  // Which table is pending an uproot confirmation (null = none). Clicking the
+  // trash opens a "are you sure?" prompt instead of clearing the table outright.
+  const [confirmUproot, setConfirmUproot] = useState(null)
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* Aspect-locked room box so the plant overlays stay glued to the benches
@@ -1596,9 +1645,15 @@ function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBud
         {[1, 2, 3].map(tbl => {
           if (!tableStarted(tbl, planted)) return null
           const [, x1, yTop] = BINS[tbl]
+          // Tables 1 & 2 sit their trash just past the bin's right edge, where the
+          // bench surface still extends. The rightmost bench leans toward the
+          // vanishing point, so its surface ends at the bin edge — nudging right
+          // there floats the button into the wall corner. Pull it inward so it
+          // lands on the table edge like the others.
+          const trashX = tbl === 3 ? x1 - 1.5 : x1 + 1.5
           return (
-            <button key={`up${tbl}`} onClick={() => onUproot && onUproot(tbl)} title={`Uproot table ${tbl}`}
-              style={{ position: 'absolute', left: `${x1 + 1.5}%`, top: `${yTop}%`,
+            <button key={`up${tbl}`} onClick={() => { sfx.tap?.(); setConfirmUproot(tbl) }} title={`Uproot table ${tbl}`}
+              style={{ position: 'absolute', left: `${trashX}%`, top: `${yTop}%`,
                 transform: 'translate(-50%, -150%)', zIndex: 5, padding: 0,
                 width: 24, height: 24, borderRadius: '50%',
                 background: 'rgba(120,28,22,0.92)', border: '1px solid #e06a5a', color: '#fff',
@@ -1608,6 +1663,36 @@ function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBud
             </button>
           )
         })}
+
+        {/* Uproot confirmation — a clear "are you sure?" gate so a tap can't wipe
+            a planted table by accident. Yes uproots, No just closes. */}
+        {confirmUproot != null && (
+          <div onClick={() => setConfirmUproot(null)}
+            style={{ position: 'absolute', inset: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)' }}>
+            <div onClick={e => e.stopPropagation()}
+              style={{ background: '#1a1510', border: `1px solid ${GOLD}66`, borderRadius: 14, padding: '20px 22px',
+                maxWidth: 320, textAlign: 'center', boxShadow: '0 8px 30px rgba(0,0,0,0.7)' }}>
+              <i className="ti ti-trash" style={{ color: '#e06a5a', fontSize: 26 }} />
+              <div style={{ color: '#fff', fontSize: 15, fontWeight: 700, margin: '8px 0 4px' }}>Remove current plants?</div>
+              <div style={{ color: DIM, fontSize: 12, lineHeight: 1.4, marginBottom: 16 }}>
+                Are you sure you want to remove the current plants? Any un-hauled buds are lost.
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => setConfirmUproot(null)}
+                  style={{ flex: 1, padding: '9px 0', borderRadius: 9, fontWeight: 800, fontSize: 13, cursor: 'pointer',
+                    background: '#2a2722', color: '#fff', border: '1px solid #403c33' }}>
+                  No
+                </button>
+                <button onClick={() => { sfx.tap?.(); const t = confirmUproot; setConfirmUproot(null); onUproot && onUproot(t) }}
+                  style={{ flex: 1, padding: '9px 0', borderRadius: 9, fontWeight: 800, fontSize: 13, cursor: 'pointer',
+                    background: 'rgba(120,28,22,0.95)', color: '#fff', border: '1px solid #e06a5a' }}>
+                  Yes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

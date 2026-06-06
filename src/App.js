@@ -19,6 +19,7 @@ import { SetPasswordModal } from './components/SetPasswordModal'
 import { ensureCardsLoaded } from './state/cardsStore'
 import { ensureUpgradesLoaded } from './state/upgradesStore'
 import { useBlockPayoutTicker } from './state/blocksStore'
+import { usePropertyPayoutTicker } from './state/propertyStore'
 import { usePlayerCard } from './state/profileStore'
 import { useUnreadCount } from './state/fightLogStore'
 import { NotificationsModal } from './components/NotificationsModal'
@@ -55,6 +56,7 @@ export default function App() {
 
   // Global hourly block-income payout — runs app-wide regardless of screen.
   useBlockPayoutTicker()
+  usePropertyPayoutTicker()
   // Live player card (look + name) for the header avatar — stays in sync with SWAP.
   const playerCard = usePlayerCard()
   // Keep the player's shared-world trap-house name in sync with their display
