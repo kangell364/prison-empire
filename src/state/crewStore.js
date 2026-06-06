@@ -13,7 +13,6 @@
 //   def(card) = baseDef + DEF_PER_LEVEL × upgrades.def
 
 import { useEffect, useState } from 'react'
-import { STARTER_CARD_IDS } from '../data/gameData'
 
 const KEY = 'pe_crew_v1'
 
@@ -50,18 +49,13 @@ function padOrTrim(arr, n) {
   return out
 }
 
-// First-launch crew: drop starter cards into the slots so the player isn't
-// staring at an empty roster. SlickRico (id 1) is the natural leader.
-// Once Phase 3 moves crew to Supabase, this seed only runs in the
-// localStorage fallback path.
+// First-launch crew: the loadout starts EMPTY in the crew-card era — you own
+// cards (see STARTER_CARD_IDS) but choose who to slot. My Crew fills only when
+// you add crew cards yourself.
 function seedFromCollection() {
-  const leaderId = STARTER_CARD_IDS.includes(1) ? 1 : (STARTER_CARD_IDS[0] ?? null)
-  const memberIds = STARTER_CARD_IDS
-    .filter(id => id !== leaderId)
-    .slice(0, CREW_MEMBER_SLOTS)
   return {
-    leader:  leaderId,
-    members: padOrTrim(memberIds, CREW_MEMBER_SLOTS),
+    leader:  null,
+    members: padOrTrim([], CREW_MEMBER_SLOTS),
   }
 }
 
@@ -130,6 +124,7 @@ export function useCrew() {
 
 export function baseAtk(card) {
   if (!card) return 0
+  if (card.atk    != null) return card.atk          // crew cards carry explicit ATK/DEF
   if (card.muscle != null) return card.muscle * 5 + 15
   if (card.power  != null) return Math.floor(card.power * 0.55) + 10
   return 0
@@ -137,6 +132,7 @@ export function baseAtk(card) {
 
 export function baseDef(card) {
   if (!card) return 0
+  if (card.def   != null) return card.def
   if (card.cred  != null) return card.cred * 5 + 10
   if (card.power != null) return Math.floor(card.power * 0.45) + 15
   return 0

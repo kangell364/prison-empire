@@ -1,0 +1,682 @@
+================================================================================
+  PRISON EMPIRE — CREW CARDS  ::  COMMON TIER  (100 cards)
+  File: CREW LIST.txt   |   Batch 1 of the collection (Commons only)
+================================================================================
+
+WHAT THIS IS
+  The 100 COMMON crew cards — the floor of the collection. Every card is one
+  individual street-gang member with art, an ATK number, a DEF number, and a
+  flavor Bonus + Weakness. These stack (20 -> merge to next card level, max
+  Lv60) and get per-level ATK/DEF upgrades (LV/20) exactly like the existing
+  player cards. They fight other PLAYERS' crews, so balance matters.
+
+  Cards are numbered CARD 1 .. CARD 100. A "(suggested: ...)" street name is
+  kept on each for when you art/name them — rename freely. Bonus/Weakness are
+  FLAVOR for now (no combat effect wired yet), written in a consistent
+  condition-based format so they wire into the battle engine later.
+
+--------------------------------------------------------------------------------
+BALANCE FRAMEWORK  (why the numbers look the way they do)
+--------------------------------------------------------------------------------
+  Commons are deliberately weak so Rare/Epic/Legendary have room to climb. Power
+  total = ATK + DEF. Ability strength — NOT raw stats — is what should separate
+  a Common from a Legendary (this is how Hearthstone/Clash/Magic do it).
+
+      TIER         POWER TOTAL   MAX SINGLE STAT   ABILITY STRENGTH
+      ---------    -----------   ---------------   ------------------------------
+   >> COMMON          50 – 70          52          tiny bonus, real weakness (net ~0)
+      UNCOMMON        70 – 95          70          one modest bonus, soft weakness
+      RARE            95 – 130         85          strong bonus, minor weakness
+      EPIC           130 – 175        110          big bonus, cosmetic weakness
+      LEGENDARY      175 – 230+       130          powerful bonus, little/no weakness
+
+  KEEP THIS IN MIND: if a Common creeps above ~70 total or gets a strong,
+  un-paired bonus, it eats into the Uncommon/Rare design space and makes the
+  chase cards pointless in PvP. Every Common bonus below is small and is paid
+  for with a matching weakness.
+
+--------------------------------------------------------------------------------
+ARCHETYPE LEGEND  (the shape of each card's stat split)
+--------------------------------------------------------------------------------
+  [RUNNER]  glass cannon — very high ATK, very low DEF   (hits hard, folds fast)
+  [BRUISER] aggressive   — high ATK, low DEF
+  [BRAWLER] balanced     — even ATK / DEF
+  [TILT-A]  ATK-leaning balanced
+  [TILT-D]  DEF-leaning balanced
+  [WALL]    defensive    — low ATK, high DEF
+  [BODY]    heavy tank   — very low ATK, very high DEF  (soaks hits, barely scratches)
+
+  LOOKS  (new): a short, comma-separated physical descriptor for each card —
+  height, build, complexion, age, and one stand-out feature — in the same
+  short-keyword style as CARD BUILDS.txt. The Art line folds those traits in so
+  one line is a complete prompt. Keep the original art scene; just make sure the
+  person's build/height/complexion is stated.
+
+  Format:
+    CARD ###   (suggested: name)        [ARCHETYPE]   ATK ##  DEF ##   (total)
+         Bonus:    + condition-based upside
+         Weakness: - condition-based downside
+         Looks:    height, build, complexion, age, stand-out feature
+         Art:      one-line art brief (incorporates the Looks)
+
+================================================================================
+  THE 100 COMMONS
+================================================================================
+
+CARD 1   (suggested: Lil Smoke)        [BRUISER]   ATK 44  DEF 18   (62)
+     Bonus:    +8% ATK when his crew outnumbers the enemy
+     Weakness: -10% DEF when fighting alone
+     Looks:    short, wiry, light-brown skin, ~17
+     Art:      short wiry light-brown teen, hood up, blunt tucked behind the ear, smoke curling
+
+CARD 2   (suggested: Big Worm)         [BODY]      ATK 12  DEF 48   (60)
+     Bonus:    +6% DEF while a teammate is still standing
+     Weakness: -15% ATK against faster opponents
+     Looks:    tall, heavyset, dark-skinned black, 50s
+     Art:      tall heavyset older dark-skinned head in a sweat-stained tank, gold rope chain
+
+CARD 3   (suggested: Re-Up)            [TILT-A]    ATK 38  DEF 26   (64)
+     Bonus:    +1 Hustle drop on a winning fight
+     Weakness: -8% DEF when the bank is empty
+     Looks:    average height, lean, black, late 20s
+     Art:      lean black hustler counting a fat knot of bills, duffel over the shoulder
+
+CARD 4   (suggested: Dukes)            [BRAWLER]   ATK 32  DEF 32   (64)
+     Bonus:    +6% ATK on the first strike of a fight
+     Weakness: -6% ATK once below half health
+     Looks:    medium height, solid muscular, tan white, 30s
+     Art:      solid tan bare-knuckle brawler, taped fists raised, busted lip
+
+CARD 5   (suggested: Scrappy)          [RUNNER]    ATK 48  DEF 12   (60)
+     Bonus:    12% chance to dodge the first incoming hit
+     Weakness: takes +15% damage from heavy hitters
+     Looks:    short, small fast frame, black, early teen
+     Art:      short small fast black kid mid-sprint, untied high-tops, mean grin
+
+CARD 6   (suggested: Ghost)            [RUNNER]    ATK 46  DEF 12   (58)
+     Bonus:    +10% ATK at Night
+     Weakness: -12% ATK in daylight
+     Looks:    average height, lean, complexion hidden, face shadowed
+     Art:      lean hooded figure half-faded into shadow, only the eyes lit
+
+CARD 7   (suggested: Pelican)          [WALL]      ATK 18  DEF 44   (62)
+     Bonus:    +8% DEF when defending home turf
+     Weakness: -10% DEF when attacking away
+     Looks:    tall, lanky, brown-skinned, early 20s
+     Art:      tall lanky brown-skinned lookout perched on a stoop, hood, watchful slouch
+
+CARD 8   (suggested: Quickdraw)        [BRUISER]   ATK 46  DEF 18   (64)
+     Bonus:    +10% ATK on the opening exchange
+     Weakness: -8% ATK if the fight drags past 3 rounds
+     Looks:    average height, wiry, black, 20s
+     Art:      wiry black kid, twitchy hands hovering at the waistband, jittery side-eye
+
+CARD 9   (suggested: Two-Step)         [TILT-A]    ATK 36  DEF 24   (60)
+     Bonus:    8% chance to counter after taking a hit
+     Weakness: -6% DEF against grapplers
+     Looks:    average height, lean athletic, black, 20s
+     Art:      lean athletic black dancer-fighter mid bob-and-weave
+
+CARD 10  (suggested: Cinder)           [BRUISER]   ATK 42  DEF 20   (62)
+     Bonus:    +8% ATK while the enemy is below half health
+     Weakness: -10% DEF on the opening exchange
+     Looks:    average height, lean, pale white, 20s
+     Art:      wild-eyed pale arsonist, zippo flame lighting the face
+
+CARD 11  (suggested: Mumbles)          [TILT-D]    ATK 24  DEF 36   (60)
+     Bonus:    enemy ATK -5% on their first strike (hard to read)
+     Weakness: -8% ATK (never commits fully)
+     Looks:    average height, slim, black, low cap, 20s
+     Art:      quiet slim black head, low cap, face shadowed, barely moving lips
+
+CARD 12  (suggested: Knuckles)         [BRUISER]   ATK 44  DEF 16   (60)
+     Bonus:    +10% ATK in a melee (blades & fists)
+     Weakness: -12% DEF against ranged attackers
+     Looks:    stocky, muscular, scarred tan white, 30s
+     Art:      stocky scarred tan brawler, brass knuckles on both hands, scowl
+
+CARD 13  (suggested: Greasy Lou)       [TILT-D]    ATK 22  DEF 38   (60)
+     Bonus:    10% chance to slip a grab and reset
+     Weakness: -6% ATK (more talk than action)
+     Looks:    average height, slim, white, slick hair, 40s
+     Art:      slick-haired white fixer in a stained mechanic jumpsuit
+
+CARD 14  (suggested: Pockets)          [RUNNER]    ATK 50  DEF 14   (64)
+     Bonus:    +1 Hustle drop when the enemy is distracted (first round)
+     Weakness: -15% DEF when caught flat-footed
+     Looks:    short, wiry, light-brown Latino, teen
+     Art:      wiry Latino pickpocket with hands buried in an oversized coat, sly look
+
+CARD 15  (suggested: Slim Jaws)        [BRUISER]   ATK 40  DEF 22   (62)
+     Bonus:    +8% ATK when outnumbered (fights desperate)
+     Weakness: -8% DEF when the crew is full (gets lazy)
+     Looks:    tall, gaunt long reach, black, gold grill
+     Art:      gaunt tall black fighter, long reach, hollow cheeks, gold grill
+
+CARD 16  (suggested: Domino)           [BRAWLER]   ATK 30  DEF 30   (60)
+     Bonus:    +6% ATK for each ally already knocked out (revenge)
+     Weakness: -6% DEF on round one
+     Looks:    average height, lean, Latino, neck tattoo
+     Art:      lean Latino gambler flicking a domino, dice tattoo on the neck
+
+CARD 17  (suggested: Razor Ray)        [RUNNER]    ATK 50  DEF 12   (62)
+     Bonus:    +10% ATK with blades
+     Weakness: takes +18% damage once hit (no defense)
+     Looks:    average height, thin, pale white, nervous
+     Art:      thin pale man flashing a box cutter, quick nervous energy
+
+CARD 18  (suggested: Fat Stacks)       [WALL]      ATK 16  DEF 46   (62)
+     Bonus:    +8% DEF while holding the bank lead
+     Weakness: -10% ATK (slow, content to sit)
+     Looks:    short, heavyset, black, rings, smug, 30s
+     Art:      heavyset short black money-man, rings on every finger, smug
+
+CARD 19  (suggested: Creeper)          [TILT-A]    ATK 38  DEF 22   (60)
+     Bonus:    +10% ATK at Night
+     Weakness: -10% ATK in daylight
+     Looks:    average height, lean, brown-skinned, hood low
+     Art:      lean brown-skinned figure easing out from an alley, hood drawn low
+
+CARD 20  (suggested: Hollow)           [WALL]      ATK 18  DEF 46   (64)
+     Bonus:    +6% DEF when below half health (digs in)
+     Weakness: -8% ATK against fresh opponents
+     Looks:    average height, scarred lean, weathered white, 30s
+     Art:      hollow-eyed scarred white survivor, refusing to go down
+
+CARD 21  (suggested: Tank)             [BODY]      ATK 14  DEF 50   (64)
+     Bonus:    +8% DEF on the front line (defends first)
+     Weakness: -15% ATK against runners
+     Looks:    huge, bald, dark-skinned black, neck tattoos
+     Art:      enormous bald black enforcer, arms crossed, neck tattoos
+
+CARD 22  (suggested: Lookout Les)      [WALL]      ATK 16  DEF 42   (58)
+     Bonus:    enemy first-strike ATK -8% (spots it coming)
+     Weakness: -10% ATK (never the one swinging)
+     Looks:    short, wiry, black, teen
+     Art:      wiry black teen on a BMX, scanning the block, phone in hand
+
+CARD 23  (suggested: Blister)          [BRAWLER]   ATK 34  DEF 34   (68)
+     Bonus:    +6% ATK and +6% DEF in the rain (thrives in mess)
+     Weakness: -8% to both in clear daylight
+     Looks:    medium height, stocky muscular, black, boxer
+     Art:      sweaty stocky black boxer, swollen knuckles, towel around the neck
+
+CARD 24  (suggested: Slick Vic)        [TILT-A]    ATK 36  DEF 26   (62)
+     Bonus:    8% chance to talk down the first hit (enemy hesitates)
+     Weakness: -8% DEF once the enemy stops listening
+     Looks:    average height, lean sharp, Latino, gold tooth
+     Art:      sharp-dressed lean Latino smooth talker, gold tooth, open silk shirt
+
+CARD 25  (suggested: Boot)             [BODY]      ATK 12  DEF 46   (58)
+     Bonus:    +8% DEF against meleers (kicks them off)
+     Weakness: -12% ATK (slow wind-up)
+     Looks:    stocky, thick, white, bouncer build
+     Art:      stocky thick white bouncer-type, steel-toe boots, arms like hams
+
+CARD 26  (suggested: Half-Pint)        [RUNNER]    ATK 46  DEF 14   (60)
+     Bonus:    14% dodge chance vs bigger opponents
+     Weakness: -15% DEF once actually caught
+     Looks:    tiny, small frame, black, kid
+     Art:      tiny scrappy black kid, way too big jersey, fearless face
+
+CARD 27  (suggested: Gristle)          [BRUISER]   ATK 42  DEF 20   (62)
+     Bonus:    +8% ATK in a grind-it-out fight (round 3+)
+     Weakness: -8% ATK on the opening exchange (slow starter)
+     Looks:    average height, leathery wiry, weathered white, old
+     Art:      leathery old white brawler, cauliflower ears, toothpick
+
+CARD 28  (suggested: Maddog)           [BRUISER]   ATK 46  DEF 18   (64)
+     Bonus:    +10% ATK when below half health (goes feral)
+     Weakness: -12% DEF while at full health (reckless)
+     Looks:    average height, muscular, tan white, snarling
+     Art:      snarling muscular tan fighter, foaming energy, chain-leash tattoo
+
+CARD 29  (suggested: Lil Reaper)       [RUNNER]    ATK 48  DEF 12   (60)
+     Bonus:    +12% ATK against an already-wounded enemy
+     Weakness: takes +15% damage from first hit
+     Looks:    tall, skinny, black, teen
+     Art:      skinny tall black kid in a black hood, scythe doodle on the jacket
+
+CARD 30  (suggested: Switch)           [TILT-A]    ATK 40  DEF 24   (64)
+     Bonus:    +8% ATK with concealed blades
+     Weakness: -10% DEF when searched/disarmed (round 1)
+     Looks:    average height, lean, Latino, dead-eyed
+     Art:      lean Latino hand flicking open a switchblade, calm dead-eyed stare
+
+CARD 31  (suggested: Cricket)          [RUNNER]    ATK 44  DEF 10   (54)
+     Bonus:    18% chance to dodge a single hit (always moving)
+     Weakness: -18% DEF when cornered
+     Looks:    short, thin jittery, white, kid
+     Art:      jittery thin white kid bouncing on his toes, wide eyes
+
+CARD 32  (suggested: Bones)            [WALL]      ATK 20  DEF 42   (62)
+     Bonus:    +6% DEF the longer the fight lasts
+     Weakness: -8% ATK against fast openers
+     Looks:    tall, gaunt, black, calm
+     Art:      tall gaunt black man, skeleton-glove print, calm menace
+
+CARD 33  (suggested: Lefty)            [TILT-A]    ATK 38  DEF 24   (62)
+     Bonus:    +8% ATK on the first strike (southpaw surprise)
+     Weakness: -8% ATK if the enemy adapts (round 2+)
+     Looks:    average height, solid, white, southpaw stance
+     Art:      solid white one-armed-stance brawler leading hard with the left
+
+CARD 34  (suggested: Goldie)           [TILT-D]    ATK 24  DEF 36   (60)
+     Bonus:    +1 Hustle drop on a win (flashy hustler)
+     Weakness: -8% DEF when the bank is empty (no flash, no fight)
+     Looks:    average height, lean flashy, black, gold grill
+     Art:      lean black hustler in everything gold — grill, chains, watch — cocky lean
+
+CARD 35  (suggested: Sticks)           [RUNNER]    ATK 46  DEF 14   (60)
+     Bonus:    +10% ATK with bats and clubs (reach weapons)
+     Weakness: -12% DEF in close grapples
+     Looks:    tall, lanky thin, black, teen
+     Art:      lanky black kid spinning a baseball bat, loose stance
+
+CARD 36  (suggested: Brick)            [BODY]      ATK 14  DEF 48   (62)
+     Bonus:    +8% DEF on the front line
+     Weakness: -15% ATK against runners (can't catch them)
+     Looks:    stocky, square-built, white, bald
+     Art:      square-built bald white bruiser, fists like cinderblocks
+
+CARD 37  (suggested: Cubano)           [BRAWLER]   ATK 32  DEF 32   (64)
+     Bonus:    +6% ATK and +6% DEF when defending turf
+     Weakness: -8% to both when attacking away
+     Looks:    average height, thick veteran, Cuban-brown, older
+     Art:      thick older Cuban veteran, cigar-chewing, guayabera shirt, gold cross
+
+CARD 38  (suggested: Static)           [TILT-A]    ATK 36  DEF 24   (60)
+     Bonus:    enemy ATK -5% round one (unpredictable)
+     Weakness: -8% DEF once the enemy reads the pattern
+     Looks:    average height, lean, mixed, frizzed hair
+     Art:      lean mixed kid, glitchy energy, frizzed hair, headphones around neck
+
+CARD 39  (suggested: Wheels)           [RUNNER]    ATK 48  DEF 14   (62)
+     Bonus:    +10% ATK on a drive-by / hit-and-run opener
+     Weakness: -15% DEF in a stand-and-bang fight
+     Looks:    average height, lean, Latino, young
+     Art:      lean young Latino kid hanging off a lowrider door, fearless lean-out
+
+CARD 40  (suggested: Grits)            [WALL]      ATK 18  DEF 44   (62)
+     Bonus:    +6% DEF when a teammate is down (holds the line)
+     Weakness: -8% ATK against fresh opponents
+     Looks:    tall, heavy-set, dark-skinned black, do-rag, Southern
+     Art:      heavy-set Southern black enforcer, do-rag, calm patience
+
+CARD 41  (suggested: Munch)            [BODY]      ATK 12  DEF 44   (56)
+     Bonus:    +8% DEF against blades (too thick to cut)
+     Weakness: -12% ATK (slow, lumbering)
+     Looks:    huge, round, black, always eating
+     Art:      huge round black enforcer always eating, grease-stained shirt
+
+CARD 42  (suggested: Tex)              [BRUISER]   ATK 44  DEF 18   (62)
+     Bonus:    +8% ATK with reach weapons (long arms)
+     Weakness: -10% DEF up close
+     Looks:    tall, lean long-armed, white, cowboy hat
+     Art:      tall lean white cowboy-hatted brawler, belt buckle, drawl
+
+CARD 43  (suggested: Snub)             [RUNNER]    ATK 50  DEF 12   (62)
+     Bonus:    +12% ATK on a surprise opener
+     Weakness: -15% DEF if the opener misses
+     Looks:    short, stocky, black, smirk
+     Art:      short stocky black kid, hands jammed in jacket pockets, smirk
+
+CARD 44  (suggested: Vapor)            [RUNNER]    ATK 46  DEF 12   (58)
+     Bonus:    +10% ATK at Night
+     Weakness: -12% ATK in daylight
+     Looks:    average height, lean, complexion hidden, neon glow
+     Art:      lean figure dissolving into a cloud of vape smoke, neon glow
+
+CARD 45  (suggested: Lil Heat)         [BRUISER]   ATK 42  DEF 20   (62)
+     Bonus:    +8% ATK while ahead on the bank (riding hot)
+     Weakness: -8% ATK when losing (tilts easy)
+     Looks:    average height, lean, Latino, red bandana, young
+     Art:      hot-headed young Latino shooter, red bandana, flushed snarl
+
+CARD 46  (suggested: Roach)            [WALL]      ATK 16  DEF 42   (58)
+     Bonus:    +8% DEF when below half health (just won't die)
+     Weakness: -10% ATK (no real punch)
+     Looks:    average height, scrappy lean, white, patched jacket
+     Art:      scrappy lean white survivor, patched jacket, refuses to be stomped
+
+CARD 47  (suggested: Diesel)           [BODY]      ATK 16  DEF 46   (62)
+     Bonus:    +6% DEF for each round survived
+     Weakness: -12% ATK against runners
+     Looks:    huge, mountain of muscle, black, oil-stained tank
+     Art:      mountain-of-muscle black man in an oil-stained tank, slow grin
+
+CARD 48  (suggested: Patches)          [BRAWLER]   ATK 30  DEF 30   (60)
+     Bonus:    +6% ATK while a teammate is still up
+     Weakness: -6% DEF when alone
+     Looks:    average height, solid, white, one eye covered
+     Art:      solid white fighter, jacket covered in stitched crew patches, one eye covered
+
+CARD 49  (suggested: Trey)             [TILT-A]    ATK 38  DEF 24   (62)
+     Bonus:    +8% ATK on the third hit of a combo
+     Weakness: -8% DEF if the combo is broken early
+     Looks:    average height, athletic, black, young
+     Art:      young athletic black triple-threat, three-finger sign, cocky grin
+
+CARD 50  (suggested: Coldcut)          [TILT-D]    ATK 24  DEF 38   (62)
+     Bonus:    +6% DEF against meleers (slips the blade)
+     Weakness: -8% ATK against ranged
+     Looks:    average height, solid, white, butcher apron
+     Art:      calm solid white butcher-apron enforcer, cleaver on the hip
+
+CARD 51  (suggested: Wingnut)          [RUNNER]    ATK 46  DEF 12   (58)
+     Bonus:    15% chance to dodge when outnumbered (erratic)
+     Weakness: -15% DEF once predictable (round 2+)
+     Looks:    average height, wiry, white, manic, mismatched shoes
+     Art:      wiry white kid, wild unscrewed energy, mismatched shoes, manic grin
+
+CARD 52  (suggested: Buck)             [BRUISER]   ATK 44  DEF 18   (62)
+     Bonus:    +10% ATK on a charge / first rush
+     Weakness: -10% DEF if the charge is stopped
+     Looks:    stocky, thick-necked, white, head down
+     Art:      thick-necked white bull of a kid lowered to charge, head down
+
+CARD 53  (suggested: Hammer)           [BODY]      ATK 18  DEF 46   (64)
+     Bonus:    +8% DEF on the front line (won't move)
+     Weakness: -12% ATK (one slow heavy swing)
+     Looks:    huge, tall, dark-skinned black, sledgehammer
+     Art:      huge tall black man resting a sledgehammer on the shoulder
+
+CARD 54  (suggested: Smiley)           [TILT-A]    ATK 36  DEF 24   (60)
+     Bonus:    enemy ATK -6% first strike (unsettling grin)
+     Weakness: -8% DEF once the enemy ignores the act
+     Looks:    average height, lean, Latino, scar-pulled smile
+     Art:      lean Latino with a permanent unsettling smile, scar pulling one cheek up
+
+CARD 55  (suggested: Onion)            [WALL]      ATK 18  DEF 44   (62)
+     Bonus:    +6% DEF per round (layers of toughness)
+     Weakness: -8% ATK against fast starters
+     Looks:    stocky, layered build, white, watery red eyes
+     Art:      stocky multi-hoodie-layered white head, watery red eyes
+
+CARD 56  (suggested: Tweak)            [RUNNER]    ATK 48  DEF 12   (60)
+     Bonus:    +12% ATK on the opening flurry
+     Weakness: -15% ATK if the fight goes long (burns out)
+     Looks:    thin, twitchy, white, can't stand still
+     Art:      hyper twitchy thin white kid, can't stand still, darting eyes
+
+CARD 57  (suggested: Grizz)            [BODY]      ATK 16  DEF 48   (64)
+     Bonus:    +8% DEF against multiple attackers
+     Weakness: -12% ATK against a single fast target
+     Looks:    huge, bearded, white, fur-lined coat
+     Art:      bearded white giant in a fur-lined coat, slow and immovable
+
+CARD 58  (suggested: Lowrider)         [TILT-D]    ATK 24  DEF 36   (60)
+     Bonus:    +1 Steel drop on a defensive win
+     Weakness: -8% ATK when attacking away from the block
+     Looks:    average height, lean, Latino, gold-frame shades
+     Art:      lean Latino leaning on a candy-paint lowrider, gold-frame shades
+
+CARD 59  (suggested: Pita)             [BRAWLER]   ATK 32  DEF 32   (64)
+     Bonus:    +6% ATK and +6% DEF when crew is full
+     Weakness: -8% to both when alone (needs the squad)
+     Looks:    average height, solid middleweight, Latino, mouthy
+     Art:      annoying mouthy Latino middleweight, always talking trash
+
+CARD 60  (suggested: Skinny P)         [RUNNER]    ATK 50  DEF 14   (64)
+     Bonus:    +10% ATK against bigger opponents (chips them down)
+     Weakness: -15% DEF when grabbed
+     Looks:    tall, rail-thin, black, sunken cheeks
+     Art:      rail-thin tall black kid, long limbs, sunken cheeks, fast hands
+
+CARD 61  (suggested: Mongoose)         [RUNNER]    ATK 46  DEF 14   (60)
+     Bonus:    16% chance to dodge a single strike
+     Weakness: takes +15% damage when it does land
+     Looks:    average height, lean quick, brown-skinned, low crouch
+     Art:      lean quick brown-skinned fighter, low crouch, darting side-to-side
+
+CARD 62  (suggested: Bagman)           [TILT-D]    ATK 24  DEF 38   (62)
+     Bonus:    +1 Hustle drop on any win (always holding)
+     Weakness: -8% DEF when the bank runs dry
+     Looks:    average height, hunched, white, courier
+     Art:      hunched white courier clutching a money bag to the chest
+
+CARD 63  (suggested: Toothpick)        [RUNNER]    ATK 48  DEF 12   (60)
+     Bonus:    +10% ATK with concealed blades
+     Weakness: -15% DEF in a straight brawl
+     Looks:    tall, skinny, black, lazy calm
+     Art:      skinny black kid chewing a toothpick, lazy dangerous calm
+
+CARD 64  (suggested: Nickel)           [BRAWLER]   ATK 28  DEF 28   (56)
+     Bonus:    +6% ATK on the first strike
+     Weakness: -6% ATK below half health
+     Looks:    short, small-time build, black, cheap chain
+     Art:      small black corner hustler flipping a coin, cheap chain
+
+CARD 65  (suggested: Spider)           [TILT-A]    ATK 38  DEF 24   (62)
+     Bonus:    8% chance to entangle and counter
+     Weakness: -8% DEF against heavy hitters (gets crushed)
+     Looks:    tall, long thin limbs, black, web hand tattoo
+     Art:      long thin black limbs, web tattoo on the hand, climbing pose
+
+CARD 66  (suggested: Heavyset)         [BODY]      ATK 14  DEF 50   (64)
+     Bonus:    +8% DEF on the front line
+     Weakness: -15% ATK against runners
+     Looks:    enormous, huge, dark-skinned black, calm
+     Art:      enormous calm black enforcer filling the whole frame
+
+CARD 67  (suggested: Rook)             [WALL]      ATK 18  DEF 44   (62)
+     Bonus:    +8% DEF when defending turf (holds position)
+     Weakness: -10% DEF when forced to advance
+     Looks:    average height, solid, black, young soldier
+     Art:      young solid black soldier standing post, arms folded, dead serious
+
+CARD 68  (suggested: Lil Vegas)        [TILT-A]    ATK 36  DEF 26   (62)
+     Bonus:    +6% ATK per round won in a row (on a streak)
+     Weakness: -8% DEF the round after a loss (tilts)
+     Looks:    average height, flashy lean, Latino, neon glow
+     Art:      flashy lean Latino kid tossing casino chips, neon-sign reflection
+
+CARD 69  (suggested: Crash)            [BRUISER]   ATK 44  DEF 18   (62)
+     Bonus:    +10% ATK on a reckless charge
+     Weakness: -12% DEF for the rest of the fight after charging
+     Looks:    average height, wild reckless, white, young
+     Art:      wild-eyed young white kid mid-tackle, no regard for his own body
+
+CARD 70  (suggested: Chico)            [BRAWLER]   ATK 30  DEF 30   (60)
+     Bonus:    +6% ATK while a teammate is up
+     Weakness: -6% DEF when alone
+     Looks:    average height, solid, Mexican-brown, white tee, rosary
+     Art:      young solid Mexican vato, white tee, rosary, calm steady stance
+
+CARD 71  (suggested: Drizzle)          [RUNNER]    ATK 46  DEF 12   (58)
+     Bonus:    +8% ATK and +8% dodge in the rain
+     Weakness: -10% ATK in dry daylight
+     Looks:    average height, lean, black, dripping hood
+     Art:      lean black kid under a dripping hood, rain streaking the frame
+
+CARD 72  (suggested: Bull)             [BODY]      ATK 18  DEF 46   (64)
+     Bonus:    +8% DEF against multiple attackers
+     Weakness: -12% ATK against a single quick target
+     Looks:    stocky, neckless, white, bald, nose ring
+     Art:      bald neckless white bruiser, nose ring, head lowered
+
+CARD 73  (suggested: Squeak)           [RUNNER]    ATK 44  DEF 10   (54)
+     Bonus:    18% dodge vs bigger opponents
+     Weakness: -18% DEF once pinned
+     Looks:    tiny, small frame, black, high-voiced kid
+     Art:      tiny high-voiced black kid, oversized hoodie, fearless
+
+CARD 74  (suggested: Loco)             [BRUISER]   ATK 46  DEF 18   (64)
+     Bonus:    +10% ATK when below half health (goes wild)
+     Weakness: -12% DEF at full health (no caution)
+     Looks:    average height, muscular shirtless, Latino, teardrop tattoos
+     Art:      wild-eyed shirtless Latino fighter, teardrop tattoos, manic
+
+CARD 75  (suggested: Petey Bricks)     [WALL]      ATK 20  DEF 42   (62)
+     Bonus:    +6% DEF when behind on the bank (digs in)
+     Weakness: -8% ATK against fresh openers
+     Looks:    stocky, bricklayer-built, tan white, dusty work gloves
+     Art:      stocky tan bricklayer-built enforcer, dusty work gloves
+
+CARD 76  (suggested: Sandman)          [TILT-A]    ATK 38  DEF 24   (62)
+     Bonus:    +8% ATK at Night
+     Weakness: -8% ATK in daylight
+     Looks:    average height, heavy-handed, black, sleepy-eyed
+     Art:      sleepy-eyed black late-night creeper, slow heavy hands
+
+CARD 77  (suggested: Gutter)           [TILT-D]    ATK 24  DEF 38   (62)
+     Bonus:    +6% DEF in a dirty grind-it-out fight
+     Weakness: -8% ATK against clean fast strikers
+     Looks:    average height, grimy lean, white, mud-streaked
+     Art:      grimy mud-streaked white alley fighter, broken-bottle grip
+
+CARD 78  (suggested: Flaco)            [RUNNER]    ATK 48  DEF 12   (60)
+     Bonus:    +10% ATK against larger opponents
+     Weakness: -15% DEF when grabbed
+     Looks:    tall, very skinny long reach, Latino, wife-beater
+     Art:      very skinny tall Latino kid, wife-beater, long reach, fast
+
+CARD 79  (suggested: Cash)             [TILT-D]    ATK 24  DEF 36   (60)
+     Bonus:    +1 Hustle drop on a win
+     Weakness: -8% DEF when broke
+     Looks:    average height, slick lean, black, gold watch
+     Art:      slick lean black hustler fanning a stack of bills, gold watch
+
+CARD 80  (suggested: Numbers)          [WALL]      ATK 16  DEF 42   (58)
+     Bonus:    enemy first-strike ATK -8% (always calculating)
+     Weakness: -10% ATK (thinks instead of swings)
+     Looks:    average height, slight, white, glasses, bookie
+     Art:      slight white bookie type with a notepad, glasses, quiet patience
+
+CARD 81  (suggested: Tiny Tone)        [BODY]      ATK 14  DEF 46   (60)
+     Bonus:    +8% DEF on the front line
+     Weakness: -15% ATK against runners
+     Looks:    huge, enormous, dark-skinned black, gentle stare
+     Art:      ironically huge black enforcer named "Tiny," gentle dead stare
+
+CARD 82  (suggested: Pitbull)          [BRUISER]   ATK 44  DEF 18   (62)
+     Bonus:    +10% ATK once he's locked on (round 2+)
+     Weakness: -10% DEF on the opening round (slow to engage)
+     Looks:    stocky, muscular, Latino, locked jaw
+     Art:      stocky muscular Latino fighter, locked jaw, won't let go
+
+CARD 83  (suggested: Whisper)          [RUNNER]    ATK 46  DEF 12   (58)
+     Bonus:    +12% ATK on a silent first strike (Night)
+     Weakness: -12% ATK once spotted (daylight)
+     Looks:    average height, lean, black, hooded quiet
+     Art:      quiet hooded black figure, finger to the lips, blade low
+
+CARD 84  (suggested: Sketch)           [TILT-A]    ATK 36  DEF 24   (60)
+     Bonus:    enemy ATK -6% round one (unreadable)
+     Weakness: -8% DEF once figured out
+     Looks:    average height, twitchy lean, mixed, paint-stained hands
+     Art:      twitchy mixed graffiti writer, paint-stained fingers, hood
+
+CARD 85  (suggested: Bo)               [BRUISER]   ATK 42  DEF 20   (62)
+     Bonus:    +8% ATK in a melee brawl
+     Weakness: -10% DEF against ranged
+     Looks:    big, country bruiser, white, easy smile
+     Art:      big country white bruiser, overalls, no shirt, easy smile
+
+CARD 86  (suggested: Lil Vato)         [BRAWLER]   ATK 30  DEF 30   (60)
+     Bonus:    +6% ATK and DEF when defending the block
+     Weakness: -8% to both when away
+     Looks:    average height, solid young, Latino, hairnet
+     Art:      young solid Latino homie, buttoned-up plaid, hairnet, steady eyes
+
+CARD 87  (suggested: Stutter)          [RUNNER]    ATK 48  DEF 14   (62)
+     Bonus:    +10% ATK on a stop-start fake-out opener
+     Weakness: -15% DEF once the rhythm is read
+     Looks:    average height, jittery, black, can't hold still
+     Art:      jittery black kid with a stuttering bounce, can't hold still
+
+CARD 88  (suggested: Cobra)            [TILT-A]    ATK 40  DEF 22   (62)
+     Bonus:    +10% ATK on a quick-strike counter
+     Weakness: -8% DEF after striking (recoils slow)
+     Looks:    average height, lean coiled, Latino, cobra-hood tattoo
+     Art:      coiled lean Latino fighter, cobra-hood tattoo, still then fast
+
+CARD 89  (suggested: Mack)             [TILT-D]    ATK 26  DEF 38   (64)
+     Bonus:    8% chance to talk the enemy down (first strike -8% ATK)
+     Weakness: -8% ATK (relies on the mouth, not the hands)
+     Looks:    average height, smooth older, black, fur collar
+     Art:      smooth older black player, fur collar, rings, easy confidence
+
+CARD 90  (suggested: Fingers)          [RUNNER]    ATK 46  DEF 12   (58)
+     Bonus:    +1 Hustle drop when the enemy is distracted round one
+     Weakness: -15% DEF when caught
+     Looks:    average height, quick-handed lean, white, sly
+     Art:      quick-handed lean white thief flexing nimble fingers, sly look
+
+CARD 91  (suggested: Slugger)          [BRUISER]   ATK 46  DEF 18   (64)
+     Bonus:    +10% ATK with bats and pipes
+     Weakness: -12% DEF when disarmed
+     Looks:    stocky, thick, black, dented bat
+     Art:      stocky black kid resting a dented bat on the shoulder
+
+CARD 92  (suggested: Cleats)           [BRAWLER]   ATK 32  DEF 32   (64)
+     Bonus:    +6% ATK on uneven / rough ground
+     Weakness: -8% ATK on a clean flat fight
+     Looks:    average height, athletic, black, jersey
+     Art:      young athletic black baller-turned-soldier, cleats laced, jersey
+
+CARD 93  (suggested: Junior)           [BRAWLER]   ATK 28  DEF 28   (56)
+     Bonus:    +6% ATK while a teammate is up (eager to prove it)
+     Weakness: -6% DEF when alone (still green)
+     Looks:    young, slim, Latino, oversized chain
+     Art:      youngest of the crew, slim Latino, oversized chain, trying hard
+
+CARD 94  (suggested: Booboo)           [WALL]      ATK 16  DEF 42   (58)
+     Bonus:    +6% DEF when below half health (won't quit)
+     Weakness: -10% ATK (soft hands, hard head)
+     Looks:    heavyset, chubby, black, perma-bruised face
+     Art:      chubby loyal black soldier, perma-bruised face, gentle giant
+
+CARD 95  (suggested: Trill)            [TILT-A]    ATK 38  DEF 24   (62)
+     Bonus:    +6% ATK per round won in a row (real recognizes real)
+     Weakness: -8% DEF after a loss
+     Looks:    average height, laid-back, black, gold fronts
+     Art:      laid-back authentic black head, gold fronts, calm confidence
+
+CARD 96  (suggested: Vinnie)           [TILT-D]    ATK 24  DEF 38   (62)
+     Bonus:    +6% DEF when defending turf
+     Weakness: -8% ATK on the attack
+     Looks:    average height, slicked-back, Italian-white, pinky ring
+     Art:      slicked-back old-school Italian type, track jacket, pinky ring
+
+CARD 97  (suggested: Lil Tillie)       [RUNNER]    ATK 44  DEF 12   (56)
+     Bonus:    14% dodge vs bigger opponents
+     Weakness: -15% DEF when cornered
+     Looks:    small, fearless girl, black, braids, hoop earrings
+     Art:      small fearless black girl, braids, hoop earrings, fierce glare
+
+CARD 98  (suggested: Spook)            [RUNNER]    ATK 48  DEF 12   (60)
+     Bonus:    +12% ATK at Night / from the shadows
+     Weakness: -15% ATK in full daylight
+     Looks:    average height, pale lean, white, dark circles
+     Art:      pale hooded white figure, dark circles, eerie quiet stare
+
+CARD 99  (suggested: Mo)               [TILT-A]    ATK 36  DEF 26   (62)
+     Bonus:    +1 Hustle drop on a win (mo money)
+     Weakness: -8% DEF when the bank is empty
+     Looks:    average height, flashy lean, black, gold everything
+     Art:      flashy young black hustler making it rain, gold everything
+
+CARD 100 (suggested: Ace)              [BRAWLER]   ATK 34  DEF 34   (68)
+     Bonus:    +6% ATK and +6% DEF on the first strike (sets the tone)
+     Weakness: -8% to both once behind (not used to losing)
+     Looks:    average height, sharp confident, mixed, clean fit
+     Art:      sharp confident mixed leader-type, ace tattoo, clean fit, calm
+
+================================================================================
+  STAT SPREAD CHECK  (all 100 sit inside the COMMON budget)
+================================================================================
+  Power totals span 54–68 (target band 50–70). No single stat exceeds 50.
+  Archetype mix:
+     RUNNER  (glass)   ~26    BRUISER (atk)    ~16
+     WALL    (def)     ~12    BODY    (tank)   ~11
+     BRAWLER (even)    ~11    TILT-A  (atk-ish)~13    TILT-D (def-ish) ~11
+  Every bonus is small and paired with a matching weakness — net ~neutral, so
+  no Common outclasses a future Uncommon/Rare. Conditions used (Night, turf,
+  outnumbered, low-health, first-strike, melee/ranged, rain, bank lead, crew
+  size) are all things the battle engine can check, so these wire up cleanly
+  when we move bonus/weakness from flavor to real combat effects.
+
+  NEXT BATCHES (not in this file): UNCOMMON x ~28, RARE x ~20, EPIC x ~9,
+  LEGENDARY x ~3 — each with bigger budgets AND stronger, less-penalized abilities.
+================================================================================
