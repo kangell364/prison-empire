@@ -288,28 +288,41 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [othersKey])
 
-  // Attack-car drive — the raid "en route" flourish, in three beats:
-  //   1. OUT  — lowrider drives attacker -> defender (the hit going out)
-  //   2. HOLD — car vanishes at the defender's house (the attack is happening)
-  //   3. BACK — car returns defender -> attacker, then vanishes at home
-  // The sprite faces LEFT by default, so it's flipped to face each leg's
-  // travel direction. On completion it notifies the parent (where damage/
-  // landing will resolve once the backend is in).
+  // Attack-car drive — the raid "en route" cinematic, SYNCED to the real attack
+  // timer. The car leaves the attacker the moment the raid starts and travels at
+  // constant speed so it ARRIVES exactly when the raid lands (ends_at) — the
+  // drive length == the countdown the defender is watching, not a quick flourish
+  // that finishes minutes early. Three beats:
+  //   1. OUT  — attacker -> defender over (endsAt - startedAt), LINEAR so the
+  //             car's position always == the raid's progress (so a reload
+  //             mid-raid resumes the car in the right spot, not back at the start)
+  //   2. HOLD — car vanishes at the defender's house (the hit goes down)
+  //   3. BACK — a quick return defender -> attacker, then vanish at home
+  // Falls back to a short distance-based drive if no timer is supplied.
+  // The sprite faces LEFT by default, so it's flipped to face each leg's travel
+  // direction. On completion it notifies the parent.
   const raidDriveId = raidDrive && raidDrive.id
   useEffect(() => {
     const map = mapRef.current
     if (!map || !raidDrive) return
-    const { from, to } = raidDrive
+    const { from, to, startedAt, endsAt } = raidDrive
     if (from == null || to == null) return
 
-    // Car drive speed is LINKED to distance: constant map-speed, so a farther
-    // target takes proportionally longer to reach (matches the longer raid).
     const sepDeg = Math.sqrt((to.lat - from.lat) ** 2 + (to.lng - from.lng) ** 2)
-    const leg = Math.round(Math.max(2500, Math.min(11000, (sepDeg / 0.26) * 11000)))
-    const OUT = leg, HOLD = 1800, BACK = leg
-    const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2   // easeInOutQuad
+    // OUT window: the live attack timer when present (car matches the countdown);
+    // otherwise a short distance-based fallback. landAt is the wall-clock instant
+    // the car reaches the defender — i.e. when the raid lands.
+    const hasTimer = startedAt != null && endsAt != null && endsAt > startedAt
+    const outStart = hasTimer ? startedAt : Date.now()
+    const landAt   = hasTimer ? endsAt   : Date.now() + Math.round(Math.max(2500, Math.min(11000, (sepDeg / 0.26) * 11000)))
+    const total    = Math.max(1, landAt - outStart)
+    const HOLD = 1800
+    // The return leg stays a quick flourish (never the full timer).
+    const BACK = Math.round(Math.max(2500, Math.min(8000, (sepDeg / 0.26) * 8000)))
+    const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2   // easeInOutQuad (BACK only)
     const outRight  = to.lng > from.lng       // heading toward defender
     const backRight = from.lng > to.lng       // heading back toward attacker
+    const lerpOut = e => [from.lat + (to.lat - from.lat) * e, from.lng + (to.lng - from.lng) * e]
 
     let marker = null
     const makeMarker = (lat, lng, facingRight) => {
@@ -334,26 +347,28 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
       className: 'raid-path-line', interactive: false,
     }).addTo(map)
 
-    marker = makeMarker(from.lat, from.lng, outRight)
+    // Spawn the car at its CURRENT progress so a reload mid-raid picks it up in
+    // the right spot instead of snapping back to the attacker.
+    const startE = Math.max(0, Math.min(1, (Date.now() - outStart) / total))
+    marker = makeMarker(...lerpOut(startE), outRight)
 
-    let raf = null, startTs = null, done = false
-    const step = ts => {
-      if (startTs == null) startTs = ts
-      const t = ts - startTs
-      if (t < OUT) {
-        // 1. drive out to the defender
-        if (!marker) marker = makeMarker(from.lat, from.lng, outRight)
-        const e = ease(t / OUT)
-        marker.setLatLng([from.lat + (to.lat - from.lat) * e, from.lng + (to.lng - from.lng) * e])
+    let raf = null, backStart = null, done = false
+    const step = () => {
+      const now = Date.now()
+      if (now < landAt) {
+        // 1. drive out — linear position == raid progress, arrives at landAt
+        if (!marker) marker = makeMarker(...lerpOut(0), outRight)
+        marker.setLatLng(lerpOut(Math.max(0, Math.min(1, (now - outStart) / total))))
         raf = requestAnimationFrame(step)
-      } else if (t < OUT + HOLD) {
+      } else if (now < landAt + HOLD) {
         // 2. the attack — car is gone while the hit goes down
         removeMarker()
         raf = requestAnimationFrame(step)
-      } else if (t < OUT + HOLD + BACK) {
-        // 3. drive back home
+      } else if (now < landAt + HOLD + BACK) {
+        // 3. drive back home (quick, eased)
+        if (backStart == null) backStart = landAt + HOLD
         if (!marker) marker = makeMarker(to.lat, to.lng, backRight)
-        const e = ease((t - OUT - HOLD) / BACK)
+        const e = ease((now - backStart) / BACK)
         marker.setLatLng([to.lat + (from.lat - to.lat) * e, to.lng + (from.lng - to.lng) * e])
         raf = requestAnimationFrame(step)
       } else if (!done) {
