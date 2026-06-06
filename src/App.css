@@ -323,6 +323,43 @@ body {
   50%      { opacity: 0.95; stroke-dashoffset: 0; }
 }
 
+/* Turf "juice": soft glow under owned hexes + claim-burst pop on takeover. */
+.pe-hex-glow { filter: blur(2.5px); }
+.pe-claim-burst {
+  position: relative; width: 64px; height: 64px;
+  display: flex; align-items: center; justify-content: center;
+}
+.pe-claim-burst .ring {
+  position: absolute; left: 50%; top: 50%; width: 18px; height: 18px;
+  border: 2.5px solid var(--c); border-radius: 50%; transform: translate(-50%, -50%);
+  animation: peClaimRing 0.85s ease-out forwards;
+}
+.pe-claim-burst .core {
+  color: var(--c); font-size: 26px; font-weight: 900; line-height: 1;
+  text-shadow: 0 0 8px var(--c), 0 1px 3px rgba(0,0,0,.8);
+  animation: peClaimPop 0.85s cubic-bezier(.2,1.3,.4,1) forwards;
+}
+@keyframes peClaimRing {
+  0%   { width: 14px; height: 14px; opacity: 0.9; }
+  100% { width: 58px; height: 58px; opacity: 0; }
+}
+@keyframes peClaimPop {
+  0%   { transform: scale(0.2); opacity: 0; }
+  40%  { transform: scale(1.3); opacity: 1; }
+  70%  { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.05); opacity: 0; }
+}
+/* Hourly-payout pulse: a one-shot bright bloom on owned glows + a softer "＄"
+   pop (smaller core than a takeover, since it fires on many blocks at once). */
+.pe-glow-flash { animation: peGlowFlash 1.1s ease-out; }
+@keyframes peGlowFlash {
+  0%   { filter: blur(2.5px) brightness(1); }
+  30%  { filter: blur(5px) brightness(1.9); }
+  100% { filter: blur(2.5px) brightness(1); }
+}
+.pe-payout-burst .core { font-size: 20px; }
+.pe-payout-burst .ring { border-width: 2px; }
+
 /* Card battle animations */
 @keyframes battleCardInLeft {
   from { transform: translateX(-50px); opacity: 0; }
