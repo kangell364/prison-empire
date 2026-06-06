@@ -1481,9 +1481,10 @@ function DustRoom({ art }) {
         {/* Layer 1 — room backdrop (ROOM 4). */}
         <img src={art} alt="Dust Room" style={{ display: 'block', width: '100%', height: '100%' }} />
         {/* Layer 2 — the table, kept as its own overlay so it can be moved or
-            swapped independently of the backdrop. Sits on the floor, full-width. */}
+            swapped independently of the backdrop. Top edge sits ~25% up the back
+            wall: floor line ≈ 62.5%, wall top ≈ 21% → 25% up lands its top at 52%. */}
         <img src="/dust-table.webp" alt="" aria-hidden
-          style={{ position: 'absolute', left: '50%', bottom: '4%', transform: 'translateX(-50%)',
+          style={{ position: 'absolute', left: '50%', top: '52%', transform: 'translateX(-50%)',
             width: '94%', zIndex: 1, pointerEvents: 'none',
             filter: 'drop-shadow(0 8px 10px rgba(0,0,0,0.4))' }} />
         <div style={{ position: 'absolute', left: '50%', top: '38%', transform: 'translate(-50%, -50%)', zIndex: 2,
