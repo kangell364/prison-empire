@@ -241,12 +241,12 @@ export function CharacterDetailModal({
         {/* Card stats — for CARDS_COLLECTION items. ATK + DEF are the only
             visible numbers; the underlying hustle/muscle/smarts/cred breakdown
             was removed at user request (those derive ATK/DEF anyway). */}
-        {c.hustle != null && c.muscle != null && c.smarts != null && c.cred != null && (
+        {(c.atk != null || c.def != null || (c.muscle != null && c.cred != null)) && (
           <div style={{ padding: '16px 18px 0' }}>
             <SectionLabel>Combat Stats</SectionLabel>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <StatTile icon="ti-sword"  label="Attack"  value={derivedAtk(c, upgrades, atkPerLevel)}  color={RED} />
-              <StatTile icon="ti-shield" label="Defense" value={derivedDef(c, upgrades, defPerLevel)} color={BLUE} />
+              <StatTile icon="ti-sword"  label="Attack"  value={derivedAtk(c, cardLevel, atkPerLevel)}  color={RED} />
+              <StatTile icon="ti-shield" label="Defense" value={derivedDef(c, cardLevel, defPerLevel)} color={BLUE} />
             </div>
             {c.special && (
               <div style={{
@@ -261,6 +261,27 @@ export function CharacterDetailModal({
               }}>
                 <i className="ti ti-bolt" />
                 Special: {c.special}
+              </div>
+            )}
+            {/* Bonus + Weakness — flavor abilities from the crew list. */}
+            {c.bonus && (
+              <div style={{
+                marginTop: 8, background: '#1f7a3318', border: '0.5px solid #1f7a3355',
+                borderRadius: 10, padding: '8px 12px', color: '#3fcf6a',
+                fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'flex-start', gap: 6,
+              }}>
+                <i className="ti ti-arrow-up-right" style={{ marginTop: 1 }} />
+                <span><b>Bonus:</b> {c.bonus}</span>
+              </div>
+            )}
+            {c.weakness && (
+              <div style={{
+                marginTop: 8, background: '#c0392b18', border: '0.5px solid #c0392b55',
+                borderRadius: 10, padding: '8px 12px', color: '#e0735f',
+                fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'flex-start', gap: 6,
+              }}>
+                <i className="ti ti-arrow-down-right" style={{ marginTop: 1 }} />
+                <span><b>Weakness:</b> {c.weakness}</span>
               </div>
             )}
           </div>
@@ -519,13 +540,14 @@ function capitalize(s) {
 
 // Derived ATK/DEF including upgrade levels. Matches the formula used in
 // crewStore — base from muscle/cred, +perLevel per upgrade level.
-function derivedAtk(c, upgrades, perLevel) {
-  const base = (c.muscle * 5 + 15)
-  return (base + (upgrades?.atk || 0) * perLevel).toLocaleString()
+// ATK/DEF scale with the card's LEVEL (raised by merging), not point-buy.
+function derivedAtk(c, cardLevel = 1, perLevel) {
+  const base = c.atk != null ? c.atk : (c.muscle * 5 + 15)   // crew cards carry explicit ATK
+  return (base + Math.max(0, cardLevel - 1) * perLevel).toLocaleString()
 }
-function derivedDef(c, upgrades, perLevel) {
-  const base = (c.cred * 5 + 10)
-  return (base + (upgrades?.def || 0) * perLevel).toLocaleString()
+function derivedDef(c, cardLevel = 1, perLevel) {
+  const base = c.def != null ? c.def : (c.cred * 5 + 10)
+  return (base + Math.max(0, cardLevel - 1) * perLevel).toLocaleString()
 }
 
 function UpgradeRow({ label, color, stat, level, perLevel, maxLevel, cost, hustle, onUpgrade }) {

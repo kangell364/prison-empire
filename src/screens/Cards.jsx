@@ -5,10 +5,6 @@ import {
   baseAtk, baseDef, useCrew,
   ATK_PER_LEVEL, DEF_PER_LEVEL,
 } from '../state/crewStore'
-import {
-  useUpgrades, readUpgrade, getUpgrade, upgradeStat, carryUpgrades,
-  HUSTLE_COST_PER_LEVEL, MAX_UPGRADE_LEVEL,
-} from '../state/upgradesStore'
 import { useHustle, spendHustle } from '../state/playerStore'
 import {
   useSkillCardCounts, getOwnedSkillTuples, mergeSkillCard, SKILL_STACK_SIZE,
@@ -70,7 +66,6 @@ export default function Cards({ initialTab = 'player' }) {
   const [filter, setFilter] = useState('All')
   const counts = useCardCounts()
   const crew   = useCrew()
-  const upgradesMap = useUpgrades()
   const hustle = useHustle()
   const skillCounts     = useSkillCardCounts()
   const skillUpgradeMap = useSkillUpgrades()
@@ -111,17 +106,9 @@ export default function Cards({ initialTab = 'player' }) {
     return s
   }, [crew.leader, crew.members])
 
-  const handleUpgrade = (cardId, cardLevel) => (stat) => {
-    const current = getUpgrade(cardId, cardLevel)[stat] || 0
-    if (current >= MAX_UPGRADE_LEVEL) return
-    const cost = HUSTLE_COST_PER_LEVEL(current)
-    if (spendHustle(cost)) {
-      upgradeStat(cardId, cardLevel, stat)
-      sfx.buy()
-    } else {
-      sfx.deny?.()
-    }
-  }
+  // Crew cards have NO point-buy upgrade: their ATK/DEF come from CREW LIST and
+  // rise with the card's LEVEL, which you raise by stacking + merging (20 ->
+  // next level). So no per-stat hustle-spend handler here.
 
   // Crew tab swaps in the standalone Crew screen so all of its layout
   // (header stats, slot grid, slot editor) renders without the pack banner
@@ -183,7 +170,6 @@ export default function Cards({ initialTab = 'player' }) {
                       cardLevel={t.level}
                       count={t.count}
                       inCrew={inCrewSet.has(t.id)}
-                      upgrades={readUpgrade(upgradesMap, t.id, t.level)}
                       onTap={() => setSelectedCard({ card, cardLevel: t.level, count: t.count })}
                     />
                   )
@@ -256,19 +242,13 @@ export default function Cards({ initialTab = 'player' }) {
             cardType="CREW"
             count={liveCount}
             cardLevel={cardLevel}
-            upgrades={readUpgrade(upgradesMap, card.id, cardLevel)}
-            hustle={hustle}
-            onUpgrade={handleUpgrade(card.id, cardLevel)}
             atkPerLevel={ATK_PER_LEVEL}
             defPerLevel={DEF_PER_LEVEL}
-            maxUpgradeLevel={MAX_UPGRADE_LEVEL}
-            costForLevel={HUSTLE_COST_PER_LEVEL}
             canMerge={liveCount >= STACK_SIZE}
             onMerge={() => {
+              // Stacking + merging is the ONLY way crew cards level up; the new
+              // level carries the higher ATK/DEF automatically (no point-buy).
               mergeCard(card.id, cardLevel)
-              // Level 2 inherits the Level-1 upgrades (higher of the two).
-              carryUpgrades(card.id, cardLevel, cardLevel + 1)
-              // Hand off to the full-screen consume → reveal animation.
               setSelectedCard(null)
               setMergeReveal({ card, toLevel: cardLevel + 1 })
             }}
@@ -524,10 +504,11 @@ function MergeRevealModal({ card, toLevel, onDone }) {
 // where upgrades and the MERGE action live.
 // `inCrew` dims the tile and shows an IN CREW badge so you can see at a
 // glance which cards are slotted vs. on the bench.
-function CollectionTile({ card, cardLevel, count, inCrew, upgrades, onTap }) {
+function CollectionTile({ card, cardLevel, count, inCrew, onTap }) {
   const rarityColor = RARITY_COLORS[card.rarity]
-  const atk = baseAtk(card) + (upgrades?.atk || 0) * ATK_PER_LEVEL
-  const def = baseDef(card) + (upgrades?.def || 0) * DEF_PER_LEVEL
+  // ATK/DEF rise with the card's LEVEL (from merging) — no point-buy upgrades.
+  const atk = baseAtk(card) + (cardLevel - 1) * ATK_PER_LEVEL
+  const def = baseDef(card) + (cardLevel - 1) * DEF_PER_LEVEL
   // Cards pile into stacks of STACK_SIZE; extras spill into the next stack.
   const fullStacks = Math.floor(count / STACK_SIZE)
   const remainder  = count % STACK_SIZE
@@ -584,7 +565,10 @@ function CollectionTile({ card, cardLevel, count, inCrew, upgrades, onTap }) {
             )
           })}
           <div style={{ position: 'relative', zIndex: 1 }}>
-            <Avatar src={card.avatar} emoji={card.emoji} size={56} radius={8} />
+            {/* Face close-up on the tile (`face`); the full card art shows when
+                the card is opened. Player cards have no `face`, so they keep
+                using their portrait avatar. */}
+            <Avatar src={card.face || card.avatar} emoji={card.emoji} size={56} radius={8} />
           </div>
         </div>
       </div>

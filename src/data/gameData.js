@@ -157,7 +157,7 @@ export const LEADERBOARD = [
 // collide with the legacy player-card ids (1-8) sitting in old saves. `archetype`,
 // `bonus`, `weakness` are flavor for now; they wire into combat later.
 export const CARDS_COLLECTION = [
-  { id: 101, no: 1, name: 'Lil Smoke', emoji: '🚬', avatar: '/crew-1.webp', rarity: 'common',
+  { id: 101, no: 1, name: 'Lil Smoke', emoji: '🚬', avatar: '/crew-1.webp', face: '/crew-1-face.webp', rarity: 'common',
     archetype: 'BRUISER', atk: 44, def: 18, special: 'Outnumber',
     bonus: '+8% ATK when his crew outnumbers the enemy',
     weakness: '-10% DEF when fighting alone',
