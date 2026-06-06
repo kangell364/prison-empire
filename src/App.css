@@ -349,6 +349,16 @@ body {
   70%  { transform: scale(1); opacity: 1; }
   100% { transform: scale(1.05); opacity: 0; }
 }
+/* Hourly-payout pulse: a one-shot bright bloom on owned glows + a softer "＄"
+   pop (smaller core than a takeover, since it fires on many blocks at once). */
+.pe-glow-flash { animation: peGlowFlash 1.1s ease-out; }
+@keyframes peGlowFlash {
+  0%   { filter: blur(2.5px) brightness(1); }
+  30%  { filter: blur(5px) brightness(1.9); }
+  100% { filter: blur(2.5px) brightness(1); }
+}
+.pe-payout-burst .core { font-size: 20px; }
+.pe-payout-burst .ring { border-width: 2px; }
 
 /* Card battle animations */
 @keyframes battleCardInLeft {

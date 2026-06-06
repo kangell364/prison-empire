@@ -11,7 +11,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { geoBounds, geoContains } from 'd3-geo'
-import { GRID, getBlock, subscribeBlocks, subscribeActivity, CREW_COLORS } from '../state/blocksStore'
+import { GRID, getBlock, subscribeBlocks, subscribeActivity, subscribePayout, CREW_COLORS } from '../state/blocksStore'
 
 const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -87,6 +87,9 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
   onTrapTapRef.current = onTrapHouseTap
   onHouseTapRef.current = onHouseTap
   onRaidArriveRef.current = onRaidArrive
+  // Your owned blocks currently drawn on-screen — captured each redraw so the
+  // hourly payout can pulse exactly the turf that's in view (no full re-scan).
+  const ownedInViewRef = useRef([])
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
@@ -134,6 +137,7 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
       if ((x1 - x0) * (y1 - y0) > 3000) return
       const showIcons = map.getZoom() >= 13    // NPC icons only up close (perf + clutter)
       layer = L.layerGroup().addTo(map)
+      const ownedHere = []                     // your blocks in this viewport (for payout pulse)
       for (let gx = x0; gx < x1; gx++) for (let gy = y0; gy < y1; gy++) {
         const blk = getBlock(gx, gy)
         if (blk.land === false) continue   // ocean / Canada / Mexico — off the board, draw nothing
@@ -144,14 +148,21 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
         // Juice: a soft, color-matched glow under owned blocks (a larger blurred
         // tile beneath) so held turf reads as "lit up", Million-Lords style. Works
         // on either shape — a scaled hex on the hex board, a grown square otherwise.
+        const mine = owner === 'you'
+        if (mine) ownedHere.push([gx, gy])
         if (JUICE && owner) {
+          // Slightly richer glow on YOUR turf (bigger, warmer) so it reads as the
+          // hero color; rivals get a tighter, dimmer halo. `.pe-mine-glow` is the
+          // hook the hourly payout flashes.
           const glowStyle = {
-            className: 'pe-hex-glow', stroke: false, fillColor: color,
-            fillOpacity: owner === 'you' ? 0.32 : 0.22, interactive: false,
+            className: mine ? 'pe-hex-glow pe-mine-glow' : 'pe-hex-glow',
+            stroke: false, fillColor: color,
+            fillOpacity: mine ? 0.36 : 0.20, interactive: false,
           }
+          const scale = mine ? 1.42 : 1.28
           const g = HEX
-            ? L.polygon(hexCorners(cy, cx, 1.32), glowStyle)
-            : L.rectangle([[cy - GRID * 0.66, cx - GRID * 0.66], [cy + GRID * 0.66, cx + GRID * 0.66]], glowStyle)
+            ? L.polygon(hexCorners(cy, cx, scale), glowStyle)
+            : L.rectangle([[cy - GRID * 0.5 * scale, cx - GRID * 0.5 * scale], [cy + GRID * 0.5 * scale, cx + GRID * 0.5 * scale]], glowStyle)
           g.addTo(layer)
         }
         const shapeStyle = {
@@ -170,6 +181,7 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
             .on('click', () => onBlockTapRef.current && onBlockTapRef.current(gx, gy)).addTo(layer)
         }
       }
+      ownedInViewRef.current = ownedHere
     }
     map.on('moveend zoomend', draw)
     const unsub = subscribeBlocks(draw)   // redraw when blocks change
@@ -195,6 +207,39 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
       })
       const m = L.marker([lat, lng], { icon, interactive: false, zIndexOffset: 1500 }).addTo(map)
       setTimeout(() => { try { map.removeLayer(m) } catch {} }, 950)
+    })
+  }, [])
+
+  // Juice: payout pulse. On the hourly block payout, your turf visibly "pays" —
+  // every owned glow in view flashes once and a gold "＄" pops on a sample of
+  // your blocks. Sampled (≤16) so a big empire doesn't carpet the map with
+  // markers. Fed by the block store's payout bus (same tick that banks income).
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !JUICE) return
+    return subscribePayout(() => {
+      // Flash the persistent gold glows already on the map (one-shot CSS class).
+      const glows = document.querySelectorAll('.pe-mine-glow')
+      glows.forEach(g => {
+        g.classList.add('pe-glow-flash')
+        setTimeout(() => { try { g.classList.remove('pe-glow-flash') } catch {} }, 1200)
+      })
+      // Pop a "＄" on a sample of your in-view blocks.
+      const owned = ownedInViewRef.current || []
+      if (!owned.length) return
+      const step = Math.max(1, Math.ceil(owned.length / 16))
+      const markers = []
+      owned.forEach(([gx, gy], i) => {
+        if (i % step !== 0) return
+        const [lat, lng] = blockCenter(gx, gy)
+        const icon = L.divIcon({
+          className: '', iconSize: [64, 64], iconAnchor: [32, 32],
+          html: `<div class="pe-claim-burst pe-payout-burst" style="--c:${CREW_COLORS.you}"><span class="ring"></span><span class="core">＄</span></div>`,
+        })
+        const mk = L.marker([lat, lng], { icon, interactive: false, zIndexOffset: 1400 }).addTo(map)
+        markers.push(mk)
+      })
+      setTimeout(() => { markers.forEach(mk => { try { map.removeLayer(mk) } catch {} }) }, 1200)
     })
   }, [])
 
