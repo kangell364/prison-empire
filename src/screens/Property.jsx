@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { PROPERTIES, PROPERTY_COST_GROWTH } from '../data/gameData'
 import { useHustle, spendHustle } from '../state/playerStore'
 import { useProgress } from '../state/progressionStore'
-import { useOwnedProperties, buyProperty } from '../state/propertyStore'
+import { useOwnedProperties, buyProperty, usePropertyPayoutCountdown, propertyPending } from '../state/propertyStore'
 import { sfx } from '../sounds'
 
 const GOLD = '#c9a84c'
@@ -33,11 +33,21 @@ function bulkCost(baseCost, owned, qty) {
 
 const QTY_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
+// mm:ss / hh:mm:ss countdown — same format as the block-income payout timer.
+function fmtCountdown(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
+  const pad = n => String(n).padStart(2, '0')
+  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`
+}
+
 export default function Property() {
   const playerLevel = useProgress().level
   const hustle      = useHustle()
   // Owned counts per property id — persisted (survives leaving the screen).
   const owned = useOwnedProperties()
+  // Global hourly payout countdown (same clock as block income).
+  const payoutMsLeft = usePropertyPayoutCountdown()
   // Per-card transient feedback ("Bought 3 for 1,540 Hustle, +15/hr")
   const [flash, setFlash] = useState({})
 
@@ -115,8 +125,26 @@ export default function Property() {
               <div style={{ color: '#888', fontSize: 10, marginTop: 2, letterSpacing: 1 }}>HUSTLE / HR</div>
             </div>
           </div>
+          {/* Global hourly payout — same countdown as block income, auto-banks at 0. */}
           <div style={{
-            marginTop: 12, paddingTop: 10,
+            marginTop: 12, padding: '10px 12px', borderRadius: 12,
+            background: '#1a1510', border: `0.5px solid ${GOLD}33`,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <i className="ti ti-clock-hour-4" style={{ color: GOLD, fontSize: 18 }} />
+              <div>
+                <div style={{ color: '#888', fontSize: 9, letterSpacing: 0.5, fontWeight: 600 }}>NEXT PAYOUT</div>
+                <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmtCountdown(payoutMsLeft)}</div>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ color: '#888', fontSize: 9, letterSpacing: 0.5, fontWeight: 600 }}>PAYING OUT</div>
+              <div style={{ color: GOLD, fontSize: 16, fontWeight: 700 }}>+{formatHustle(propertyPending())}</div>
+            </div>
+          </div>
+          <div style={{
+            marginTop: 10, paddingTop: 10,
             borderTop: `0.5px solid ${GOLD}22`,
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           }}>

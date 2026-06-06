@@ -58,25 +58,57 @@ export function useOwnedProperties() {
   return s.owned
 }
 
-// Bank the Hustle earned since the last settle. Whole Hustle is credited; the
-// fractional remainder carries forward so even a 5/hr property eventually pays
-// out. Always advances `lastAccrued` so a later rate change can't double-count.
+// Property income pays out on the SAME global hourly clock as block income —
+// aligned to the top of every UTC hour, so its countdown is identical to the
+// block payout (and the "pays every hour" copy is finally literal). At each hour
+// boundary we bank one hour of income per bucket crossed (capped at 24h of
+// backlog for time spent away), so the Property screen's timer has a real payout
+// moment instead of income trickling in continuously.
+const PAYOUT_PERIOD_MS  = 3_600_000               // 1 hour (matches blocksStore)
+const PAYOUT_BUCKET_KEY = 'pe_property_payout_bucket_v1'
+
+// ms remaining until the next top-of-hour payout — same instant as blocks.
+export function msToNextPropertyPayout() { return PAYOUT_PERIOD_MS - (Date.now() % PAYOUT_PERIOD_MS) }
+
+// Income that will bank at the next boundary: grows 0 → propertyPerHr over the
+// hour so the "PAYING OUT +N" readout climbs like the block one.
+export function propertyPending() {
+  const elapsed = 1 - msToNextPropertyPayout() / PAYOUT_PERIOD_MS
+  return Math.round(propertyPerHr() * elapsed)
+}
+
 export function runDuePropertyPayout(now = Date.now()) {
-  const dtHr = Math.max(0, (now - state.lastAccrued) / 3_600_000)
-  const earned = propertyPerHr() * dtHr + state.frac
-  const whole = Math.floor(earned)
-  if (whole > 0) addHustle(whole)
-  state = { ...state, lastAccrued: now, frac: earned - whole }
-  persist()
+  let last = null
+  try { const raw = localStorage.getItem(PAYOUT_BUCKET_KEY); if (raw != null) last = parseInt(raw, 10) } catch {}
+  const bucket = Math.floor(now / PAYOUT_PERIOD_MS)
+  if (last == null || Number.isNaN(last)) {           // first run — start the clock, no payout
+    try { localStorage.setItem(PAYOUT_BUCKET_KEY, String(bucket)) } catch {}
+    return 0
+  }
+  if (bucket <= last) return 0
+  const hours = Math.min(bucket - last, 24)            // cap offline backlog at 24h
+  const paid = Math.round(propertyPerHr() * hours)
+  if (paid > 0) addHustle(paid)
+  try { localStorage.setItem(PAYOUT_BUCKET_KEY, String(bucket)) } catch {}
+  return paid
 }
 
 // Add `qty` units of a property to your holdings (the caller charges Hustle).
-// Settle accrual at the OLD rate first so the new property only earns from now.
 export function buyProperty(id, qty) {
   const n = Math.max(0, Math.floor(qty || 0))
   if (!n) return
   runDuePropertyPayout()
   commitOwned({ ...state.owned, [id]: (state.owned[id] || 0) + n })
+}
+
+// Live-ticking countdown to the next property payout — re-renders each second.
+export function usePropertyPayoutCountdown() {
+  const [ms, setMs] = useState(msToNextPropertyPayout())
+  useEffect(() => {
+    const iv = setInterval(() => setMs(msToNextPropertyPayout()), 1000)
+    return () => clearInterval(iv)
+  }, [])
+  return ms
 }
 
 // Drive the idle income: catch up on mount (covers time spent away) then tick
