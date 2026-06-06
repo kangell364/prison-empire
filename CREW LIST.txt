@@ -76,7 +76,7 @@ CARD 2   (suggested: Big Worm)         [BODY]      ATK 12  DEF 48   (60)
      Art:      tall heavyset older dark-skinned head in a sweat-stained tank, gold rope chain
 
 CARD 3   (suggested: Re-Up)            [TILT-A]    ATK 38  DEF 26   (64)
-     Bonus:    +1 Hustle drop on a winning fight
+     Bonus:    +10% Hustle from a winning fight (skims every score)
      Weakness: -8% DEF when the bank is empty
      Looks:    average height, lean, black, late 20s
      Art:      lean black hustler counting a fat knot of bills, duffel over the shoulder
@@ -142,7 +142,7 @@ CARD 13  (suggested: Greasy Lou)       [TILT-D]    ATK 22  DEF 38   (60)
      Art:      slick-haired white fixer in a stained mechanic jumpsuit
 
 CARD 14  (suggested: Pockets)          [RUNNER]    ATK 50  DEF 14   (64)
-     Bonus:    +1 Hustle drop when the enemy is distracted (first round)
+     Bonus:    +15% Hustle from a win where the enemy never lands a hit (clean pickpocket)
      Weakness: -15% DEF when caught flat-footed
      Looks:    short, wiry, light-brown Latino, teen
      Art:      wiry Latino pickpocket with hands buried in an oversized coat, sly look
@@ -262,7 +262,7 @@ CARD 33  (suggested: Lefty)            [TILT-A]    ATK 38  DEF 24   (62)
      Art:      solid white one-armed-stance brawler leading hard with the left
 
 CARD 34  (suggested: Goldie)           [TILT-D]    ATK 24  DEF 36   (60)
-     Bonus:    +1 Hustle drop on a win (flashy hustler)
+     Bonus:    +8% Hustle and +8% Steel from a winning fight (flash pays both ways)
      Weakness: -8% DEF when the bank is empty (no flash, no fight)
      Looks:    average height, lean flashy, black, gold grill
      Art:      lean black hustler in everything gold — grill, chains, watch — cocky lean
@@ -430,7 +430,7 @@ CARD 61  (suggested: Mongoose)         [RUNNER]    ATK 46  DEF 14   (60)
      Art:      lean quick brown-skinned fighter, low crouch, darting side-to-side
 
 CARD 62  (suggested: Bagman)           [TILT-D]    ATK 24  DEF 38   (62)
-     Bonus:    +1 Hustle drop on any win (always holding)
+     Bonus:    +8% Hustle on a win, and keeps 8% even on a loss (always holding)
      Weakness: -8% DEF when the bank runs dry
      Looks:    average height, hunched, white, courier
      Art:      hunched white courier clutching a money bag to the chest
@@ -532,7 +532,7 @@ CARD 78  (suggested: Flaco)            [RUNNER]    ATK 48  DEF 12   (60)
      Art:      very skinny tall Latino kid, wife-beater, long reach, fast
 
 CARD 79  (suggested: Cash)             [TILT-D]    ATK 24  DEF 36   (60)
-     Bonus:    +1 Hustle drop on a win
+     Bonus:    +2% Hustle per win in a row, resets on a loss (riding the streak)
      Weakness: -8% DEF when broke
      Looks:    average height, slick lean, black, gold watch
      Art:      slick lean black hustler fanning a stack of bills, gold watch
@@ -598,7 +598,7 @@ CARD 89  (suggested: Mack)             [TILT-D]    ATK 26  DEF 38   (64)
      Art:      smooth older black player, fur collar, rings, easy confidence
 
 CARD 90  (suggested: Fingers)          [RUNNER]    ATK 46  DEF 12   (58)
-     Bonus:    +1 Hustle drop when the enemy is distracted round one
+     Bonus:    +12% Hustle from a win against a higher-level opponent (big pockets)
      Weakness: -15% DEF when caught
      Looks:    average height, quick-handed lean, white, sly
      Art:      quick-handed lean white thief flexing nimble fingers, sly look
@@ -652,7 +652,7 @@ CARD 98  (suggested: Spook)            [RUNNER]    ATK 48  DEF 12   (60)
      Art:      pale hooded white figure, dark circles, eerie quiet stare
 
 CARD 99  (suggested: Mo)               [TILT-A]    ATK 36  DEF 26   (62)
-     Bonus:    +1 Hustle drop on a win (mo money)
+     Bonus:    +10% Hustle from a win, doubled against a boss (mo money)
      Weakness: -8% DEF when the bank is empty
      Looks:    average height, flashy lean, black, gold everything
      Art:      flashy young black hustler making it rain, gold everything
