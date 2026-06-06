@@ -157,11 +157,11 @@ export const LEADERBOARD = [
 // collide with the legacy player-card ids (1-8) sitting in old saves. `archetype`,
 // `bonus`, `weakness` are flavor for now; they wire into combat later.
 export const CARDS_COLLECTION = [
-  { id: 101, no: 1, name: 'Lil Smoke', emoji: '🚬', avatar: '/crew-1.webp', face: '/crew-1-face.webp', rarity: 'common',
-    archetype: 'BRUISER', atk: 44, def: 18, special: 'Outnumber',
-    bonus: '+8% ATK when his crew outnumbers the enemy',
-    weakness: '-10% DEF when fighting alone',
-    bio: 'Short, wiry, hood up, blunt tucked behind the ear and smoke always curling. Hits harder when the block has his back — and folds a little when he is left holding it alone.' },
+  { id: 101, no: 1, name: 'Outcast', emoji: '🏍️', avatar: '/crew-1.webp', face: '/crew-1-face.webp', rarity: 'common',
+    archetype: 'OUTLAW', atk: 44, def: 18, special: 'Lone Wolf',
+    bonus: '+8% ATK when fighting alone',
+    weakness: '-10% ATK when his crew outnumbers the enemy',
+    bio: 'Long hair, heavy mustache, a battered leather cut with a 13 patch and gold round his neck. Rides alone and likes it that way — deadliest with nobody watching his back, and itchy the moment he is boxed in by his own crew.' },
 ]
 
 // Cards a new player starts with. Empty for the crew-card era: My Crew starts
