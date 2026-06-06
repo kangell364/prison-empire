@@ -11,7 +11,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { geoBounds, geoContains } from 'd3-geo'
-import { GRID, getBlock, subscribeBlocks, CREW_COLORS } from '../state/blocksStore'
+import { GRID, getBlock, subscribeBlocks, subscribeActivity, CREW_COLORS } from '../state/blocksStore'
 
 const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -19,6 +19,61 @@ const GOLD = '#c9a84c'
 // Zoom the turf map opens at when entering a county — a metro-wide view (your
 // trap house + surrounding turf in frame), NOT street level. Tune to taste.
 const OPEN_ZOOM = 11
+
+// --- Block shape -----------------------------------------------------------
+// Prototype: draw each block as a HEXAGON (Million Lords look) instead of the
+// uniform square grid. Flip HEX to false to restore the original squares.
+// Ownership/income are unchanged — blocks are still keyed by (gx, gy); this
+// only changes geometry + lattice, reinterpreting (gx, gy) as hex offset coords.
+const HEX = false
+// Counter Leaflet's Mercator vertical stretch so hexes read as REGULAR on
+// screen (cos of Harris County's latitude). Without this they look squashed.
+const HEX_ASPECT = Math.cos(29.76 * Math.PI / 180)
+// Center-to-corner radius in degrees. sqrt(3)*R = GRID keeps column spacing
+// (and thus block density across) identical to the old square grid.
+const HEX_R = GRID / Math.sqrt(3)
+const HEX_COL = Math.sqrt(3) * HEX_R   // lng step between columns
+const HEX_ROW = 1.5 * HEX_R * HEX_ASPECT // lat step between rows (aspect-corrected)
+// Pointy-top hex: 6 [lat,lng] corners around a center, aspect-corrected. `scale`
+// grows the ring for the soft glow underlay drawn beneath owned blocks.
+function hexCorners(cy, cx, scale = 1) {
+  const pts = []
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 180) * (60 * i - 30)
+    pts.push([cy + HEX_R * scale * Math.sin(a) * HEX_ASPECT, cx + HEX_R * scale * Math.cos(a)])
+  }
+  return pts
+}
+// [lat,lng] center of block (gx,gy) on the active lattice (hex offset or square).
+function blockCenter(gx, gy) {
+  if (HEX) return [gy * HEX_ROW, gx * HEX_COL + (Math.abs(gy % 2) ? HEX_COL / 2 : 0)]
+  return [gy * GRID + GRID / 2, gx * GRID + GRID / 2]
+}
+
+// --- Terrain tint ----------------------------------------------------------
+// Prototype: tint each VACANT block by a deterministic "terrain" so the board
+// reads as a varied honeycomb (Million Lords look) instead of uniform grey —
+// but in the game's dark palette so it doesn't fight the crime aesthetic. The
+// terrain is purely cosmetic and stable per block (same hash style the store
+// uses for owners). Owned blocks keep their crew color. Flip to false for plain.
+const TERRAIN = false
+// Prototype: the "juice" layer — a soft glow under owned hexes + a pop burst when
+// turf changes hands. This is the Million-Lords *feel* a static tint can't give.
+const JUICE = true
+// Dark, muted tiles: deep water, dim park-green, industrial tan, urban grey.
+// Weighted mostly urban so the city still reads as a city, with pockets of
+// green/water/industrial for texture.
+const TERRAINS = [
+  { p: 0.12, fill: '#1b3a5c', stroke: '#2c5680', opacity: 0.20 }, // water
+  { p: 0.30, fill: '#2e4d2e', stroke: '#3f6b3f', opacity: 0.18 }, // park / green
+  { p: 0.45, fill: '#4a3f2a', stroke: '#6b5a3a', opacity: 0.16 }, // industrial / tan
+  { p: 1.00, fill: '#3a3a4a', stroke: '#50506a', opacity: 0.10 }, // urban grey
+]
+function terrainOf(gx, gy) {
+  const h = Math.abs((Math.sin(gx * 41.17 + gy * 289.3) * 21971.7) % 1)
+  for (const t of TERRAINS) if (h < t.p) return t
+  return TERRAINS[TERRAINS.length - 1]
+}
 
 export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse, trapHouseName, onTrapHouseTap, onHouseTap, otherHouses, myUserId, raidDrive, onRaidArrive }) {
   const containerRef = useRef(null)
@@ -66,8 +121,12 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
     const draw = () => {
       if (layer) { try { map.removeLayer(layer) } catch {}; layer = null }
       const b = map.getBounds()
-      const x0 = Math.floor(b.getWest() / GRID), x1 = Math.ceil(b.getEast() / GRID)
-      const y0 = Math.floor(b.getSouth() / GRID), y1 = Math.ceil(b.getNorth() / GRID)
+      // Hex lattice: columns step by GRID in lng (= sqrt(3)*HEX_R), rows step by
+      // 1.5*HEX_R in lat (aspect-corrected). Squares step by GRID in both.
+      const COL = HEX ? Math.sqrt(3) * HEX_R : GRID
+      const ROW = HEX ? 1.5 * HEX_R * HEX_ASPECT : GRID
+      const x0 = Math.floor(b.getWest() / COL) - 1, x1 = Math.ceil(b.getEast() / COL) + 1
+      const y0 = Math.floor(b.getSouth() / ROW) - 1, y1 = Math.ceil(b.getNorth() / ROW) + 1
       // No hard zoom floor — let the count cap decide. Now that blocks are the
       // ~1.8km merged unit, a viewport holds 16× fewer, so you can pan/zoom way
       // out and still see colored turf (a generous metro-wide view). Past the cap
@@ -79,16 +138,35 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
         const blk = getBlock(gx, gy)
         if (blk.land === false) continue   // ocean / Canada / Mexico — off the board, draw nothing
         const owner = blk.owner
-        const color = owner ? (owner === 'you' ? CREW_COLORS.you : blk.color) : '#3a3a4a'
-        const w = gx * GRID, s = gy * GRID
-        const rect = L.rectangle([[s, w], [s + GRID, w + GRID]], {
-          color, weight: owner ? 1.5 : 0.5, opacity: owner ? 0.9 : 0.3,
-          fillColor: owner ? color : '#888', fillOpacity: owner ? 0.18 : 0.04, interactive: true,
-        }).addTo(layer)
-        rect.on('click', () => onBlockTapRef.current && onBlockTapRef.current(gx, gy))
+        const terr = (!owner && TERRAIN) ? terrainOf(gx, gy) : null
+        const color = owner ? (owner === 'you' ? CREW_COLORS.you : blk.color) : (terr ? terr.stroke : '#3a3a4a')
+        const [cy, cx] = blockCenter(gx, gy)
+        // Juice: a soft, color-matched glow under owned blocks (a larger blurred
+        // tile beneath) so held turf reads as "lit up", Million-Lords style. Works
+        // on either shape — a scaled hex on the hex board, a grown square otherwise.
+        if (JUICE && owner) {
+          const glowStyle = {
+            className: 'pe-hex-glow', stroke: false, fillColor: color,
+            fillOpacity: owner === 'you' ? 0.32 : 0.22, interactive: false,
+          }
+          const g = HEX
+            ? L.polygon(hexCorners(cy, cx, 1.32), glowStyle)
+            : L.rectangle([[cy - GRID * 0.66, cx - GRID * 0.66], [cy + GRID * 0.66, cx + GRID * 0.66]], glowStyle)
+          g.addTo(layer)
+        }
+        const shapeStyle = {
+          color, weight: owner ? 1.5 : 0.5, opacity: owner ? 0.9 : (terr ? 0.45 : 0.3),
+          fillColor: owner ? color : (terr ? terr.fill : '#888'),
+          fillOpacity: owner ? 0.18 : (terr ? terr.opacity : 0.04), interactive: true,
+        }
+        const shape = HEX
+          ? L.polygon(hexCorners(cy, cx), shapeStyle)
+          : L.rectangle([[cy - GRID / 2, cx - GRID / 2], [cy + GRID / 2, cx + GRID / 2]], shapeStyle)
+        shape.addTo(layer)
+        shape.on('click', () => onBlockTapRef.current && onBlockTapRef.current(gx, gy))
         if (owner && showIcons) {
           const npc = L.divIcon({ className: '', iconSize: [28, 36], iconAnchor: [14, 30], html: `<div style="text-align:center"><div style="width:24px;height:24px;border-radius:50%;background:${color};border:2px solid #0a0a0f;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,.7);margin:0 auto">🕴️</div></div>` })
-          L.marker([s + GRID / 2, w + GRID / 2], { icon: npc })
+          L.marker([cy, cx], { icon: npc })
             .on('click', () => onBlockTapRef.current && onBlockTapRef.current(gx, gy)).addTo(layer)
         }
       }
@@ -97,6 +175,27 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
     const unsub = subscribeBlocks(draw)   // redraw when blocks change
     draw()
     return () => { map.off('moveend zoomend', draw); unsub(); if (layer) { try { map.removeLayer(layer) } catch {} } }
+  }, [])
+
+  // Juice: claim-burst pop. When turf changes hands, drop a one-shot animated
+  // marker on that hex — gold "＋" when YOU take it, red "✕" when a rival takes
+  // yours. Decoupled from the grid redraw so the pop plays cleanly then removes
+  // itself. Fed by the block store's activity bus (recruit / poach / raid).
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !JUICE) return
+    return subscribeActivity(ev => {
+      if (!ev || (ev.mine !== true && ev.tookFromMe !== true)) return
+      const mine = ev.mine === true
+      const col = mine ? CREW_COLORS.you : '#e74c3c'
+      const [lat, lng] = blockCenter(ev.gx, ev.gy)
+      const icon = L.divIcon({
+        className: '', iconSize: [64, 64], iconAnchor: [32, 32],
+        html: `<div class="pe-claim-burst" style="--c:${col}"><span class="ring"></span><span class="core">${mine ? '＋' : '✕'}</span></div>`,
+      })
+      const m = L.marker([lat, lng], { icon, interactive: false, zIndexOffset: 1500 }).addTo(map)
+      setTimeout(() => { try { map.removeLayer(m) } catch {} }, 950)
+    })
   }, [])
 
   // Your gang's Trap House — a single marker at your home turf. Tap it to open
