@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { CARDS_COLLECTION, RARITY_COLORS } from '../data/gameData'
-import { Avatar } from '../components/Avatar'
+import { Avatar, CARD_TILE_ART } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { sfx } from '../sounds'
 import { CrewBattleModal } from '../components/CrewBattleModal'
@@ -134,7 +134,7 @@ export default function Crew() {
       <div className="section">
         <div className="section-label">Crew Members</div>
         <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8,
+          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
         }}>
           {memberCards.map((c, i) => (
             <MemberTile
@@ -267,7 +267,7 @@ function LeaderTile({ card, upgrades, onClick }) {
       display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer',
     }}>
       <div style={{ position: 'relative' }}>
-        <Avatar src={card.avatar} emoji={card.emoji} size={72} radius={12} />
+        <Avatar src={card.face || card.avatar} emoji={card.emoji} size={CARD_TILE_ART} radius={12} />
         <div style={{
           position: 'absolute', top: -6, right: -6,
           background: GOLD, color: '#0a0a0f',
@@ -299,7 +299,7 @@ function MemberTile({ card, upgrades, onClick }) {
         borderRadius: 12, padding: '16px 8px',
         color: DIM, fontSize: 11, fontWeight: 500,
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        minHeight: 110,
+        minHeight: CARD_TILE_ART + 70,
       }}>
         <i className="ti ti-plus" style={{ fontSize: 22, marginBottom: 4 }} />
         Add
@@ -320,7 +320,7 @@ function MemberTile({ card, upgrades, onClick }) {
         height: 3, background: ringColor,
       }} />
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: 6, marginBottom: 4 }}>
-        <Avatar src={card.avatar} emoji={card.emoji} size={44} radius={8} />
+        <Avatar src={card.face || card.avatar} emoji={card.emoji} size={CARD_TILE_ART} radius={10} />
       </div>
       <div style={{
         color: '#fff', fontSize: 10, fontWeight: 500,

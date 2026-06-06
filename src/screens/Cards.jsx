@@ -25,7 +25,7 @@ import {
   PLANT_YIELD_PER_LEVEL, PLANT_UPGRADE_COST, MAX_PLANT_UPGRADE_LEVEL,
 } from '../state/plantUpgradesStore'
 import { sfx } from '../sounds'
-import { Avatar } from '../components/Avatar'
+import { Avatar, CARD_TILE_ART } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import Crew from './Crew'
 import SkillLoadout from './SkillLoadout'
@@ -532,9 +532,9 @@ function MergeRevealModal({ card, toLevel, onDone }) {
 // where upgrades and the MERGE action live.
 // `inCrew` dims the tile and shows an IN CREW badge so you can see at a
 // glance which cards are slotted vs. on the bench.
-// Tile art size — the picture (and its stack-back layers). The collection grid
-// is 2 columns, so tiles are wide enough for a big portrait.
-const ART_SIZE = 120
+// Tile art size — the picture (and its stack-back layers). Shared with My Crew
+// so a placed card shows the same size picture as in the collection.
+const ART_SIZE = CARD_TILE_ART
 
 function CollectionTile({ card, cardLevel, count, inCrew, upgradeTotal, onTap }) {
   const rarityColor = RARITY_COLORS[card.rarity]

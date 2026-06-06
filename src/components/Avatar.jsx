@@ -1,5 +1,11 @@
 import React from 'react'
 
+// Shared tile-art size for card pictures — used by the Cards collection tiles
+// and the My Crew slots so a placed card shows the same size picture as it does
+// in the collection. Lives here (a neutral module both screens import) to keep
+// them in sync without a circular Cards <-> Crew import.
+export const CARD_TILE_ART = 120
+
 // Renders a player avatar — image if `src` is set, otherwise the emoji
 // fallback. Standard sizing + styling so all the places that show a
 // character look consistent (and adding artwork to a new character is
