@@ -309,7 +309,7 @@ export default function MapScreen({ onNavigate }) {
   const [turfView, setTurfView] = useState(null)            // Map 2 (turf map): { center:[lat,lng], label }
   const [blockSel, setBlockSel] = useState(null)            // tapped block { gx, gy }
   const [houseSel, setHouseSel] = useState(null)            // tapped rival trap house (shared-world house row)
-  const [carDrive, setCarDrive] = useState(null)            // attack-car animation { id, from:{lat,lng}, to:{lat,lng} }
+  const [carDrive, setCarDrive] = useState(null)            // attack-car animation { id, from:{lat,lng}, to:{lat,lng}, startedAt, endsAt }
   const carIdRef = useRef(0)
   const [selectedFacility, setSelectedFacility] = useState(null)
   const [relocating, setRelocating] = useState(false)       // picking a relocate target
@@ -362,9 +362,19 @@ export default function MapScreen({ onNavigate }) {
     for (const r of all) {
       if (carPlayedFor.current.has(r.id)) continue
       carPlayedFor.current.add(r.id)
-      if (Date.now() - new Date(r.started_at).getTime() > 20000) continue   // stale (reload) — don't replay
+      const startedAt = r.started_at ? new Date(r.started_at).getTime() : null
+      const endsAt    = r.ends_at    ? new Date(r.ends_at).getTime()    : null
+      // The car is now SYNCED to the raid timer (drives the whole countdown), so
+      // an in-flight raid should still show — only skip ones that already landed
+      // (nothing left to drive). The car resumes at its correct mid-flight spot.
+      if (endsAt && Date.now() >= endsAt) continue
       carIdRef.current += 1
-      setCarDrive({ id: carIdRef.current, from: houseSpotFor(r.attacker_id), to: houseSpotFor(r.defender_id) })
+      setCarDrive({
+        id: carIdRef.current,
+        from: houseSpotFor(r.attacker_id),
+        to: houseSpotFor(r.defender_id),
+        startedAt, endsAt,
+      })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeRaids])
