@@ -423,7 +423,7 @@ function CardPicker({ benchCards, upgrades, onPick, onCancel }) {
                   height: 3, background: ringColor,
                 }} />
                 <div style={{ display: 'flex', justifyContent: 'center', marginTop: 6 }}>
-                  <Avatar src={card.avatar} emoji={card.emoji} size={56} radius={10} />
+                  <Avatar src={card.face || card.avatar} emoji={card.emoji} size={56} radius={10} />
                 </div>
                 <div style={{
                   color: '#fff', fontSize: 12, fontWeight: 500,
