@@ -27,7 +27,17 @@ adds the most popular mobile-RPG retention mechanic.
   separate packs per pool.
 - Pair with **daily login rewards + daily quests** (separate item) for retention.
 
-**Status:** not started.
+**Status:** PARTIAL (2026-06-07). Shipped the free-pack slice: a **Commissary
+Pack** (art: `public/pack-front.webp` / `pack-back.webp`) free every 24h, with a
+live countdown + auto-deposit into a stash, an inventory grid under Cards / the
+Store, and a black-screen spin-open (pack flips front↔back, accelerating →
+bursts → reveals 5 cards). This is a **common crew pack**: 5 fully-random pulls
+from `CARDS_COLLECTION.filter(rarity === 'common')` (auto-grows as commons are
+added), landing in `cardsStore`. State in `src/state/packsStore.js`; whole flow
+in `src/components/CommissaryPack.jsx`.
+Still open: **currency-cost pulls** (Hustle/Steel sink), **rarity-weighted odds**
+(uncommon→legendary) with odds surfaced, **skill + plant pack pools**, and a
+premium tier.
 
 ---
 
