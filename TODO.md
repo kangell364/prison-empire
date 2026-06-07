@@ -46,7 +46,9 @@ premium tier.
 - Seasonal PvP ladder with rewards (forcing function for PvP).
 - Ship territory / gang war (currently a stub; biggest "Empire" payoff).
 - Prestige / rebirth for endgame multipliers.
-- Daily login rewards + daily quest list (retention; pairs with the pull system).
+- Daily login rewards DONE (2026-06-07): 7-day streak on Home (auto-pop
+  calendar; Days 1-6 scaling Hustle, Day 7 = Commissary Pack; reset on miss).
+  `dailyBonusStore` + `DailyBonus.jsx`. STILL OPEN: daily quest list.
 
 ## Economy security (prerequisite for any player-to-player trading)
 **The client cannot be trusted — app-store wrapping does NOT prevent duping.** The
