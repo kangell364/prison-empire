@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { CARDS_COLLECTION, RARITY_COLORS } from '../data/gameData'
 import { addCards } from '../state/cardsStore'
 import { usePacks, accrueNow, msUntilNextFree, openOnePack, devFillPacks, MAX_STORED } from '../state/packsStore'
+import { isDevMode } from '../devMode'
 import { sfx } from '../sounds'
 import { Avatar } from './Avatar'
 
@@ -145,11 +146,15 @@ function PackInventoryModal({ onClose }) {
             ? 'Stash full — open one to restart the free timer.'
             : <>Next free pack in <span style={{ color: '#c9a84c' }}>{fmtCountdown(remaining)}</span></>}
         </div>
-        {/* DEV ONLY — load a full stash for testing. Remove before release. */}
-        <button onClick={() => { sfx.tap?.(); devFillPacks() }} style={{
-          flexShrink: 0, background: '#1e1e2a', border: '0.5px solid #2a2a3a', color: '#888',
-          fontSize: 11, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
-        }}>+{MAX_STORED} (dev)</button>
+        {/* DEV ONLY — load a full stash for testing. Gated by isDevMode() so
+            normal players never see it (on by default on localhost; ?dev=1 on
+            the live site). */}
+        {isDevMode() && (
+          <button onClick={() => { sfx.tap?.(); devFillPacks() }} style={{
+            flexShrink: 0, background: '#1e1e2a', border: '0.5px solid #2a2a3a', color: '#888',
+            fontSize: 11, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
+          }}>+{MAX_STORED} (dev)</button>
+        )}
       </div>
 
       {unopened === 0 ? (
