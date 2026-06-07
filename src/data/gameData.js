@@ -807,8 +807,8 @@ export const PLANTS = [
     category: 'Strain',
     minLevel: 1,
     maxLevel: 100,
-    perLevelYield: 8,                 // +8 stash units per card level
-    baseCashValue: 25,                // $ at Lvl 1; doubles every card level
+    perLevelYield: 1,                 // +1 stash unit per card level
+    baseCashValue: 10,                // $ at Lvl 1; doubles every card level
     starter: true,                    // granted to every player (seed + backfill)
     jarColor: '#8e44ad',              // colour of this strain's packed jar (Trap House packing room)
     grow: '/plant.webp',              // the potted-plant art shown growing on the bench
@@ -825,8 +825,8 @@ export const PLANTS = [
     category: 'Strain',
     minLevel: 1,
     maxLevel: 100,
-    perLevelYield: 8,                 // same stats as PURPLE HAZE
-    baseCashValue: 25,
+    perLevelYield: 1,                 // same stats as PURPLE HAZE
+    baseCashValue: 10,
     starter: true,
     jarColor: '#d9a528',              // amber/gold jar
     grow: '/plant-golden-mist.webp',
@@ -843,8 +843,8 @@ export const PLANTS = [
     category: 'Strain',
     minLevel: 1,
     maxLevel: 100,
-    perLevelYield: 8,                 // same stats as PURPLE HAZE
-    baseCashValue: 25,
+    perLevelYield: 1,                 // same stats as PURPLE HAZE
+    baseCashValue: 10,
     starter: true,
     jarColor: '#c0392b',              // red jar
     grow: '/plant-red-dawn.webp',
@@ -853,7 +853,7 @@ export const PLANTS = [
 ]
 
 // Cash value of a plant card at a given card level — starts at baseCashValue
-// and DOUBLES each level (Lvl 1 = $25, Lvl 2 = $50, Lvl 3 = $100, …).
+// and DOUBLES each level (Lvl 1 = $10, Lvl 2 = $20, Lvl 3 = $40, …).
 export function plantCashValue(plant, level = 1) {
   return (plant?.baseCashValue || 0) * Math.pow(2, Math.max(0, level - 1))
 }

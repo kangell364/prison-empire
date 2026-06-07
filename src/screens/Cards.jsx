@@ -1002,7 +1002,7 @@ function PlantCollection({ filter, upgradeMap, onTapPlant }) {
 function PlantTile({ plant, cardLevel, count, yieldUpgrade = 0, onTap }) {
   const rarityColor = RARITY_COLORS[plant.rarity] || '#c9a84c'
   const effYield    = plant.perLevelYield + yieldUpgrade * PLANT_YIELD_PER_LEVEL
-  const cash        = plantCashValue(plant, cardLevel)   // $25 at Lvl 1, doubles each level
+  const cash        = plantCashValue(plant, cardLevel)   // $10 at Lvl 1, doubles each level
   const fullStacks  = Math.floor(count / PLANT_STACK_SIZE)
   const remainder   = count % PLANT_STACK_SIZE
   const stackLabel  = fullStacks > 0

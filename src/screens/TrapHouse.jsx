@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { sfx } from '../sounds'
 import { PLANTS, plantCashValue, RARITY_COLORS } from '../data/gameData'
 import { getOwnedPlantTuples } from '../state/plantCardsStore'
+import { getPlantUpgrade, PLANT_YIELD_PER_LEVEL } from '../state/plantUpgradesStore'
 import { setRoomBank } from '../state/roomBankStore'
 import { useActiveRaids } from '../state/raidsStore'
 import { Avatar } from '../components/Avatar'
@@ -41,6 +42,18 @@ const OFFLINE_CAP_MS = 8 * 60 * 60 * 1000   // credit at most 8h of time away
 const BUD_PER_PLANT_SECS = 25.6              // one bud per plant every ~25.6s (matches BUD_SECS)
 const MACHINE_MS = 2000                      // machine pops one jar per strain every 2s
 const plantsOnTable = (table, planted) => planted.filter(id => id.startsWith(`T${table}-`)).length
+
+// Raw product ONE bud of this strain is worth — the card's YIELD stat. Matches the
+// "YIELD / LV" tile in the card detail: (base perLevelYield + each upgrade's +3) × the
+// card's level. So a higher-yield (or upgraded, or merged) strain packs more product
+// into every bud → more jars → more cash, while the bud-drop rate itself is unchanged.
+function budYield(plantId, cardLevel = 1) {
+  const plant = PLANTS.find(p => p.id === plantId)
+  if (!plant) return 1
+  const up = getPlantUpgrade(plantId, cardLevel).yield || 0
+  const perLevel = (plant.perLevelYield || 0) + up * PLANT_YIELD_PER_LEVEL
+  return Math.max(1, perLevel * (cardLevel || 1))
+}
 
 // ---- Sales economy ---------------------------------------------------
 // REPUTATION (0–100) is one shop-wide number. Good sales raise it, gouging and empty
@@ -259,7 +272,9 @@ export default function TrapHouse({ onBack, isOwner = true }) {
         return setTimeout(() => {
           const id = tableCardsRef.current[tbl]
           const n = budCountsRef.current[tbl] || 0
-          if (id && n) carryRef.current[id] = (carryRef.current[id] || 0) + n
+          // Each bud is worth the strain's YIELD in raw product (see budYield) — the
+          // grow counter tracks BUDS, but the monkey hauls buds × yield into packing.
+          if (id && n) carryRef.current[id] = (carryRef.current[id] || 0) + n * budYield(id, cardLevelsRef.current[id] || 1)
           budCountsRef.current = { ...budCountsRef.current, [tbl]: 0 }  // empty (sync) so advanceNow sees 0
           setBudCounts(c => ({ ...c, [tbl]: 0 }))                   // empty the grow counter on pass
           setBudResync(r => r + 1)                                  // re-lock belt-bud phase to 0
