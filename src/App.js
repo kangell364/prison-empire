@@ -132,15 +132,6 @@ export default function App() {
 
   return (
     <div className="phone-shell">
-      {/* Status Bar */}
-      <div className="status-bar">
-        <span className="status-time">9:41</span>
-        <div className="status-icons">
-          <i className="ti ti-wifi" aria-hidden="true" />
-          <i className="ti ti-battery-2" aria-hidden="true" />
-        </div>
-      </div>
-
       {/* Header */}
       <div className="app-header">
         <div className="game-logo">PRISON EMPIRE</div>

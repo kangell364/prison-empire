@@ -67,14 +67,6 @@ body {
   }
 }
 
-/* Hide the fake "9:41" status bar on ANY touch device — it's a desktop-only
-   design preview element. Real phones either show the OS status bar (in
-   standalone PWA) or the browser chrome (in-browser), so the fake bar is
-   wasted vertical space and was making the home screen feel oversized. */
-@media (pointer: coarse) {
-  .status-bar { display: none; }
-}
-
 /* When installed as PWA, respect safe-area insets so content isn't clipped
    by the notch / home indicator. */
 @media (display-mode: standalone) {
@@ -85,19 +77,6 @@ body {
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
-
-/* Status Bar */
-.status-bar {
-  height: 44px;
-  padding: 0 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--bg-primary);
-  flex-shrink: 0;
-}
-.status-time { color: #fff; font-size: 15px; font-weight: 500; }
-.status-icons { display: flex; gap: 6px; align-items: center; color: #fff; font-size: 14px; }
 
 /* Header */
 .app-header {
