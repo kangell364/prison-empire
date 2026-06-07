@@ -1547,7 +1547,7 @@ function DustRoom({ art }) {
             keeps her ABOVE the backdrop but BELOW the table (z1) and dust piles (z2),
             so the table occludes her lower body and she reads as standing behind it. */}
         <img src="/barbie.webp" alt="" aria-hidden
-          style={{ position: 'absolute', left: '50%', top: '70%', transform: 'translate(-50%, -100%)',
+          style={{ position: 'absolute', left: '50%', top: '80%', transform: 'translate(-50%, -100%)',
             width: '15%', zIndex: 0, pointerEvents: 'none',
             filter: 'drop-shadow(0 6px 10px rgba(0,0,0,0.5))' }} />
         {/* Layer 2 — the table, kept as its own overlay so it can be moved or
