@@ -1638,6 +1638,23 @@ function DustRoom({ art }) {
         <img src="/dust.webp" alt="" aria-hidden
           style={{ position: 'absolute', left: '70%', top: '54%', transform: 'translate(-50%, -100%)',
             width: '17%', zIndex: 2, pointerEvents: 'none', filter: 'drop-shadow(0 4px 5px rgba(0,0,0,0.5))' }} />
+        {/* A "Pixie Dust" counter in front of each pile (left 30/50/70). Static 0
+            for now — the dust economy isn't wired yet; ready to bind a real tally. */}
+        {[30, 50, 70].map(lx => (
+          <div key={`pd${lx}`} style={{ position: 'absolute', left: `${lx}%`, top: '57%',
+            transform: 'translate(-50%, 0)', zIndex: 5, pointerEvents: 'none',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <span style={{ color: '#fff', fontSize: 8, fontWeight: 800, letterSpacing: 0.6,
+              background: 'rgba(10,8,14,0.78)', borderRadius: 4, padding: '1px 6px',
+              textShadow: '0 1px 2px #000', whiteSpace: 'nowrap' }}>Pixie Dust</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4,
+              background: 'rgba(10,8,14,0.82)', border: '1px solid #b06ad066', borderRadius: 999,
+              padding: '2px 8px', boxShadow: '0 2px 7px rgba(0,0,0,0.55)' }}>
+              <i className="ti ti-sparkles" style={{ color: '#d9a8ee', fontSize: 12 }} />
+              <span style={{ color: '#d9a8ee', fontWeight: 900, fontSize: 13, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>0</span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
