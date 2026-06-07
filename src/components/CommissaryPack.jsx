@@ -337,7 +337,7 @@ function RevealedDeckSummary({ cards, onAccept }) {
             }}>
               <div style={{ height: 2, background: color, borderRadius: 1, marginBottom: 8 }} />
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
-                <Avatar src={c.avatar} emoji={c.emoji} size={42} radius={6} />
+                <Avatar src={c.face || c.avatar} emoji={c.emoji} size={42} radius={6} />
               </div>
               <div style={{ color: '#fff', fontSize: 11, fontWeight: 500, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
               <div style={{ color, fontSize: 9, textAlign: 'center', textTransform: 'capitalize', marginTop: 2 }}>{c.rarity}</div>
@@ -386,7 +386,7 @@ function RevealedCard({ card, rarityColor, onAccept, cta = 'Add to Collection' }
         animation: 'cardRevealBounce 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
         filter: `drop-shadow(0 0 14px ${rarityColor})`, display: 'flex', justifyContent: 'center',
       }}>
-        <Avatar src={card.avatar} emoji={card.emoji} size={180} radius={21} />
+        <Avatar src={card.face || card.avatar} emoji={card.emoji} size={180} radius={21} />
       </div>
 
       <div style={{ height: 3, background: rarityColor, borderRadius: 2, margin: '8px auto 16px', width: 80, opacity: 0, animation: 'logLineIn 0.4s ease 0.5s forwards' }} />
