@@ -108,6 +108,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   const raids = useActiveRaids()
   const underAttack = (raids.incoming?.length || 0) > 0
   const [room, setRoom] = useState(0)
+  const [menuOpen, setMenuOpen] = useState(false)   // MENU price editor — rendered at the top level so it overlays gnomes + chrome
   const [land, setLand] = useState(isLandscape())
   const [rotated, setRotated] = useState(false)  // manual CSS rotate (works even with iOS orientation-lock on)
   // Persisted operating state — lazy-loaded from localStorage so the line resumes.
@@ -332,15 +333,26 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   const roomRef = useRef(room)
   useEffect(() => { roomRef.current = room }, [room])
   const idleTsRef = useRef(typeof saved.lastSaleTs === 'number' ? saved.lastSaleTs : Date.now())
+  // Tally of jars + cash sold by the idle engine while you were OUT of the shop, so
+  // the Shop Front can pop a "sold while you were away" recap when you walk back.
+  const awaySalesRef = useRef({ jars: 0, cash: 0 })
+  const [awaySummary, setAwaySummary] = useState(null)
   const accrueIdleSales = useCallback(() => {
     const now = Date.now()
-    let elapsed = Math.min(now - idleTsRef.current, SALES_OFFLINE_CAP_MS)
-    idleTsRef.current = now
+    const rawGap = now - idleTsRef.current
+    let elapsed = Math.min(rawGap, SALES_OFFLINE_CAP_MS)
     if (elapsed <= 0) return
-    let nCust = Math.min(2000, Math.floor((elapsed / 1000) * (demandPerMin(repRef.current) / 60)))
+    const ratePerSec = demandPerMin(repRef.current) / 60
+    let nCust = Math.min(2000, Math.floor((elapsed / 1000) * ratePerSec))
+    // Demand is only a few customers per MINUTE, so a single 3s poll usually rounds
+    // to zero. Don't advance the clock until at least one customer's worth of time
+    // has actually elapsed — otherwise that sub-customer remainder is discarded every
+    // tick and idle sales never fire while you watch another room. When over the cap
+    // it's an offline catch-up: jump straight to now.
     if (nCust <= 0) return
+    idleTsRef.current = rawGap > SALES_OFFLINE_CAP_MS ? now : idleTsRef.current + (nCust / ratePerSec) * 1000
     const jc = { ...jarCountsRef.current }
-    let bankGain = 0, repAccum = 0
+    let bankGain = 0, repAccum = 0, jarsSold = 0
     for (let i = 0; i < nCust; i++) {
       const inStock = Object.keys(jc).filter(id => Math.floor(jc[id] || 0) >= 1)
       if (!inStock.length) { repAccum += REP_DELTA.nostock; continue }
@@ -353,11 +365,14 @@ export default function TrapHouse({ onBack, isOwner = true }) {
       if (Math.random() < acceptProb(price / street)) {
         const qty = Math.min(rollBasket(), Math.floor(jc[best] || 0))
         jc[best] = Math.floor(jc[best] || 0) - qty
-        bankGain += price * qty
+        bankGain += price * qty; jarsSold += qty
         repAccum += price <= street * 1.05 ? REP_DELTA.happy : REP_DELTA.grumble
       } else { repAccum += REP_DELTA.refuse }
     }
-    if (bankGain > 0) setBank(b => b + bankGain)
+    if (bankGain > 0) {
+      setBank(b => b + bankGain)
+      awaySalesRef.current = { jars: awaySalesRef.current.jars + jarsSold, cash: awaySalesRef.current.cash + bankGain }
+    }
     jarCountsRef.current = jc; setJarCounts(jc)
     if (repAccum) adjustRep(Math.max(-8, Math.min(8, repAccum * 0.15)))   // dampen the aggregate swing
   }, [adjustRep])
@@ -371,6 +386,18 @@ export default function TrapHouse({ onBack, isOwner = true }) {
     document.addEventListener('visibilitychange', onVis)
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
   }, [accrueIdleSales])
+
+  // When you arrive at the Shop Front, recap anything the idle engine sold while
+  // you were in the back rooms (or away), then clear the tally. Auto-dismisses.
+  useEffect(() => {
+    if (room !== 0) return
+    const { jars, cash } = awaySalesRef.current
+    if (jars <= 0) return
+    awaySalesRef.current = { jars: 0, cash: 0 }
+    setAwaySummary({ jars, cash: Math.round(cash) })
+    const t = setTimeout(() => setAwaySummary(null), 5000)
+    return () => clearTimeout(t)
+  }, [room])
 
   // HOT STRAIN: every few minutes a random planted strain trends (popularity 1.6×),
   // so it sells faster and front-faces more shelf space. Recomputed on mount + timer.
@@ -516,13 +543,31 @@ export default function TrapHouse({ onBack, isOwner = true }) {
         </div>
       )}
 
+      {/* "Sold while you were away" recap — idle sales banked in the back rooms. */}
+      {cur.key === 'shop' && awaySummary && (
+        <div onClick={() => setAwaySummary(null)} style={{
+          position: 'absolute', top: 'calc(48px + env(safe-area-inset-top))',
+          left: '50%', transform: 'translateX(-50%)', zIndex: 6, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap',
+          background: 'rgba(26,21,16,0.94)', border: `1px solid ${GOLD}`,
+          borderRadius: 12, padding: '8px 14px',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.55)', animation: 'logLineIn 0.3s ease both',
+        }}>
+          <i className="ti ti-cash-register" style={{ color: GOLD, fontSize: 16 }} />
+          <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>
+            Sold {awaySummary.jars} jar{awaySummary.jars === 1 ? '' : 's'} while you were away
+            <span style={{ color: GOLD, marginLeft: 6 }}>+${awaySummary.cash.toLocaleString()}</span>
+          </span>
+        </div>
+      )}
+
       {/* Room fills the whole screen as a backdrop — so it grows to fill the
           display when the phone is turned sideways. Controls float on top.
           zIndex:0 makes this its own stacking context, so the monkey's high
           z-index keeps him above the room art/counters but still under the UI
           chrome (top bar, arrows) that floats over everything. */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-        {cur.key === 'shop' && <ShopFront art={cur.art} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} prices={prices} popularity={popularity} rep={rep} onSetPrice={setStrainPrice} onSell={sellJar} />}
+        {cur.key === 'shop' && <ShopFront art={cur.art} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} prices={prices} popularity={popularity} rep={rep} onSetPrice={setStrainPrice} onSell={sellJar} onOpenMenu={() => setMenuOpen(true)} />}
         {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} packCounts={packCounts} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} />}
         {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} budResync={budResync} onBudLand={advanceNow} tableCards={tableCards} cardLevels={cardLevels} onAdd={setPicking} onUproot={uprootTable} skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} />}
         {cur.key === 'dust' && <DustRoom art={cur.art} />}
@@ -593,6 +638,16 @@ export default function TrapHouse({ onBack, isOwner = true }) {
           </div>
         )}
       </div>
+
+      {/* MENU price editor — rendered here at the top level (not inside ShopFront's
+          z:0 room backdrop) so its dim overlay sits ABOVE the customers/gnomes (incl.
+          leaving ones at z50) and all the floating chrome. Shop room only. */}
+      {menuOpen && cur.key === 'shop' && (
+        <MenuEditor
+          placedIds={[...new Set(Object.values(tableCards))].filter(id => PLANTS.find(p => p.id === id))}
+          cardLevels={cardLevels} prices={prices} popularity={popularity}
+          onSetPrice={setStrainPrice} onClose={() => setMenuOpen(false)} />
+      )}
 
       {/* Grow Card picker — opens from a box's "+ Add" slot; picking a card
           plants it in that table's first (P4) slot. */}
@@ -709,8 +764,7 @@ const BEG_DIALOG = [
   { who: 'bum',    text: "Y'all trash anyway! 😤", ms: 2000 },
 ]
 
-function ShopFront({ art, jarCounts = {}, tableCards = {}, cardLevels = {}, prices = {}, popularity = {}, rep = 50, onSetPrice, onSell }) {
-  const [menuOpen, setMenuOpen] = useState(false)
+function ShopFront({ art, jarCounts = {}, tableCards = {}, cardLevels = {}, prices = {}, popularity = {}, rep = 50, onSetPrice, onSell, onOpenMenu }) {
   // One tinted jar per banked unit, in the order strains were planted, capped at
   // the shelf's slot count so the stock never overflows the cabinet.
   const placedIds = [...new Set(Object.values(tableCards))].filter(id => PLANTS.find(p => p.id === id))
@@ -821,7 +875,7 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, cardLevels = {}, pric
             A bold pulsing gold outline frames the board + a bobbing "Set Prices"
             chip below it, so it's obvious you can tap it. Always shown (drawing the
             eye to the sign) regardless of whether strains are placed yet. */}
-        <button onClick={() => setMenuOpen(true)} aria-label="Edit menu prices"
+        <button onClick={onOpenMenu} aria-label="Edit menu prices"
           style={{ position: 'absolute', left: '28.4%', top: '18.8%', width: '10.6%', height: '26%',
             zIndex: 6, background: 'transparent', border: 'none', cursor: 'pointer' }} />
         {/* Pulsing outline ring (decorative; clicks pass through to the button under it). */}
@@ -829,7 +883,7 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, cardLevels = {}, pric
           zIndex: 6, border: `2px solid ${GOLD}`, borderRadius: 5, pointerEvents: 'none',
           animation: 'menuGlow 1.5s ease-in-out infinite' }} />
         {/* Hint chip moved to top-center, just under the bank / top bar. */}
-        <div onClick={() => setMenuOpen(true)}
+        <div onClick={onOpenMenu}
           style={{ position: 'absolute', left: '50%', top: '2.5%', transform: 'translate(-50%, 0)',
             zIndex: 7, cursor: 'pointer', whiteSpace: 'nowrap',
             background: GOLD, color: '#1a1206', fontSize: 10, fontWeight: 900, letterSpacing: 0.5,
@@ -839,11 +893,6 @@ function ShopFront({ art, jarCounts = {}, tableCards = {}, cardLevels = {}, pric
           <i className="ti ti-tag" style={{ fontSize: 11 }} /> Set Prices
         </div>
       </div>
-
-      {menuOpen && (
-        <MenuEditor placedIds={placedIds} cardLevels={cardLevels} prices={prices} popularity={popularity}
-          onSetPrice={onSetPrice} onClose={() => setMenuOpen(false)} />
-      )}
     </div>
   )
 }
@@ -1548,7 +1597,7 @@ function DustRoom({ art }) {
             so the table occludes her lower body and she reads as standing behind it. */}
         <img src="/barbie.webp" alt="" aria-hidden
           style={{ position: 'absolute', left: '50%', top: '70%', transform: 'translate(-50%, -100%)',
-            width: '14.16%', zIndex: 0, pointerEvents: 'none',
+            width: '12%', zIndex: 0, pointerEvents: 'none',
             filter: 'drop-shadow(0 6px 10px rgba(0,0,0,0.5))' }} />
         {/* Layer 2 — the table, kept as its own overlay so it can be moved or
             swapped independently of the backdrop. Top edge sits ~25% up the back
