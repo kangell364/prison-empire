@@ -124,7 +124,7 @@ export default function App() {
       case 'gang':     return <Gang onBack={() => setScreen('home')} onNavigate={navigateTo} />
       case 'traphouse': return <TrapHouse onBack={() => setScreen(trapFrom)} />
       case 'nurse':    return <Nurse onBack={() => setScreen('home')} />
-      case 'chat':     return <ChatScreen />
+      case 'chat':     return <ChatScreen onNavigate={navigateTo} />
       case 'profile':  return <Profile onBack={() => setScreen('home')} initialTab={profileTab} accountOnly={profileAccountOnly} />
       default:         return <Dashboard onNavigate={navigateTo} />
     }
