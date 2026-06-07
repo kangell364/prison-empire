@@ -524,7 +524,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
         {cur.key === 'shop' && <ShopFront art={cur.art} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} prices={prices} popularity={popularity} rep={rep} onSetPrice={setStrainPrice} onSell={sellJar} />}
         {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} packCounts={packCounts} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} />}
-        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} budResync={budResync} onBudLand={advanceNow} tableCards={tableCards} onAdd={setPicking} onUproot={uprootTable} skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} />}
+        {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} budResync={budResync} onBudLand={advanceNow} tableCards={tableCards} cardLevels={cardLevels} onAdd={setPicking} onUproot={uprootTable} skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} />}
         {cur.key === 'dust' && <DustRoom art={cur.art} />}
       </div>
 
@@ -1574,7 +1574,7 @@ function DustRoom({ art }) {
   )
 }
 
-function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBudLand, tableCards = {}, onAdd, onUproot, skatePhase = 'idle', skateStart = 0, onSkateClick }) {
+function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBudLand, tableCards = {}, cardLevels = {}, onAdd, onUproot, skatePhase = 'idle', skateStart = 0, onSkateClick }) {
   // Which table is pending an uproot confirmation (null = none). Clicking the
   // trash opens a "are you sure?" prompt instead of clearing the table outright.
   const [confirmUproot, setConfirmUproot] = useState(null)
@@ -1693,8 +1693,13 @@ function GrowRoom({ planted, bank, onPlace, budCounts = {}, budResync = 0, onBud
         {[1, 2, 3].map(tbl => {
           if (!planted.some(id => id.startsWith(`T${tbl}-`))) return null
           const [x0, x1, yTop] = BINS[tbl]
-          const n = Math.floor(budCounts[tbl] || 0)   // wall-clock truth; a bud lands as it ticks
-          const strain = PLANTS.find(p => p.id === tableCards[tbl])
+          // budCounts is the raw bud tally (drives the drop animation + haul). The
+          // counter SHOWS the yielded total — buds × the card's YIELD/LV (budYield) —
+          // so a +1 strain reads 1 per bud and a +7 strain reads 7 per bud. The haul
+          // already multiplies by the same yield, so packing/cash stay in sync.
+          const cardId = tableCards[tbl]
+          const n = Math.floor(budCounts[tbl] || 0) * budYield(cardId, cardLevels[cardId] || 1)
+          const strain = PLANTS.find(p => p.id === cardId)
           return (
             <div key={`cnt${tbl}`} style={{
               position: 'absolute', left: `${(x0 + x1) / 2}%`, top: `${yTop}%`,
