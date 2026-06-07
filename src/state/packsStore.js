@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react'
 
 const STORAGE_KEY   = 'pe_packs_v1'
 export const FREE_PERIOD_MS = 24 * 60 * 60 * 1000   // one free pack per 24h
-export const MAX_STORED      = 5                     // stash cap for auto-granted packs
+export const MAX_STORED      = 20                    // stash cap for auto-granted packs
 
 let state = readInitial()
 const listeners = new Set()
@@ -65,6 +65,12 @@ export function openOnePack() {
   const wasFull = state.unopened >= MAX_STORED
   commit({ unopened: state.unopened - 1, lastGrant: wasFull ? Date.now() : state.lastGrant })
   return true
+}
+
+// DEV ONLY — fill the stash up to the cap for testing the open flow. Remove the
+// button that calls this (and optionally this fn) before a real release.
+export function devFillPacks() {
+  commit({ unopened: MAX_STORED, lastGrant: state.lastGrant })
 }
 
 export function getPacks() { return state }

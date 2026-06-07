@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { CARDS_COLLECTION, RARITY_COLORS } from '../data/gameData'
 import { addCards } from '../state/cardsStore'
-import { usePacks, accrueNow, msUntilNextFree, openOnePack } from '../state/packsStore'
+import { usePacks, accrueNow, msUntilNextFree, openOnePack, devFillPacks, MAX_STORED } from '../state/packsStore'
 import { sfx } from '../sounds'
 import { Avatar } from './Avatar'
 
@@ -70,7 +70,7 @@ export function CommissaryPack({ style }) {
   const { unopened } = usePacks()
   const [invOpen, setInvOpen] = useState(false)
   const remaining = msUntilNextFree()
-  const full = remaining >= 24 * 60 * 60 * 1000 && unopened >= 5
+  const full = remaining >= 24 * 60 * 60 * 1000 && unopened >= MAX_STORED
 
   return (
     <>
@@ -139,10 +139,17 @@ function PackInventoryModal({ onClose }) {
         }}><i className="ti ti-x" /></button>
       </div>
 
-      <div style={{ color: '#7a7468', fontSize: 12, padding: '0 16px 4px', fontVariantNumeric: 'tabular-nums' }}>
-        {remaining >= 24 * 60 * 60 * 1000 && unopened >= 5
-          ? 'Stash full — open one to restart the free timer.'
-          : <>Next free pack in <span style={{ color: '#c9a84c' }}>{fmtCountdown(remaining)}</span></>}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '0 16px 4px' }}>
+        <div style={{ color: '#7a7468', fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
+          {remaining >= 24 * 60 * 60 * 1000 && unopened >= MAX_STORED
+            ? 'Stash full — open one to restart the free timer.'
+            : <>Next free pack in <span style={{ color: '#c9a84c' }}>{fmtCountdown(remaining)}</span></>}
+        </div>
+        {/* DEV ONLY — load a full stash for testing. Remove before release. */}
+        <button onClick={() => { sfx.tap?.(); devFillPacks() }} style={{
+          flexShrink: 0, background: '#1e1e2a', border: '0.5px solid #2a2a3a', color: '#888',
+          fontSize: 11, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
+        }}>+{MAX_STORED} (dev)</button>
       </div>
 
       {unopened === 0 ? (
@@ -198,14 +205,19 @@ function PackSpinOpenModal({ onClose }) {
   // The accelerating flip, driven by rAF mutating the transform directly.
   useEffect(() => {
     if (phase !== 'spinning') return
-    const SPIN_MS = 2400
-    const MAX_DEG = 3240                           // ~18 face flips
+    const HOLD_MS = 220                            // beat on the FRONT before it turns
+    const SPIN_MS = 2900                           // then a long slow-to-fast spin
+    const MAX_DEG = 2880                           // 8 turns; multiple of 360 → lands on FRONT
     let start = null
     const tick = (ts) => {
       if (start == null) start = ts
-      const t = Math.min(1, (ts - start) / SPIN_MS)
-      const angle = MAX_DEG * (t * t)              // easeInQuad → starts slow, speeds up
-      const scale = 1 + 0.18 * (t * t)             // swells as it spins faster
+      const elapsed = ts - start
+      // Hold dead-still on the front first, then ease in CUBICALLY so the early
+      // turns are gentle (front stays readable) and it only whips around near the end.
+      const t = Math.max(0, Math.min(1, (elapsed - HOLD_MS) / SPIN_MS))
+      const ease = t * t * t                       // easeInCubic → much slower start than quad
+      const angle = MAX_DEG * ease
+      const scale = 1 + 0.16 * ease                // swells only as it speeds up
       if (flipRef.current) flipRef.current.style.transform = `scale(${scale}) rotateY(${angle}deg)`
       if (t < 1) { rafRef.current = requestAnimationFrame(tick) }
       else {
