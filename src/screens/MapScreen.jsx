@@ -313,6 +313,7 @@ export default function MapScreen({ onNavigate }) {
   const carIdRef = useRef(0)
   const [selectedFacility, setSelectedFacility] = useState(null)
   const [relocating, setRelocating] = useState(false)       // picking a relocate target
+  const [relocateErr, setRelocateErr] = useState(null)      // "tapped a locked county" warning text
   const [moveConfirm, setMoveConfirm] = useState(null)      // { fips, name, state, miles, sec }
   const [, setMoveTick] = useState(0)                       // ticks the move countdown
   const { attacks, landed, launch, dismissLanded } = useDriveBys()
@@ -669,20 +670,20 @@ export default function MapScreen({ onNavigate }) {
             )}
           </div>
           {!moving && !relocating && (
-            <button className="btn" onClick={(e) => { e.stopPropagation(); sfx.tap(); setRelocating(true); setTurfView(null) }}
+            <button className="btn" onClick={(e) => { e.stopPropagation(); sfx.tap(); setRelocating(true); setRelocateErr(null); setTurfView(null) }}
               style={{ padding: '7px 11px', background: GOLD, color: '#0a0a0f', border: 'none', borderRadius: 9, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>
               <i className="ti ti-arrows-move" /> Relocate
             </button>
           )}
           {relocating && (
-            <button className="btn btn-dark" onClick={(e) => { e.stopPropagation(); sfx.tap(); setRelocating(false) }} style={{ padding: '7px 11px', fontSize: 11 }}>
+            <button className="btn btn-dark" onClick={(e) => { e.stopPropagation(); sfx.tap(); setRelocating(false); setRelocateErr(null) }} style={{ padding: '7px 11px', fontSize: 11 }}>
               Cancel
             </button>
           )}
         </div>
         {relocating && (
-          <div style={{ color: GOLD, fontSize: 11, marginTop: 8, textAlign: 'center' }}>
-            Tap a state, then tap any county to move your trap house there.
+          <div style={{ color: relocateErr ? RED : GOLD, fontSize: 11, marginTop: 8, textAlign: 'center' }}>
+            {relocateErr || 'Tap a state, then tap any unlocked county to move your trap house there.'}
           </div>
         )}
       </div>
@@ -739,7 +740,15 @@ export default function MapScreen({ onNavigate }) {
               strokeFor={(fips) => facilityByFips[fips] ? '#fff' : `${GOLD}59`}
               strokeWidthFor={(fips) => facilityByFips[fips] ? 1.5 : 0.7}
               onCountyClick={(c) => {
-                if (relocating) { sfx.tap(); beginMoveTo(c.fips, c.name); return }
+                if (relocating) {
+                  // Can only relocate into an unlocked county — locked counties
+                  // aren't open for view (uncolored), so they can't be a target.
+                  if (!unlockedCountySet.has(String(c.fips).padStart(5, '0'))) {
+                    sfx.lose?.(); setRelocateErr(`${c.name} County is locked — unlock it before moving there.`)
+                    return
+                  }
+                  sfx.tap(); setRelocateErr(null); beginMoveTo(c.fips, c.name); return
+                }
                 const fac = facilityByFips[c.fips]
                 if (fac) {
                   sfx.tap()
