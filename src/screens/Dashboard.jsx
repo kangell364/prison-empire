@@ -83,9 +83,6 @@ export default function Dashboard({ onNavigate }) {
         </button>
       </div>
 
-      {/* Vitals HUD — health + stamina with live regen countdown */}
-      <VitalsHud />
-
       {/* Daily login bonus — auto-pops the 7-day calendar once per day */}
       <DailyBonus />
 
@@ -173,6 +170,9 @@ export default function Dashboard({ onNavigate }) {
           <i className="ti ti-repeat" /> SWAP
         </button>
       </div>
+
+      {/* Vitals HUD — health + stamina with live regen countdown */}
+      <VitalsHud />
 
       {/* Resources */}
       <div className="section">

@@ -1595,10 +1595,23 @@ function DustRoom({ art }) {
         {/* Barbie — centered, standing on the floor line behind the table. zIndex 0
             keeps her ABOVE the backdrop but BELOW the table (z1) and dust piles (z2),
             so the table occludes her lower body and she reads as standing behind it. */}
-        <img src="/barbie.webp" alt="" aria-hidden
-          style={{ position: 'absolute', left: '50%', top: '70%', transform: 'translate(-50%, -100%)',
-            width: '12%', zIndex: 0, pointerEvents: 'none',
-            filter: 'drop-shadow(0 6px 10px rgba(0,0,0,0.5))' }} />
+        {/* Barbie — split into body + two arms so the arms can pivot from the
+            shoulders down to the dust pile and back, in a loop. All three layers
+            are the SAME 360×582 canvas (perfectly registered), so they stack at
+            the same spot; each arm just rotates about its shoulder joint. */}
+        <div aria-hidden style={{ position: 'absolute', left: '50%', top: '70%', transform: 'translate(-50%, -100%)',
+            width: '12%', aspectRatio: '360 / 582', zIndex: 0, pointerEvents: 'none',
+            filter: 'drop-shadow(0 6px 10px rgba(0,0,0,0.5))' }}>
+          <style>{`
+            @keyframes barbieArmL { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(54deg); } }
+            @keyframes barbieArmR { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-54deg); } }
+          `}</style>
+          <img src="/barbie-body.webp" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
+          <img src="/barbie-larm.webp" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
+            transformOrigin: '36.1% 22%', animation: 'barbieArmL 2.4s ease-in-out infinite' }} />
+          <img src="/barbie-rarm.webp" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
+            transformOrigin: '63.9% 22%', animation: 'barbieArmR 2.4s ease-in-out infinite' }} />
+        </div>
         {/* Layer 2 — the table, kept as its own overlay so it can be moved or
             swapped independently of the backdrop. Top edge sits ~25% up the back
             wall: floor line ≈ 62.5%, wall top ≈ 21% → 25% up lands its top at 52%. */}
