@@ -1603,8 +1603,8 @@ function DustRoom({ art }) {
             width: '12%', aspectRatio: '360 / 582', zIndex: 0, pointerEvents: 'none',
             filter: 'drop-shadow(0 6px 10px rgba(0,0,0,0.5))' }}>
           <style>{`
-            @keyframes barbieArmL { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(54deg); } }
-            @keyframes barbieArmR { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-54deg); } }
+            @keyframes barbieArmL { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-54deg); } }
+            @keyframes barbieArmR { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(54deg); } }
           `}</style>
           <img src="/barbie-body.webp" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
           <img src="/barbie-larm.webp" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
