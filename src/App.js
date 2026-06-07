@@ -46,8 +46,10 @@ export default function App() {
   // the My Crew view (e.g. tapping a crew slot on the home screen).
   const [cardsTab, setCardsTab] = useState('player')
   // Which sub-tab the Profile screen opens on (null = its default). Set to
-  // 'account' when deep-linking from the Home-screen Account entry.
+  // 'account' when deep-linking from the Home-screen Account entry. accountOnly
+  // strips the SR header + sub-tabs so only the account panel shows.
   const [profileTab, setProfileTab] = useState(null)
+  const [profileAccountOnly, setProfileAccountOnly] = useState(false)
   // Where the Trap House was opened from, so its "Out" button returns there.
   // The trap house is the player's own (not gang-gated), reachable from Home,
   // the Gang hub, or the map.
@@ -97,6 +99,8 @@ export default function App() {
     if (id !== screen) sfx.tap()
     // Bottom-nav Cards always lands on the collection tab.
     if (id === 'cards') setCardsTab('player')
+    // Avatar (top-right) → the full Profile, not the stripped account-only view.
+    if (id === 'profile') { setProfileTab(null); setProfileAccountOnly(false) }
     setScreen(id)
   }
 
@@ -104,7 +108,7 @@ export default function App() {
   // a caller can deep-link into the Cards screen's My Crew view.
   const navigateTo = (id, opts) => {
     if (id === 'cards') setCardsTab(opts?.tab || 'player')
-    if (id === 'profile') setProfileTab(opts?.tab || null)   // deep-link to a Profile sub-tab (e.g. Account)
+    if (id === 'profile') { setProfileTab(opts?.tab || null); setProfileAccountOnly(!!opts?.accountOnly) }   // deep-link to a Profile sub-tab (e.g. Account)
     if (id === 'traphouse') setTrapFrom(screen)   // remember origin for the Out button
     setScreen(id)
   }
@@ -121,7 +125,7 @@ export default function App() {
       case 'traphouse': return <TrapHouse onBack={() => setScreen(trapFrom)} />
       case 'nurse':    return <Nurse onBack={() => setScreen('home')} />
       case 'chat':     return <ChatScreen />
-      case 'profile':  return <Profile onBack={() => setScreen('home')} initialTab={profileTab} />
+      case 'profile':  return <Profile onBack={() => setScreen('home')} initialTab={profileTab} accountOnly={profileAccountOnly} />
       default:         return <Dashboard onNavigate={navigateTo} />
     }
   }

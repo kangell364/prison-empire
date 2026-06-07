@@ -17,7 +17,7 @@ const BLUE  = '#4a9eff'
 const GREEN = '#2ecc71'
 const DIM   = '#555'
 
-export default function Profile({ onBack, initialTab }) {
+export default function Profile({ onBack, initialTab, accountOnly = false }) {
   const [tab, setTab] = useState(initialTab || 'upgrades')
   // Traits + points are now the PERSISTED single source of truth (statsStore):
   // upgrading spends a real point, bumps the trait, updates live combat/pool
@@ -28,6 +28,21 @@ export default function Profile({ onBack, initialTab }) {
   const upgrade = (traitId) => {
     if (allocate(traitId, 1) > 0) sfx.buy()
     else sfx.deny()
+  }
+
+  // Opened from the Home-screen Account button: show ONLY the account info —
+  // no SR player header, no sub-tabs. Just a back arrow + the account panel.
+  if (accountOnly) {
+    return (
+      <div className="scroll-area animate-in">
+        <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button className="btn btn-dark" onClick={onBack} style={{ padding: '6px 11px', fontSize: 12 }}>
+            <i className="ti ti-arrow-left" /> Back
+          </button>
+        </div>
+        <AccountTab onAuthed={onBack} />
+      </div>
+    )
   }
 
   return (

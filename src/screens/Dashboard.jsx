@@ -70,7 +70,7 @@ export default function Dashboard({ onNavigate }) {
           Deep-links into the Profile screen's Account sub-tab. */}
       <div style={{ padding: '12px 16px 0' }}>
         <button
-          onClick={() => { sfx.tap?.(); onNavigate('profile', { tab: 'account' }) }}
+          onClick={() => { sfx.tap?.(); onNavigate('profile', { tab: 'account', accountOnly: true }) }}
           style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10,
             background: '#13131f', border: '0.5px solid #2a2a3a', borderRadius: 12,
             padding: '11px 13px', cursor: 'pointer', color: '#fff' }}>

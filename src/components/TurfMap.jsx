@@ -113,8 +113,8 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
   }, [])
 
   // Block grid (street-zoom economic layer). A large uniform ~1.8km (4×4 merged) grid laid
-  // over the map; blocks held by a crew are colored + have an NPC standing on
-  // them, vacant blocks are faint claimable outlines. Only drawn at street zoom.
+  // over the map; blocks held by a crew are colored + have a trap house in their
+  // center, vacant blocks are faint claimable outlines. Only drawn at street zoom.
   // NOTE: owners are deterministic placeholders for now — the real loyalty-market
   // data model (recruit / poach / income) wires in next.
   useEffect(() => {
@@ -176,8 +176,10 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
         shape.addTo(layer)
         shape.on('click', () => onBlockTapRef.current && onBlockTapRef.current(gx, gy))
         if (owner && showIcons) {
-          const npc = L.divIcon({ className: '', iconSize: [28, 36], iconAnchor: [14, 30], html: `<div style="text-align:center"><div style="width:24px;height:24px;border-radius:50%;background:${color};border:2px solid #0a0a0f;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,.7);margin:0 auto">🕴️</div></div>` })
-          L.marker([cy, cx], { icon: npc })
+          // A trap house centered in the middle of the owned block (replaces the
+          // old standing-NPC figure), tinted by the owning crew's color.
+          const house = L.divIcon({ className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: `<div style="width:28px;height:28px;border-radius:8px;background:${color};border:2px solid #0a0a0f;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 5px rgba(0,0,0,.7)">🏚️</div>` })
+          L.marker([cy, cx], { icon: house })
             .on('click', () => onBlockTapRef.current && onBlockTapRef.current(gx, gy)).addTo(layer)
         }
       }
