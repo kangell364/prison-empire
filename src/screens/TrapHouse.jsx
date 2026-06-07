@@ -1583,6 +1583,22 @@ const SLOTH_CENTERS = [27.0, 51.5, 78.0]   // one sloth per table (over the plan
 const SLOTH_PIVOT = '19.7% 53%'                  // arm shoulder (% of the sloth canvas)
 const SLOTH_ARM_DELAYS = ['0s', '-0.55s', '-1.05s']
 
+// One Barbie — body + two arms split into perfectly-registered 360×582 layers
+// so each arm pivots from its shoulder, looping rest → reach the dust → back.
+// `left` positions her over a given dust pile (matches the pile's left %).
+function DustBarbie({ left }) {
+  const arm = { position: 'absolute', inset: 0, width: '100%', height: '100%' }
+  return (
+    <div aria-hidden style={{ position: 'absolute', left: `${left}%`, top: '70%', transform: 'translate(-50%, -100%)',
+        width: '12%', aspectRatio: '360 / 582', zIndex: 0, pointerEvents: 'none',
+        filter: 'drop-shadow(0 6px 10px rgba(0,0,0,0.5))' }}>
+      <img src="/barbie-body.webp" alt="" style={arm} />
+      <img src="/barbie-larm.webp" alt="" style={{ ...arm, transformOrigin: '36.1% 22%', animation: 'barbieArmL 2.4s ease-in-out infinite' }} />
+      <img src="/barbie-rarm.webp" alt="" style={{ ...arm, transformOrigin: '63.9% 22%', animation: 'barbieArmR 2.4s ease-in-out infinite' }} />
+    </div>
+  )
+}
+
 // Dust Room — the deepest back room (4th). Visual-only placeholder for now: an
 // aspect-locked backdrop so it's navigable today, with a "coming soon" tag. The
 // production loop (premium dust) gets wired up once the real art lands.
@@ -1595,23 +1611,14 @@ function DustRoom({ art }) {
         {/* Barbie — centered, standing on the floor line behind the table. zIndex 0
             keeps her ABOVE the backdrop but BELOW the table (z1) and dust piles (z2),
             so the table occludes her lower body and she reads as standing behind it. */}
-        {/* Barbie — split into body + two arms so the arms can pivot from the
-            shoulders down to the dust pile and back, in a loop. All three layers
-            are the SAME 360×582 canvas (perfectly registered), so they stack at
-            the same spot; each arm just rotates about its shoulder joint. */}
-        <div aria-hidden style={{ position: 'absolute', left: '50%', top: '70%', transform: 'translate(-50%, -100%)',
-            width: '12%', aspectRatio: '360 / 582', zIndex: 0, pointerEvents: 'none',
-            filter: 'drop-shadow(0 6px 10px rgba(0,0,0,0.5))' }}>
-          <style>{`
-            @keyframes barbieArmL { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-54deg); } }
-            @keyframes barbieArmR { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(54deg); } }
-          `}</style>
-          <img src="/barbie-body.webp" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
-          <img src="/barbie-larm.webp" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
-            transformOrigin: '36.1% 22%', animation: 'barbieArmL 2.4s ease-in-out infinite' }} />
-          <img src="/barbie-rarm.webp" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
-            transformOrigin: '63.9% 22%', animation: 'barbieArmR 2.4s ease-in-out infinite' }} />
-        </div>
+        {/* Arm-swing keyframes — defined once, shared by every Barbie. */}
+        <style>{`
+          @keyframes barbieArmL { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-54deg); } }
+          @keyframes barbieArmR { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(54deg); } }
+        `}</style>
+        {/* One Barbie standing in front of EACH of the three dust piles
+            (left 30 / 50 / 70 — same as the piles), same size + arm animation. */}
+        {[30, 50, 70].map(lx => <DustBarbie key={lx} left={lx} />)}
         {/* Layer 2 — the table, kept as its own overlay so it can be moved or
             swapped independently of the backdrop. Top edge sits ~25% up the back
             wall: floor line ≈ 62.5%, wall top ≈ 21% → 25% up lands its top at 52%. */}
