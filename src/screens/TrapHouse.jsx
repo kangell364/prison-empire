@@ -1586,15 +1586,20 @@ const SLOTH_ARM_DELAYS = ['0s', '-0.55s', '-1.05s']
 // One Barbie — body + two arms split into perfectly-registered 360×582 layers
 // so each arm pivots from its shoulder, looping rest → reach the dust → back.
 // `left` positions her over a given dust pile (matches the pile's left %).
-function DustBarbie({ left }) {
+// `onRotation` fires once per full arm swing (left-arm animationiteration), so
+// the caller can tally rotations; `delay` staggers each Barbie so the three run
+// independently rather than in lockstep.
+function DustBarbie({ left, delay = '0s', onRotation }) {
   const arm = { position: 'absolute', inset: 0, width: '100%', height: '100%' }
   return (
     <div aria-hidden style={{ position: 'absolute', left: `${left}%`, top: '70%', transform: 'translate(-50%, -100%)',
         width: '12%', aspectRatio: '360 / 582', zIndex: 0, pointerEvents: 'none',
         filter: 'drop-shadow(0 6px 10px rgba(0,0,0,0.5))' }}>
       <img src="/barbie-body.webp" alt="" style={arm} />
-      <img src="/barbie-larm.webp" alt="" style={{ ...arm, transformOrigin: '36.1% 22%', animation: 'barbieArmL 2.4s ease-in-out infinite' }} />
-      <img src="/barbie-rarm.webp" alt="" style={{ ...arm, transformOrigin: '63.9% 22%', animation: 'barbieArmR 2.4s ease-in-out infinite' }} />
+      <img src="/barbie-larm.webp" alt="" onAnimationIteration={onRotation}
+        style={{ ...arm, transformOrigin: '36.1% 22%', animation: `barbieArmL 2.4s ease-in-out ${delay} infinite` }} />
+      <img src="/barbie-rarm.webp" alt=""
+        style={{ ...arm, transformOrigin: '63.9% 22%', animation: `barbieArmR 2.4s ease-in-out ${delay} infinite` }} />
     </div>
   )
 }
@@ -1603,6 +1608,19 @@ function DustBarbie({ left }) {
 // aspect-locked backdrop so it's navigable today, with a "coming soon" tag. The
 // production loop (premium dust) gets wired up once the real art lands.
 function DustRoom({ art }) {
+  // Three independent positions (1,2,3 ↔ piles at left 30/50/70). Each Pixie Dust
+  // counter ticks +1 every 3 full arm swings of ITS OWN Barbie, tracked via the
+  // left arm's animationiteration. itersRef holds the raw swing tally per position.
+  const POS = [30, 50, 70]
+  const DELAYS = ['0s', '-0.8s', '-1.6s']   // stagger so the three run independently
+  const [counts, setCounts] = useState([0, 0, 0])
+  const itersRef = useRef([0, 0, 0])
+  const onRotation = useCallback((i) => {
+    itersRef.current[i] += 1
+    if (itersRef.current[i] % 3 === 0) {
+      setCounts(c => { const n = c.slice(); n[i] += 1; return n })
+    }
+  }, [])
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ position: 'relative', aspectRatio: '1600 / 900', maxWidth: '100%', maxHeight: '100%' }}>
@@ -1617,8 +1635,8 @@ function DustRoom({ art }) {
           @keyframes barbieArmR { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(54deg); } }
         `}</style>
         {/* One Barbie standing in front of EACH of the three dust piles
-            (left 30 / 50 / 70 — same as the piles), same size + arm animation. */}
-        {[30, 50, 70].map(lx => <DustBarbie key={lx} left={lx} />)}
+            (positions 1/2/3 ↔ left 30/50/70), same size + arm animation. */}
+        {POS.map((lx, i) => <DustBarbie key={i} left={lx} delay={DELAYS[i]} onRotation={() => onRotation(i)} />)}
         {/* Layer 2 — the table, kept as its own overlay so it can be moved or
             swapped independently of the backdrop. Top edge sits ~25% up the back
             wall: floor line ≈ 62.5%, wall top ≈ 21% → 25% up lands its top at 52%. */}
@@ -1638,10 +1656,10 @@ function DustRoom({ art }) {
         <img src="/dust.webp" alt="" aria-hidden
           style={{ position: 'absolute', left: '70%', top: '54%', transform: 'translate(-50%, -100%)',
             width: '17%', zIndex: 2, pointerEvents: 'none', filter: 'drop-shadow(0 4px 5px rgba(0,0,0,0.5))' }} />
-        {/* A "Pixie Dust" counter in front of each pile (left 30/50/70). Static 0
-            for now — the dust economy isn't wired yet; ready to bind a real tally. */}
-        {[30, 50, 70].map(lx => (
-          <div key={`pd${lx}`} style={{ position: 'absolute', left: `${lx}%`, top: '57%',
+        {/* A "Pixie Dust" counter in front of each pile (positions 1/2/3). Each
+            ticks +1 every 3 full arm swings of its own Barbie — independent tallies. */}
+        {POS.map((lx, i) => (
+          <div key={`pd${i}`} style={{ position: 'absolute', left: `${lx}%`, top: '57%',
             transform: 'translate(-50%, 0)', zIndex: 5, pointerEvents: 'none',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <span style={{ color: '#fff', fontSize: 8, fontWeight: 800, letterSpacing: 0.6,
@@ -1651,7 +1669,8 @@ function DustRoom({ art }) {
               background: 'rgba(10,8,14,0.82)', border: '1px solid #b06ad066', borderRadius: 999,
               padding: '2px 8px', boxShadow: '0 2px 7px rgba(0,0,0,0.55)' }}>
               <i className="ti ti-sparkles" style={{ color: '#d9a8ee', fontSize: 12 }} />
-              <span style={{ color: '#d9a8ee', fontWeight: 900, fontSize: 13, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>0</span>
+              <span key={counts[i]} style={{ color: '#d9a8ee', fontWeight: 900, fontSize: 13,
+                fontVariantNumeric: 'tabular-nums', lineHeight: 1, animation: 'budTick 0.35s ease-out' }}>{counts[i]}</span>
             </div>
           </div>
         ))}
