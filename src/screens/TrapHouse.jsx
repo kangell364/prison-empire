@@ -43,16 +43,16 @@ const BUD_PER_PLANT_SECS = 25.6              // one bud per plant every ~25.6s (
 const MACHINE_MS = 2000                      // machine pops one jar per strain every 2s
 const plantsOnTable = (table, planted) => planted.filter(id => id.startsWith(`T${table}-`)).length
 
-// Raw product ONE bud of this strain is worth — the card's YIELD stat. Matches the
-// "YIELD / LV" tile in the card detail: (base perLevelYield + each upgrade's +3) × the
-// card's level. So a higher-yield (or upgraded, or merged) strain packs more product
-// into every bud → more jars → more cash, while the bud-drop rate itself is unchanged.
+// Product ONE bud of this strain is worth — EXACTLY the card's "YIELD / LV" tile
+// value: base perLevelYield + each yield upgrade's +3. So the grow-box counter, the
+// haul into packing, and the number printed on the card all agree (a +7 card adds 7
+// per bud). `cardLevel` is only used to look up that level's upgrade total — it does
+// NOT multiply the yield, so a merged card never drifts away from its printed value.
 function budYield(plantId, cardLevel = 1) {
   const plant = PLANTS.find(p => p.id === plantId)
   if (!plant) return 1
   const up = getPlantUpgrade(plantId, cardLevel).yield || 0
-  const perLevel = (plant.perLevelYield || 0) + up * PLANT_YIELD_PER_LEVEL
-  return Math.max(1, perLevel * (cardLevel || 1))
+  return Math.max(1, (plant.perLevelYield || 0) + up * PLANT_YIELD_PER_LEVEL)
 }
 
 // ---- Sales economy ---------------------------------------------------
