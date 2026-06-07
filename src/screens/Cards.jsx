@@ -11,7 +11,7 @@ import {
 } from '../state/upgradesStore'
 import { useHustle, spendHustle } from '../state/playerStore'
 import {
-  useSkillCardCounts, getOwnedSkillTuples, mergeSkillCard, SKILL_STACK_SIZE,
+  useSkillCardCounts, getOwnedSkillTuples, mergeSkillCard, addSkillCard, SKILL_STACK_SIZE,
 } from '../state/skillCardsStore'
 import {
   useSkillUpgrades, readSkillUpgrade, getSkillUpgrade, upgradeSkillStat, carrySkillUpgrades,
@@ -235,6 +235,15 @@ export default function Cards({ initialTab = 'player' }) {
       {tab === 'skill' && (
         <>
           <FilterChips filter={filter} setFilter={setFilter} />
+          {/* DEV ONLY — unlock one of every catalog skill card for testing. */}
+          {isDevMode() && (
+            <div style={{ padding: '10px 16px 0', display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => { sfx.tap?.(); SKILLS.forEach(s => addSkillCard(s.id)) }} style={{
+                background: '#1e1e2a', border: '0.5px solid #2a2a3a', color: '#888',
+                fontSize: 11, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
+              }}>Unlock all (dev)</button>
+            </div>
+          )}
           <SkillCollection
             filter={filter}
             upgradeMap={skillUpgradeMap}
@@ -751,7 +760,10 @@ function TabSwitcher({ tab, onTab }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
         {COLLECTION_TABS.map(TabButton)}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+      {/* Same 3-up grid as the collections so each loadout tab matches the width
+          of the collection tab above it (My Crew ↔ Crew Cards, Skills ↔ Skill Cards);
+          the third cell is left empty. */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
         {LOADOUT_TABS.map(TabButton)}
       </div>
     </div>

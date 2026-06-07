@@ -12,8 +12,9 @@ export function SkillCardPopup({ skill, level, dmgPerLevel, onClose }) {
   return (
     <div onClick={onClose} style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 400, padding: 24,
+      display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+      zIndex: 400, padding: 'calc(14px + env(safe-area-inset-top)) 16px 16px',
+      overflowY: 'auto',
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         width: '100%', maxWidth: 320, background: '#13131f',

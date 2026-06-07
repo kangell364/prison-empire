@@ -65,6 +65,24 @@ export default function Dashboard({ onNavigate }) {
   return (
     <div className="scroll-area animate-in">
 
+      {/* Account — sits at the very top (under the PRISON EMPIRE header) so
+          sign-in / save / delete-account is reachable straight from Home.
+          Deep-links into the Profile screen's Account sub-tab. */}
+      <div style={{ padding: '12px 16px 0' }}>
+        <button
+          onClick={() => { sfx.tap?.(); onNavigate('profile', { tab: 'account' }) }}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+            background: '#13131f', border: '0.5px solid #2a2a3a', borderRadius: 12,
+            padding: '11px 13px', cursor: 'pointer', color: '#fff' }}>
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(201,168,76,0.12)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <i className="ti ti-user-circle" style={{ color: '#c9a84c', fontSize: 17 }} />
+          </div>
+          <span style={{ flex: 1, textAlign: 'left', fontSize: 13, fontWeight: 700 }}>Account</span>
+          <i className="ti ti-chevron-right" style={{ color: '#555', fontSize: 18 }} />
+        </button>
+      </div>
+
       {/* Vitals HUD — health + stamina with live regen countdown */}
       <VitalsHud />
 

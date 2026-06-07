@@ -17,8 +17,8 @@ const BLUE  = '#4a9eff'
 const GREEN = '#2ecc71'
 const DIM   = '#555'
 
-export default function Profile({ onBack }) {
-  const [tab, setTab] = useState('upgrades')
+export default function Profile({ onBack, initialTab }) {
+  const [tab, setTab] = useState(initialTab || 'upgrades')
   // Traits + points are now the PERSISTED single source of truth (statsStore):
   // upgrading spends a real point, bumps the trait, updates live combat/pool
   // stats everywhere, and survives a refresh.
