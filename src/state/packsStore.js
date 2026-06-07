@@ -67,6 +67,12 @@ export function openOnePack() {
   return true
 }
 
+// Grant n packs into the stash (capped at MAX_STORED). Used by reward systems
+// like the daily login bonus. Does not touch the free-pack timer.
+export function grantPacks(n = 1) {
+  commit({ unopened: Math.min(MAX_STORED, state.unopened + n), lastGrant: state.lastGrant })
+}
+
 // DEV ONLY — fill the stash up to the cap for testing the open flow. Remove the
 // button that calls this (and optionally this fn) before a real release.
 export function devFillPacks() {

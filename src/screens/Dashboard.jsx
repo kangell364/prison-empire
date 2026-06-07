@@ -12,6 +12,7 @@ import { Avatar, KoOverlay, KO_FILTER } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import { SwapLookModal } from '../components/SwapLookModal'
 import { StoreModal } from '../components/StoreModal'
+import { DailyBonus } from '../components/DailyBonus'
 import { useGang } from '../state/gangStore'
 import { useRoomBank } from '../state/roomBankStore'
 import { sfx } from '../sounds'
@@ -66,6 +67,9 @@ export default function Dashboard({ onNavigate }) {
 
       {/* Vitals HUD — health + stamina with live regen countdown */}
       <VitalsHud />
+
+      {/* Daily login bonus — auto-pops the 7-day calendar once per day */}
+      <DailyBonus />
 
       {/* Player Card */}
       <div className="section" style={{ marginTop: 14 }}>
