@@ -1638,13 +1638,6 @@ function DustRoom({ art }) {
         <img src="/dust.webp" alt="" aria-hidden
           style={{ position: 'absolute', left: '70%', top: '54%', transform: 'translate(-50%, -100%)',
             width: '17%', zIndex: 2, pointerEvents: 'none', filter: 'drop-shadow(0 4px 5px rgba(0,0,0,0.5))' }} />
-        <div style={{ position: 'absolute', left: '50%', top: '38%', transform: 'translate(-50%, -50%)', zIndex: 3,
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, pointerEvents: 'none' }}>
-          <i className="ti ti-sparkles" style={{ color: '#d9a8ee', fontSize: 30, filter: 'drop-shadow(0 2px 6px #000)' }} />
-          <span style={{ color: '#fff', fontWeight: 800, fontSize: 14, letterSpacing: 1.5,
-            background: 'rgba(10,8,14,0.7)', borderRadius: 999, padding: '6px 16px',
-            border: '1px solid #b06ad055', textShadow: '0 1px 3px #000' }}>PREMIUM DUST — COMING SOON</span>
-        </div>
       </div>
     </div>
   )
