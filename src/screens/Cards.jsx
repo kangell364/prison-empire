@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { CARDS_COLLECTION, RARITY_COLORS, SKILLS, PLANTS, plantCashValue } from '../data/gameData'
-import { useCardCounts, mergeCard, getOwnedTuples, STACK_SIZE } from '../state/cardsStore'
+import { useCardCounts, mergeCard, getOwnedTuples, addCards, STACK_SIZE } from '../state/cardsStore'
 import {
   baseAtk, baseDef, useCrew,
   ATK_PER_LEVEL, DEF_PER_LEVEL,
@@ -25,6 +25,7 @@ import {
   PLANT_YIELD_PER_LEVEL, PLANT_UPGRADE_COST, MAX_PLANT_UPGRADE_LEVEL,
 } from '../state/plantUpgradesStore'
 import { sfx } from '../sounds'
+import { isDevMode } from '../devMode'
 import { Avatar, CARD_TILE_ART } from '../components/Avatar'
 import { CharacterDetailModal } from '../components/CharacterDetailModal'
 import Crew from './Crew'
@@ -166,8 +167,16 @@ export default function Cards({ initialTab = 'player' }) {
           {/* Cards Grid — one tile per (card_id, card_level) the player has,
               plus locked placeholders for catalog entries not seen yet. */}
           <div className="section" style={{ marginTop: 14 }}>
-            <div className="section-label">
-              {sectionLabelFor(filter, ownedSet.size, CARDS_COLLECTION.length)}
+            <div className="section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>{sectionLabelFor(filter, ownedSet.size, CARDS_COLLECTION.length)}</span>
+              {/* DEV ONLY — unlock one of every catalog crew card for testing.
+                  Gated by isDevMode() so normal players never see it. */}
+              {isDevMode() && (
+                <button onClick={() => { sfx.tap?.(); addCards(CARDS_COLLECTION.map(c => c.id)) }} style={{
+                  flexShrink: 0, background: '#1e1e2a', border: '0.5px solid #2a2a3a', color: '#888',
+                  fontSize: 11, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
+                }}>Unlock all (dev)</button>
+              )}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {(() => {
