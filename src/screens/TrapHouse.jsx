@@ -1543,6 +1543,13 @@ function DustRoom({ art }) {
       <div style={{ position: 'relative', aspectRatio: '1600 / 900', maxWidth: '100%', maxHeight: '100%' }}>
         {/* Layer 1 — room backdrop (ROOM 4). */}
         <img src={art} alt="Dust Room" style={{ display: 'block', width: '100%', height: '100%' }} />
+        {/* Barbie — centered, standing on the floor line behind the table. zIndex 0
+            keeps her ABOVE the backdrop but BELOW the table (z1) and dust piles (z2),
+            so the table occludes her lower body and she reads as standing behind it. */}
+        <img src="/barbie.webp" alt="" aria-hidden
+          style={{ position: 'absolute', left: '50%', top: '62%', transform: 'translate(-50%, -100%)',
+            width: '15%', zIndex: 0, pointerEvents: 'none',
+            filter: 'drop-shadow(0 6px 10px rgba(0,0,0,0.5))' }} />
         {/* Layer 2 — the table, kept as its own overlay so it can be moved or
             swapped independently of the backdrop. Top edge sits ~25% up the back
             wall: floor line ≈ 62.5%, wall top ≈ 21% → 25% up lands its top at 52%. */}
