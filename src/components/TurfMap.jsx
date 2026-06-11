@@ -12,6 +12,8 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { geoBounds, geoContains } from 'd3-geo'
 import { GRID, getBlock, subscribeBlocks, subscribeActivity, subscribePayout, CREW_COLORS } from '../state/blocksStore'
+import { getMyGangId, subscribeGang } from '../state/gangStore'
+import { blockColor } from '../state/gangTurf'
 
 const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -136,6 +138,7 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
       // it's too zoomed out for blocks to be useful, so we stop drawing.
       if ((x1 - x0) * (y1 - y0) > 3000) return
       const showIcons = map.getZoom() >= OPEN_ZOOM  // trap-house icons from the default open zoom up (only owned blocks get one, so cheap)
+      const myGangId = getMyGangId()                 // for the relative block coloring
       layer = L.layerGroup().addTo(map)
       const ownedHere = []                     // your blocks in this viewport (for payout pulse)
       for (let gx = x0; gx < x1; gx++) for (let gy = y0; gy < y1; gy++) {
@@ -143,7 +146,9 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
         if (blk.land === false) continue   // ocean / Canada / Mexico — off the board, draw nothing
         const owner = blk.owner
         const terr = (!owner && TERRAIN) ? terrainOf(gx, gy) : null
-        const color = owner ? (owner === 'you' ? CREW_COLORS.you : blk.color) : (terr ? terr.stroke : '#3a3a4a')
+        // Relative 3-color allegiance: GOLD = your block, GREEN = your gang's
+        // turf, RED = anyone else. Falls back to terrain/neutral when vacant.
+        const color = owner ? blockColor(gx, gy, blk, myGangId) : (terr ? terr.stroke : '#3a3a4a')
         const [cy, cx] = blockCenter(gx, gy)
         // Juice: a soft, color-matched glow under owned blocks (a larger blurred
         // tile beneath) so held turf reads as "lit up", Million-Lords style. Works
@@ -187,8 +192,9 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
     }
     map.on('moveend zoomend', draw)
     const unsub = subscribeBlocks(draw)   // redraw when blocks change
+    const unsubGang = subscribeGang(draw) // recolor when your gang allegiance changes
     draw()
-    return () => { map.off('moveend zoomend', draw); unsub(); if (layer) { try { map.removeLayer(layer) } catch {} } }
+    return () => { map.off('moveend zoomend', draw); unsub(); unsubGang(); if (layer) { try { map.removeLayer(layer) } catch {} } }
   }, [])
 
   // Juice: claim-burst pop. When turf changes hands, drop a one-shot animated

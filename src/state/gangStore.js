@@ -15,12 +15,14 @@ const KEY = 'pe_gang_v1'
 // ---- tuning knobs ---------------------------------------------------
 export const CREATE_MIN_LEVEL = 10     // level required to FOUND a gang
 export const FOUND_COST_STEEL  = 25    // Steel spent to found a gang
-export const GANG_CAPACITY     = 12    // MAX members per gang (1 boss + 11)
-const GANG_BASE_CAPACITY       = 4     // capacity at Lv 1 (1 boss + 3)
-// Capacity grows +1 per gang level, capped at GANG_CAPACITY — so the OG must
-// level the gang (via contributions) to open more recruit spots.
+export const GANG_CAPACITY     = 30    // MAX members per gang (1 boss + 29)
+const GANG_BASE_CAPACITY       = 6     // capacity at Lv 1 (1 boss + 5)
+// Capacity grows +2 per gang level, capped at GANG_CAPACITY — so the OG must
+// level the gang (via contributions) to open more recruit spots. 30 is the
+// ceiling (not 50): enough for real gang-vs-gang turf scale without a wall of
+// empty seats; bump GANG_CAPACITY later once real multiplayer fills rosters.
 export function capacityForLevel(level) {
-  return Math.min(GANG_CAPACITY, GANG_BASE_CAPACITY + (Math.max(1, level) - 1))
+  return Math.min(GANG_CAPACITY, GANG_BASE_CAPACITY + (Math.max(1, level) - 1) * 2)
 }
 const APPLY_DECISION_MS = 8000         // simulated time for an OG to accept you
 
@@ -100,20 +102,41 @@ export function gangLevelProgress(gang) {
   return { level, xp, inLevel: Math.max(0, inLevel), span, toNext: Math.max(0, next - xp), pct: span > 0 ? Math.min(100, (inLevel / span) * 100) : 0 }
 }
 
+// Eight hand-authored AI gangs. The IDENTITY (id/name/tag/crest/color) is stable
+// across sessions — only the member rosters are regenerated. `color` tints the
+// gang on the turf leaderboard + map; gold (#c9a84c) is reserved for the player.
+export const GANG_DEFS = [
+  { id: 'g_blok',  name: 'Block Boys',            tag: 'BLOK', crest: '🏚️', color: '#e74c3c', avgLevel: 6,  size: 9,  enrollment: ENROLLMENT.OPEN,   minLevel: 0 },
+  { id: 'g_yard',  name: 'Yard Kings',            tag: 'YARD', crest: '👑', color: '#e67e22', avgLevel: 14, size: 11, enrollment: ENROLLMENT.APPLY,  minLevel: 8 },
+  { id: 'g_dss',   name: 'Dirty South Syndicate', tag: 'DSS',  crest: '💀', color: '#9b59b6', avgLevel: 22, size: 12, enrollment: ENROLLMENT.INVITE, minLevel: 0 },
+  { id: 'g_cb9',   name: 'Cell Block 9',          tag: 'CB9',  crest: '🔒', color: '#4a9eff', avgLevel: 4,  size: 5,  enrollment: ENROLLMENT.OPEN,   minLevel: 0 },
+  { id: 'g_com',   name: 'The Commissary',        tag: 'COM',  crest: '🛒', color: '#2ecc71', avgLevel: 10, size: 8,  enrollment: ENROLLMENT.APPLY,  minLevel: 0 },
+  { id: 'g_wire',  name: 'Razor Wire',            tag: 'WIRE', crest: '🪒', color: '#1abc9c', avgLevel: 7,  size: 6,  enrollment: ENROLLMENT.OPEN,   minLevel: 5 },
+  { id: 'g_conc',  name: 'Concrete Mafia',        tag: 'CONC', crest: '🧱', color: '#95a5a6', avgLevel: 28, size: 12, enrollment: ENROLLMENT.INVITE, minLevel: 0 },
+  { id: 'g_ldl',   name: 'Lockdown Legion',       tag: 'LDL',  crest: '⛓️', color: '#e84393', avgLevel: 12, size: 7,  enrollment: ENROLLMENT.APPLY,  minLevel: 0 },
+]
+
+// Stable gang identity for the leaderboard/map. Resolves the 8 AI gangs plus the
+// player's own gang (founded id 'mine', or a joined AI gang) — flagging `isMine`
+// so the UI can highlight it. Player-founded gangs fall back to gold.
+export function gangIdentity(id) {
+  const myId = state.myGang?.id
+  if (state.myGang && id === myId) {
+    const base = GANG_DEFS.find(d => d.id === id)
+    return { id, name: state.myGang.name, tag: state.myGang.tag, crest: state.myGang.crest || '🏴',
+             color: base?.color || '#c9a84c', isMine: true }
+  }
+  const d = GANG_DEFS.find(g => g.id === id)
+  if (d) return { id: d.id, name: d.name, tag: d.tag, crest: d.crest, color: d.color, isMine: false }
+  return { id, name: id, tag: '', crest: '🏴', color: '#888', isMine: false }
+}
+export function getMyGangId() { return state.myGang?.id || null }
+export const ALL_GANG_IDS = GANG_DEFS.map(d => d.id)
+
 // Eight hand-authored AI gangs, rosters generated at load. Not persisted — this
 // is just the browse list, regenerated each session.
 function buildAiGangs() {
-  const defs = [
-    { id: 'g_blok',  name: 'Block Boys',       tag: 'BLOK',  crest: '🏚️', avgLevel: 6,  size: 9,  enrollment: ENROLLMENT.OPEN,   minLevel: 0 },
-    { id: 'g_yard',  name: 'Yard Kings',       tag: 'YARD',  crest: '👑', avgLevel: 14, size: 11, enrollment: ENROLLMENT.APPLY,  minLevel: 8 },
-    { id: 'g_dss',   name: 'Dirty South Syndicate', tag: 'DSS', crest: '💀', avgLevel: 22, size: 12, enrollment: ENROLLMENT.INVITE, minLevel: 0 },
-    { id: 'g_cb9',   name: 'Cell Block 9',     tag: 'CB9',   crest: '🔒', avgLevel: 4,  size: 5,  enrollment: ENROLLMENT.OPEN,   minLevel: 0 },
-    { id: 'g_com',   name: 'The Commissary',   tag: 'COM',   crest: '🛒', avgLevel: 10, size: 8,  enrollment: ENROLLMENT.APPLY,  minLevel: 0 },
-    { id: 'g_wire',  name: 'Razor Wire',       tag: 'WIRE',  crest: '🪒', avgLevel: 7,  size: 6,  enrollment: ENROLLMENT.OPEN,   minLevel: 5 },
-    { id: 'g_conc',  name: 'Concrete Mafia',   tag: 'CONC',  crest: '🧱', avgLevel: 28, size: 12, enrollment: ENROLLMENT.INVITE, minLevel: 0 },
-    { id: 'g_ldl',   name: 'Lockdown Legion',  tag: 'LDL',   crest: '⛓️', avgLevel: 12, size: 7,  enrollment: ENROLLMENT.APPLY,  minLevel: 0 },
-  ]
-  return defs.map(d => {
+  return GANG_DEFS.map(d => {
     const level = Math.max(1, Math.round(d.avgLevel))
     const capacity = capacityForLevel(level)
     const members = makeRoster(Math.min(d.size, capacity), d.avgLevel)
@@ -165,6 +188,10 @@ export function useGang() {
   useEffect(() => { listeners.add(setS); return () => listeners.delete(setS) }, [])
   return s
 }
+
+// Plain (non-React) subscription — fires on any gang change (join/leave/found).
+// Used by the turf map to recolor blocks the moment your gang allegiance shifts.
+export function subscribeGang(fn) { listeners.add(fn); return () => listeners.delete(fn) }
 
 // Browsable gangs = the AI list minus the one you're already in.
 export function getBrowseGangs() {

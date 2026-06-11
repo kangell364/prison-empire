@@ -1,0 +1,45 @@
+-- ===================================================================
+-- Prison Empire - GANG CHAT
+-- Paste this whole thing into the Supabase SQL Editor and press Run.
+-- Safe to run more than once.
+--
+-- A gang-scoped chat: every message carries a `gang_id` (the gang's room id).
+-- Clients only ever query the room of the gang they're currently in, so joining
+-- a gang drops you into its chat and leaving cuts you off — the room id is the
+-- gate (no membership table yet). Joined AI gangs use stable ids ('g_yard', …);
+-- a player-founded gang is scoped per-user as 'mine:<user_id>'.
+-- ===================================================================
+
+create table if not exists public.gang_chat_messages (
+  id         uuid primary key default gen_random_uuid(),
+  gang_id    text not null,
+  user_id    uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  body       text not null,
+  created_at timestamptz not null default now()
+);
+-- fast "latest messages in this room" reads
+create index if not exists gang_chat_room_idx on public.gang_chat_messages (gang_id, created_at desc);
+
+alter table public.gang_chat_messages enable row level security;
+
+drop policy if exists gang_chat_read   on public.gang_chat_messages;
+drop policy if exists gang_chat_insert on public.gang_chat_messages;
+
+-- any signed-in player can read (clients filter to their own gang's room)
+create policy gang_chat_read on public.gang_chat_messages for select to authenticated using (true);
+-- you can post only AS yourself, into a non-empty room, 1..280 chars
+create policy gang_chat_insert on public.gang_chat_messages for insert to authenticated
+  with check (
+    user_id = auth.uid()
+    and char_length(btrim(gang_id)) between 1 and 64
+    and char_length(btrim(body)) between 1 and 280
+  );
+
+-- stream new messages live
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'gang_chat_messages') then
+    alter publication supabase_realtime add table public.gang_chat_messages;
+  end if;
+end $$;

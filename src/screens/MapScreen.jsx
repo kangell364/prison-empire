@@ -16,7 +16,8 @@ import { useActiveRaids, launchRaid, RAID_HUSTLE_COST } from '../state/raidsStor
 import { usePlayerStats } from '../state/statsStore'
 import { Avatar } from '../components/Avatar'
 import { ensureMyHouse, useSharedHouses, harrisSpotFor } from '../state/sharedHousesStore'
-import { TurfLeaderboard, ActivityFeed } from '../components/TurfLeaderboard'
+import { ActivityFeed } from '../components/TurfLeaderboard'
+import { StateTurfAccordion, CountyGangLeaderboard } from '../components/GangLeaderboard'
 import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
 import { useWorld, moveHouse, arriveHouse, getHouse, applyHomeRaid, attackHouse } from '../state/worldStore'
 import { AI_MOBS } from '../data/mobs'
@@ -316,6 +317,9 @@ export default function MapScreen({ onNavigate }) {
   const [relocateErr, setRelocateErr] = useState(null)      // "tapped a locked county" warning text
   const [moveConfirm, setMoveConfirm] = useState(null)      // { fips, name, state, miles, sec }
   const [, setMoveTick] = useState(0)                       // ticks the move countdown
+  const [zip, setZip] = useState('')                        // ZIP search box
+  const [zipBusy, setZipBusy] = useState(false)
+  const [zipErr, setZipErr] = useState(null)
   const { attacks, landed, launch, dismissLanded } = useDriveBys()
   const { data: mapData } = useMapData()
   // Gate the block / NPC economy to the UNLOCKED counties (MVP: Harris only).
@@ -489,6 +493,15 @@ export default function MapScreen({ onNavigate }) {
       : [],
     [blockGeo, stateView],
   )
+  // Unlocked (active-turf) counties in the current state — drives the per-county
+  // gang leaderboards in the state view, regardless of whether you hold turf there.
+  const unlockedCountiesInState = useMemo(
+    () => stateView
+      ? UNLOCKED_COUNTY_FIPS.filter(f => f.slice(0, 2) === stateView.fips)
+          .map(f => ({ fips: f, name: countyNameByFips[f] || 'County' }))
+      : [],
+    [stateView, countyNameByFips],
+  )
 
   // Open the Turf Map centered on the average of your owned blocks in a county,
   // so it lands right on your turf there.
@@ -496,6 +509,30 @@ export default function MapScreen({ onNavigate }) {
     const n = c.blocks.length
     const [sumLat, sumLng] = c.blocks.reduce((a, [lat, lng]) => [a[0] + lat, a[1] + lng], [0, 0])
     setTurfView({ center: n ? [sumLat / n, sumLng / n] : null, label: `${c.name} County` })
+  }
+
+  // ZIP search — geocode a US ZIP via zippopotam.us (free, no key, not the
+  // Mapbox endpoint our network blocks) and fly the turf map to it. Claiming is
+  // still gated to unlocked counties; this just lets a player look at home.
+  const goToZip = async () => {
+    const z = String(zip).trim()
+    if (!/^\d{5}$/.test(z)) { setZipErr('Enter a 5-digit ZIP'); sfx.deny?.(); return }
+    setZipBusy(true); setZipErr(null)
+    try {
+      const res = await fetch(`https://api.zippopotam.us/us/${z}`)
+      if (!res.ok) throw new Error('not found')
+      const data = await res.json()
+      const p = data.places && data.places[0]
+      if (!p) throw new Error('not found')
+      const lat = parseFloat(p['latitude']), lng = parseFloat(p['longitude'])
+      const place = `${p['place name']}, ${p['state abbreviation']}`
+      sfx.tap?.()
+      setTurfView({ center: [lat, lng], label: `${z} · ${place}` })
+    } catch {
+      setZipErr(`Couldn't find ZIP ${z}`); sfx.deny?.()
+    } finally {
+      setZipBusy(false)
+    }
   }
 
   // Current county of a movable house: explicit county_fips, else via its city.
@@ -788,14 +825,44 @@ export default function MapScreen({ onNavigate }) {
         )}
       </div>
 
-      {/* Live competitive layer over the shared Harris turf: who holds the most
-          blocks + a realtime feed of takeovers. Country view only. */}
+      {/* ZIP jump — look up your home area on the turf map. Country view only. */}
       {!stateView && (
         <div className="section">
           <div className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <i className="ti ti-trophy" style={{ color: GOLD }} /> Harris Turf Leaderboard
+            <i className="ti ti-map-search" style={{ color: '#4a9eff' }} /> Find Your Area
           </div>
-          <TurfLeaderboard />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              value={zip}
+              onChange={e => { setZip(e.target.value.replace(/[^\d]/g, '').slice(0, 5)); setZipErr(null) }}
+              onKeyDown={e => { if (e.key === 'Enter') goToZip() }}
+              inputMode="numeric"
+              placeholder="Enter ZIP code"
+              style={{ flex: 1, background: '#13131f', border: '0.5px solid #2a2a38', borderRadius: 10, padding: '11px 13px', color: '#fff', fontSize: 15, outline: 'none' }}
+            />
+            <button className="btn btn-gold" onClick={goToZip} disabled={zipBusy}
+              style={{ padding: '0 18px', opacity: zipBusy ? 0.6 : 1 }}>
+              {zipBusy ? '…' : 'Go'}
+            </button>
+          </div>
+          {zipErr
+            ? <div style={{ color: RED, fontSize: 11.5, marginTop: 6 }}>{zipErr}</div>
+            : <div style={{ color: DIM, fontSize: 11, marginTop: 6 }}>Jump to your neighborhood. You can only claim turf in unlocked counties for now.</div>}
+        </div>
+      )}
+
+      {/* Gang turf leaderboards — each active-turf state expands to its gang
+          board, ranked by blocks owned. Country view only. */}
+      {!stateView && (
+        <div className="section">
+          <div className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-trophy" style={{ color: GOLD }} /> Gang Turf Leaderboard
+          </div>
+          <StateTurfAccordion
+            mapData={mapData}
+            unlockedFips={UNLOCKED_COUNTY_FIPS}
+            stateNameByFips={stateNameByFips}
+          />
         </div>
       )}
       {!stateView && (
@@ -867,6 +934,26 @@ export default function MapScreen({ onNavigate }) {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* County gang leaderboards for the drilled-in state — one board per
+          active-turf county, ranked by blocks owned. */}
+      {stateView && unlockedCountiesInState.length > 0 && (
+        <div className="section">
+          <div className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-trophy" style={{ color: GOLD }} /> {stateView.name} — County Gang Leaderboards
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {unlockedCountiesInState.map(c => (
+              <CountyGangLeaderboard
+                key={c.fips}
+                mapData={mapData}
+                fips={c.fips}
+                title={`${c.name} County Gang Leaderboard`}
+              />
+            ))}
+          </div>
         </div>
       )}
 

@@ -123,8 +123,9 @@ function commit() { try { localStorage.setItem(KEY, JSON.stringify(overrides)) }
 
 export function subscribeBlocks(fn) { listeners.add(fn); return () => listeners.delete(fn) }
 export function useBlocksVersion() {
-  const [, set] = useState(0)
-  useEffect(() => subscribeBlocks(() => set(v => v + 1)), [])
+  const [v, set] = useState(0)
+  useEffect(() => subscribeBlocks(() => set(x => x + 1)), [])
+  return v
 }
 
 // ---- shared world: other players' turf -----------------------------
