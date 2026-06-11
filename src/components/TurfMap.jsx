@@ -11,7 +11,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { geoBounds, geoContains } from 'd3-geo'
-import { GRID, getBlock, subscribeBlocks, subscribeActivity, subscribePayout, CREW_COLORS, RESERVED_BLUE } from '../state/blocksStore'
+import { GRID, getBlock, cellOf, cellKey, subscribeBlocks, subscribeActivity, subscribePayout, CREW_COLORS, RESERVED_BLUE } from '../state/blocksStore'
 import { getMyGangId, subscribeGang } from '../state/gangStore'
 import { blockColor } from '../state/gangTurf'
 
@@ -92,6 +92,11 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
   // Your owned blocks currently drawn on-screen — captured each redraw so the
   // hourly payout can pulse exactly the turf that's in view (no full re-scan).
   const ownedInViewRef = useRef([])
+  // Cells occupied by a trap house (yours + every other player's), snapped to the
+  // grid — the block grid suppresses its NPC icon there so the trap house REPLACES
+  // the NPC. drawRef lets the house layer trigger a block-grid redraw when houses move.
+  const occupiedRef = useRef(new Set())
+  const drawRef = useRef(null)
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
@@ -196,7 +201,9 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
           : L.rectangle([[cy - GRID / 2, cx - GRID / 2], [cy + GRID / 2, cx + GRID / 2]], shapeStyle)
         shape.addTo(layer)
         shape.on('click', () => onBlockTapRef.current && onBlockTapRef.current(gx, gy))
-        if (owner && showIcons) {
+        // Skip the crew NPC icon when a player's trap house occupies this cell —
+        // the trap-house marker stands in its place (the house REPLACES the NPC).
+        if (owner && showIcons && !occupiedRef.current.has(cellKey(gx, gy))) {
           // A trap house centered in the middle of the owned block (replaces the
           // old standing-NPC figure), tinted by the owning crew's color.
           const house = L.divIcon({ className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: `<div style="width:28px;height:28px;border-radius:8px;background:${color};border:2px solid #0a0a0f;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 5px rgba(0,0,0,.7)">🏚️</div>` })
@@ -207,6 +214,7 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
       ownedInViewRef.current = ownedHere
     }
     map.on('moveend zoomend', draw)
+    drawRef.current = draw                // let the house layer trigger a redraw
     const unsub = subscribeBlocks(draw)   // redraw when blocks change
     const unsubGang = subscribeGang(draw) // recolor when your gang allegiance changes
     draw()
@@ -269,8 +277,11 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
 
   // Your gang's Trap House — a single marker at your home turf. Tap it to open
   // the grow-and-sell shop. (Phase 2: map presence. Raids land in Phase 3.)
-  const tLat = trapHouse ? trapHouse.lat : null
-  const tLng = trapHouse ? trapHouse.lng : null
+  // Snap the house to the CENTER of the block it sits on — every player trap
+  // house is tied to a block cell (and replaces that block's NPC).
+  const tCell = (trapHouse && trapHouse.lat != null) ? blockCenter(...cellOf(trapHouse.lng, trapHouse.lat)) : null
+  const tLat = tCell ? tCell[0] : null
+  const tLng = tCell ? tCell[1] : null
   useEffect(() => {
     const map = mapRef.current
     if (!map || tLat == null || tLng == null) return
@@ -304,13 +315,27 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
         <div style="width:32px;height:32px;border-radius:10px;background:#1a1015;border:2px solid #e74c3c;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 2px 8px rgba(0,0,0,.7);margin:0 auto">🏚️</div>
         <div style="margin-top:2px;font-size:9px;color:#fff;background:rgba(0,0,0,.62);border-radius:4px;padding:1px 4px;white-space:normal;max-width:120px;line-height:1.2;margin-left:auto;margin-right:auto;display:inline-block">${name}</div>
       </div>` })
-      L.marker([h.lat, h.lng], { icon })
+      const [scy, scx] = blockCenter(...cellOf(h.lng, h.lat))   // snap to block center
+      L.marker([scy, scx], { icon })
         .on('click', () => onHouseTapRef.current && onHouseTapRef.current(h))
         .addTo(layer)
     })
     return () => { try { map.removeLayer(layer) } catch {} }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [othersKey])
+
+  // Track which cells trap houses occupy (yours + every other player's, snapped to
+  // the grid) so the block grid hides its NPC there — the house replaces the NPC.
+  useEffect(() => {
+    const set = new Set()
+    if (trapHouse && trapHouse.lat != null) { const [gx, gy] = cellOf(trapHouse.lng, trapHouse.lat); set.add(cellKey(gx, gy)) }
+    ;(otherHouses || []).forEach(h => {
+      if (h.lat != null && h.lng != null) { const [gx, gy] = cellOf(h.lng, h.lat); set.add(cellKey(gx, gy)) }
+    })
+    occupiedRef.current = set
+    drawRef.current && drawRef.current()   // repaint the grid so NPCs hide/show under houses
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tLat, tLng, othersKey])
 
   // MOB HOUSES — one big landmark centered on each county's reserved 2×2 blue
   // square. Same trap-house art, 3× the personal house, with a bold "MOB HOUSE"
