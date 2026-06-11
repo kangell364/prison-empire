@@ -6,6 +6,7 @@ import { getPlantUpgrade, PLANT_YIELD_PER_LEVEL } from '../state/plantUpgradesSt
 import { setRoomBank } from '../state/roomBankStore'
 import { useActiveRaids } from '../state/raidsStore'
 import { Avatar } from '../components/Avatar'
+import { SlotMachine } from '../components/SlotMachine'
 
 const GOLD = '#c9a84c'
 const GREEN = '#2ecc71'
@@ -99,6 +100,7 @@ const ROOMS = [
   { key: 'pack', name: 'Packing',    art: '/packing-room.webp', accent: BLUE, hint: 'Raw product gets cut & packed into sellable units.' },
   { key: 'grow', name: 'Grow Room',  art: '/grow-room.webp',  accent: GREEN, hint: 'Plants grow product that travels down to the bins.' },
   { key: 'dust', name: 'Dust Room',  art: '/dust-room.webp',  accent: '#b06ad0', hint: 'Premium dust — coming soon.' },
+  { key: 'casino', name: 'Casino',   art: '',                 accent: '#e0b33a', hint: 'Try your luck on the slots — burn surplus Hustle.' },
 ]
 
 // `isOwner` is the owner-vs-visitor split. Only the owner walks the back rooms;
@@ -575,6 +577,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
         {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} packCounts={packCounts} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} />}
         {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} budResync={budResync} onBudLand={advanceNow} tableCards={tableCards} cardLevels={cardLevels} onAdd={setPicking} onUproot={uprootTable} skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} />}
         {cur.key === 'dust' && <DustRoom art={cur.art} />}
+        {cur.key === 'casino' && <SlotMachine cash={bank} onCashDelta={(d) => setBank(b => Math.max(0, b + d))} />}
       </div>
 
       {/* Arrows — step between rooms. Left = toward the front, right = deeper. */}
