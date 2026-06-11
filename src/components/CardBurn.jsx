@@ -9,11 +9,13 @@ import React, { useEffect, useRef, useState } from 'react'
 //   <CardBurn active={burning} onDone={() => removeCard()}>
 //     <SkillCardTile ... />
 //   </CardBurn>
-export function CardBurn({ active, onDone, duration = 1100, children }) {
+export function CardBurn({ active, onDone, duration = 1600, children }) {
   const fired = useRef(false)
+  const videoRef = useRef(null)
   useEffect(() => {
     if (!active || fired.current) return
     fired.current = true
+    if (videoRef.current) { try { videoRef.current.currentTime = 0; videoRef.current.play() } catch {} }
     const t = setTimeout(() => onDone && onDone(), duration)
     return () => clearTimeout(t)
   }, [active, duration, onDone])
@@ -26,40 +28,37 @@ export function CardBurn({ active, onDone, duration = 1100, children }) {
       }}>
         {children}
       </div>
-      {active && <BurnOverlay duration={duration} />}
+      {active && (
+        <>
+          {/* CSS heat glow + embers play UNDER the video — and stand in as the
+              fallback if the clip can't load. */}
+          <BurnOverlay duration={duration} />
+          {/* Real fire (keyed to black) screen-blended over the card — black drops
+              out, only the flames show. Slightly oversized so they overhang. */}
+          <video ref={videoRef} src="/fire-burn.mp4" muted playsInline autoPlay
+            style={{
+              position: 'absolute', left: '-14%', top: '-22%', width: '128%', height: '132%',
+              objectFit: 'cover', mixBlendMode: 'screen', pointerEvents: 'none', borderRadius: 8,
+            }} />
+        </>
+      )}
     </div>
   )
 }
 
-// Flames along the bottom rising up + drifting embers + an orange glow. Positions
-// are index-derived (deterministic, no RNG) so it renders identically every time.
+// Heat glow + drifting embers that play UNDER the fire video (and stand in as the
+// fallback if the clip can't load). Positions are index-derived (no RNG) so it
+// renders identically every time. The big flames come from the video now.
 function BurnOverlay({ duration }) {
-  const flames = [
-    { left: '2%',  w: '42%', h: '120%', delay: 0 },
-    { left: '24%', w: '44%', h: '135%', delay: 90 },
-    { left: '48%', w: '42%', h: '125%', delay: 40 },
-    { left: '66%', w: '40%', h: '130%', delay: 140 },
-    { left: '12%', w: '38%', h: '110%', delay: 200 },
-  ]
   const embers = Array.from({ length: 16 })
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}>
-      {/* heat glow behind the flames */}
+      {/* heat glow */}
       <div style={{
         position: 'absolute', inset: -12, borderRadius: 16, mixBlendMode: 'screen',
         background: 'radial-gradient(circle at 50% 70%, rgba(255,150,40,0.6), rgba(255,80,20,0.25) 45%, transparent 72%)',
         animation: `burnGlow ${duration}ms ease-out forwards`,
       }} />
-      {/* flames */}
-      {flames.map((f, i) => (
-        <div key={i} style={{
-          position: 'absolute', left: f.left, bottom: '-8%', width: f.w, height: f.h,
-          background: 'radial-gradient(ellipse at 50% 100%, #fff4bd 0%, #ffbe3a 28%, #ff6a1f 58%, #cc1f0d 82%, transparent 100%)',
-          borderRadius: '50% 50% 46% 46% / 72% 72% 28% 28%',
-          transformOrigin: '50% 100%', filter: 'blur(1px)', mixBlendMode: 'screen',
-          animation: `burnFlame ${duration}ms ease-in ${f.delay}ms forwards`,
-        }} />
-      ))}
       {/* embers */}
       {embers.map((_, i) => {
         const left = (i * 37) % 92 + 4            // spread across the width
