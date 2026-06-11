@@ -785,6 +785,165 @@ export const SKILLS = [
       hustle:    3_000 * (currentLevel + 1),
     }),
   },
+
+  // ===================================================================
+  // PHASE 1 PRISON SKILL CARDS — fixed-affix set (DATA ONLY).
+  //
+  // The combat engine does NOT read `effect` yet — that's Phase 2. Until the
+  // resolver is wired, every card below still works as a plain nuke via its
+  // `perLevelAttack`. The `effect` block is inert metadata describing the
+  // give/take skill we'll fire once the engine lands. Safe to ship as-is.
+  //
+  // EFFECT SCHEMA — 4 primitives, each leaning to the HOLDER:
+  //   effect: {
+  //     kind:   'dot' | 'disable' | 'modifier' | 'dice',
+  //     target: 'opponent' | 'self' | 'both',
+  //     // dot ........ damage over time:        pctMaxHp, rolls
+  //     // disable .... mute opponent slots:      slots ('even'|'odd'|[2,12]), rolls
+  //     // modifier ... timed stat shift:         stat ('atk'|'def'|'payout'), pct, duration ('fight'|<rolls>)
+  //     // dice ....... steer the roll itself:    nudge (±1), rolls   (native to this engine)
+  //     selfCost:      { ...same shape, refundOnExpire?: true },   // the holder's recoverable cost
+  //     fizzleChance:  0..1,                                       // prison-made gear can misfire
+  //     scalePerLevel: { <field>: perLevel },                      // grows as the CARD levels (merge)
+  //     slotBias:      <n> | [n,n],                                // which dice slot this wants to sit in
+  //   }
+  //
+  // DESIGN LAW: holder's downside is conditional/recoverable; opponent's is
+  // unconditional. If a card can't be written that way, it's an enemy debuff.
+  // Art is the bottleneck — all five reuse the Skull Crusher image as a TEMP
+  // placeholder (// TODO art) so the catalog renders; emoji are distinct.
+  // ===================================================================
+
+  {
+    id: 'shiv',
+    name: 'SHIV',
+    shortName: 'Shiv',
+    emoji: '🔪',
+    avatar: '/skill-skull-crusher.jpg',          // TODO art — sharpened-toothbrush shank
+    rarity: 'uncommon',
+    description: 'A sharpened toothbrush. Opens a wound that bleeds them out over the next few rolls — if the shank doesn’t snap first.',
+    category: 'Brawl',
+    minLevel: 1,
+    maxLevel: 100,
+    perLevelAttack: 12,                           // low direct hit — the value is the bleed
+    effect: {
+      kind: 'dot', target: 'opponent',
+      pctMaxHp: 2, rolls: 3,                      // bleed 2% max HP / roll for 3 rolls
+      fizzleChance: 0.20,                         // 20% it snaps and does nothing (the give/take)
+      scalePerLevel: { pctMaxHp: 0.5 },           // +0.5%/roll per card level
+      slotBias: 7,                                // reliable — fires often
+    },
+    baseLearnCost:    { knowledge: 10, hustle: 1_500 },
+    upgradeCostFor: (currentLevel) => ({
+      knowledge: 10 + currentLevel * 4,
+      hustle:    1_500 * (currentLevel + 1),
+    }),
+  },
+
+  {
+    id: 'the_hole',
+    name: 'THE HOLE',
+    shortName: 'The Hole',
+    emoji: '🕳️',
+    avatar: '/skill-skull-crusher.jpg',          // TODO art — solitary cell door slamming
+    rarity: 'rare',
+    description: 'Throw them in solitary — their even slots go dark for 3 rolls. You bleed for the stretch too, but you get every drop back the moment they walk out.',
+    category: 'Control',
+    minLevel: 1,
+    maxLevel: 100,
+    perLevelAttack: 8,
+    effect: {
+      kind: 'disable', target: 'opponent',
+      slots: 'even', rolls: 3,                    // opponent's even skill slots can't fire for 3 rolls
+      selfCost: { kind: 'dot', pctMaxHp: 2, rolls: 3, refundOnExpire: true }, // you bleed, then it's refunded
+      scalePerLevel: { rolls: 0.34 },             // ~+1 roll of lockdown per 3 card levels
+      slotBias: [3, 11],
+    },
+    baseLearnCost:    { knowledge: 30, hustle: 4_000 },
+    upgradeCostFor: (currentLevel) => ({
+      knowledge: 30 + currentLevel * 6,
+      hustle:    4_000 * (currentLevel + 1),
+    }),
+  },
+
+  {
+    id: 'shakedown',
+    name: 'SHAKEDOWN',
+    shortName: 'Shakedown',
+    emoji: '🤜',
+    avatar: '/skill-skull-crusher.jpg',          // TODO art — cornering a mark in the yard
+    rarity: 'rare',
+    description: 'Strong-arm the yard. Both of you lose 10% defense for the fight — but every point stripped gets bolted onto YOUR attack. Glass cannon, your way.',
+    category: 'Control',
+    minLevel: 1,
+    maxLevel: 100,
+    perLevelAttack: 10,
+    effect: {
+      kind: 'modifier', target: 'both',
+      stat: 'def', pct: -10, duration: 'fight',   // both lose 10% def for the fight
+      convertTo: 'atk',                           // the stripped def flows to HOLDER's attack
+      scalePerLevel: { pct: -1 },                 // strips 1% more def per card level
+      slotBias: [4, 10],
+    },
+    baseLearnCost:    { knowledge: 28, hustle: 4_000 },
+    upgradeCostFor: (currentLevel) => ({
+      knowledge: 28 + currentLevel * 6,
+      hustle:    4_000 * (currentLevel + 1),
+    }),
+  },
+
+  {
+    id: 'loaded_dice',
+    name: 'LOADED DICE',
+    shortName: 'Loaded Dice',
+    emoji: '🎲',
+    avatar: '/skill-skull-crusher.jpg',          // TODO art — weighted bone dice, contraband glow
+    rarity: 'uncommon',
+    description: 'Weighted bones smuggled off the yard. Nudge the next 2 rolls toward your slots — but load ’em wrong and the die cracks in your hand.',
+    category: 'Hustle',
+    minLevel: 1,
+    maxLevel: 100,
+    perLevelAttack: 6,                            // barely a hit — it’s a steering tool
+    effect: {
+      kind: 'dice', target: 'self',
+      nudge: 1, rolls: 2,                         // ±1 to the next 2 roll-sums, toward owner’s slots
+      fizzleChance: 0.15,                         // 15% the die cracks → disables YOUR next roll (the cost)
+      scalePerLevel: { rolls: 0.5 },              // +1 steered roll per 2 card levels
+      slotBias: [6, 8],
+    },
+    baseLearnCost:    { knowledge: 15, hustle: 2_000 },
+    upgradeCostFor: (currentLevel) => ({
+      knowledge: 15 + currentLevel * 4,
+      hustle:    2_000 * (currentLevel + 1),
+    }),
+  },
+
+  {
+    id: 'contraband',
+    name: 'CONTRABAND',
+    shortName: 'Contraband',
+    emoji: '📦',
+    avatar: '/skill-skull-crusher.jpg',          // TODO art — stash of product changing hands
+    rarity: 'legendary',
+    description: 'You’re moving product mid-fight. Land the KO on this slot and the score pays DOUBLE — but eyes on the prize means slower hands all bout.',
+    category: 'Hustle',
+    minLevel: 1,
+    maxLevel: 100,
+    perLevelAttack: 5,
+    effect: {
+      kind: 'modifier', target: 'self',
+      stat: 'payout', pct: 100, duration: 'fight',// +100% (2×) rewards...
+      condition: 'killing_blow',                  // ...only if THIS slot lands the KO
+      selfCost: { stat: 'atk', pct: -10, duration: 'fight' }, // −10% attack while equipped (the cost)
+      scalePerLevel: { pct: 25 },                 // +25% payout per card level (×2 → ×2.25 → ...)
+      slotBias: 12,                               // rarest slot — a true haymaker payday
+    },
+    baseLearnCost:    { knowledge: 40, hustle: 6_000 },
+    upgradeCostFor: (currentLevel) => ({
+      knowledge: 40 + currentLevel * 8,
+      hustle:    6_000 * (currentLevel + 1),
+    }),
+  },
 ]
 
 // PLANTS — grow cards for the Trap House. Same collectible shape as SKILLS
