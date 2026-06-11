@@ -50,7 +50,7 @@ export function SkillCardPopup({ skill, level, dmgPerLevel, onClose }) {
             <div style={{ color: '#999', fontSize: 12, lineHeight: 1.5, marginTop: 8 }}>{skill.description}</div>
           )}
           <div style={{ background: '#1e1e2a', borderRadius: 8, padding: '8px 10px', textAlign: 'center', marginTop: 12 }}>
-            <div style={{ color: '#555', fontSize: 8, fontWeight: 700, letterSpacing: 1 }}>DMG</div>
+            <div style={{ color: '#555', fontSize: 8, fontWeight: 700, letterSpacing: 1 }}>POTENCY</div>
             <div style={{ color: '#e74c3c', fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
               +{dmg}<span style={{ fontSize: 9, color: '#777', fontWeight: 600 }}> /lv</span>
             </div>

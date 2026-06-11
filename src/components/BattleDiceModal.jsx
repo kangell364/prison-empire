@@ -222,8 +222,8 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
 
     // Effects cast by skills that fired (fizzle gates the effect, not the swing).
     let newFx = []
-    if (pSkillFires && pSkillDef.effect) newFx = newFx.concat(effectInstancesFor(pSkillDef, pSlot.level || 1, 'player', base, pFizzle))
-    if (oSkillFires && oSkillDef.effect) newFx = newFx.concat(effectInstancesFor(oSkillDef, oSlot.level || 1, 'opp', base, oFizzle))
+    if (pSkillFires && pSkillDef.effect) newFx = newFx.concat(effectInstancesFor(pSkillDef, pSlot.level || 1, 'player', base, pFizzle, pSlot.potency || 0))
+    if (oSkillFires && oSkillDef.effect) newFx = newFx.concat(effectInstancesFor(oSkillDef, oSlot.level || 1, 'opp', base, oFizzle, oSlot.dmgUpgrade || 0))
 
     // Standing modifiers shift atk/def this roll (fight buffs cast now take hold
     // next roll — they're committed below).

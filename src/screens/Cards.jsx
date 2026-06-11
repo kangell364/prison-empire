@@ -326,13 +326,13 @@ export default function Cards({ initialTab = 'player' }) {
             count={liveCount}
             cardLevel={cardLevel}
             statTiles={[
-              { icon: 'ti-sword', label: 'DMG / LV', value: `+${effDmg}`, color: '#e74c3c' },
+              { icon: 'ti-sword', label: 'POTENCY', value: `+${effDmg}`, color: '#e74c3c' },
               { icon: 'ti-stack-2', label: 'Card Level', value: cardLevel, color: '#c9a84c' },
             ]}
             upgrades={readSkillUpgrade(skillUpgradeMap, skill.id, cardLevel)}
             hustle={hustle}
             onUpgrade={handleSkillUpgrade(skill.id, cardLevel)}
-            upgradeRows={[{ label: 'DAMAGE', color: '#e74c3c', stat: 'dmg', perLevel: SKILL_DMG_PER_LEVEL }]}
+            upgradeRows={[{ label: 'POTENCY', color: '#e74c3c', stat: 'dmg', perLevel: SKILL_DMG_PER_LEVEL }]}
             maxUpgradeLevel={MAX_SKILL_UPGRADE_LEVEL}
             costForLevel={SKILL_UPGRADE_COST}
             canMerge={liveCount >= SKILL_STACK_SIZE}
@@ -927,7 +927,7 @@ function SkillTile({ skill, cardLevel, count, dmgUpgrade = 0, onTap }) {
       {/* Stat tiles — DMG (reflects upgrades) + LVL */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
         <div style={{ background: '#1e1e2a', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-          <div style={{ color: '#555', fontSize: 8, letterSpacing: 1, fontWeight: 700 }}>DMG</div>
+          <div style={{ color: '#555', fontSize: 8, letterSpacing: 1, fontWeight: 700 }}>POTENCY</div>
           <div style={{ color: '#e74c3c', fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
             +{effDmg}<span style={{ fontSize: 8, color: '#777', fontWeight: 600 }}>/lv</span>
           </div>

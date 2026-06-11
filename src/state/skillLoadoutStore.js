@@ -88,7 +88,9 @@ export function getBattleSkillLoadout() {
     if (level <= 0) continue
     const dmgUpgrade = getSkillUpgrade(skillId, level).dmg || 0
     const perHit = skill.perLevelAttack + dmgUpgrade * SKILL_DMG_PER_LEVEL
-    out[slot] = { skillId, level, bonus: level * perHit }
+    // `potency` = the upgrade level; it scales the skill's EFFECT magnitude too
+    // (see skillEffects.scaled), not just the per-hit nuke baked into `bonus`.
+    out[slot] = { skillId, level, bonus: level * perHit, potency: dmgUpgrade }
   }
   return out
 }

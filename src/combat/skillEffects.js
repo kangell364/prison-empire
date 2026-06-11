@@ -31,11 +31,15 @@ function sideOf(target, owner) {
   return null // 'both' is expanded by the caller
 }
 
-// Magnitude scaled by CARD level: base + perLevel × (level − 1). `field` keys the
-// scalePerLevel map (e.g. a Lvl 3 Shiv bleeds more).
-function scaled(base, scalePerLevel, field, level) {
+// Magnitude scaled by CARD level (merge) AND POTENCY (the Hustle upgrade, §1a):
+//   base + perLevel×(level−1) + base×POTENCY_FRAC×potency
+// `field` keys the scalePerLevel map (e.g. a Lvl 3 Shiv bleeds more). Potency
+// boosts the BENEFIT only — self-costs stay flat (see instancesFromCost), so
+// upgrading never increases the holder's downside.
+export const POTENCY_FRAC = 0.04   // +4% of base per potency level (max 20 → +80%)
+function scaled(base, scalePerLevel, field, level, potency = 0) {
   const per = scalePerLevel && scalePerLevel[field] ? scalePerLevel[field] : 0
-  return base + per * (Math.max(1, level) - 1)
+  return base + per * (Math.max(1, level) - 1) + base * POTENCY_FRAC * (potency || 0)
 }
 
 // Flat atk/def deltas from a percentage modifier on `side`, off its base stats.
@@ -80,7 +84,7 @@ function instancesFromCost(cost, owner, base, skillDef, level) {
 // Returns the lasting effect instances a freshly-fired skill creates. `owner` is
 // who fired it. `base` = { player:{atk,def}, opp:{atk,def} } constants.
 // Returns [] for a pure nuke (no effect block) or a fizzle.
-export function effectInstancesFor(skillDef, level, owner, base, didFizzle) {
+export function effectInstancesFor(skillDef, level, owner, base, didFizzle, potency = 0) {
   const eff = skillDef.effect
   if (!eff) return []
   // A fizzle skips the MAIN effect (and its self-cost) — the swing still landed
@@ -94,8 +98,8 @@ export function effectInstancesFor(skillDef, level, owner, base, didFizzle) {
     const side = sideOf(eff.target, owner) || foeOf(owner)
     out.push({
       kind: 'dot', appliesTo: side, owner,
-      rollsLeft: Math.round(scaled(eff.rolls || 1, sp, 'rolls', level)),
-      pctMaxHp: scaled(eff.pctMaxHp || 0, sp, 'pctMaxHp', level),
+      rollsLeft: Math.round(scaled(eff.rolls || 1, sp, 'rolls', level, potency)),
+      pctMaxHp: scaled(eff.pctMaxHp || 0, sp, 'pctMaxHp', level, potency),
       drained: 0, refundOnExpire: false,
       source: skillDef.id, label: skillDef.shortName,
     })
@@ -103,18 +107,18 @@ export function effectInstancesFor(skillDef, level, owner, base, didFizzle) {
     const side = sideOf(eff.target, owner) || foeOf(owner)
     out.push({
       kind: 'disable', appliesTo: side, owner,
-      rollsLeft: Math.round(scaled(eff.rolls || 1, sp, 'rolls', level)),
+      rollsLeft: Math.round(scaled(eff.rolls || 1, sp, 'rolls', level, potency)),
       slots: eff.slots || 'all', source: skillDef.id, label: skillDef.shortName,
     })
   } else if (eff.kind === 'dice') {
     out.push({
       kind: 'dice', appliesTo: owner, owner,
-      rollsLeft: Math.round(scaled(eff.rolls || 1, sp, 'rolls', level)),
+      rollsLeft: Math.round(scaled(eff.rolls || 1, sp, 'rolls', level, potency)),
       nudge: eff.nudge || 1, source: skillDef.id, label: skillDef.shortName,
     })
   } else if (eff.kind === 'modifier') {
     const rolls = eff.duration === 'fight' ? Infinity : (eff.rolls || eff.duration || 1)
-    const pct = scaled(eff.pct || 0, sp, 'pct', level)
+    const pct = scaled(eff.pct || 0, sp, 'pct', level, potency)
     if (eff.stat === 'payout') {
       // Payout is resolved inline at KO time — no lasting stat effect here.
     } else if (eff.target === 'both') {
