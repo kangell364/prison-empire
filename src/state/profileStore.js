@@ -17,6 +17,16 @@ import { supabase, isSupabaseConfigured } from '../supabase'
 import { RESOURCES, PLAYER, PLAYER_LOOKS, DEFAULT_LOOK_ID } from '../data/gameData'
 import { checkName } from './nameModeration'
 
+// Random starter handle for a fresh account, so the shared map isn't a wall of
+// identical 'SlickRico' defaults. e.g. "SlickRico47", "IronKane88".
+const HANDLE_A = ['Iron', 'Yard', 'Block', 'Steel', 'Mad', 'Slick', 'Big', 'Ghost', 'King', 'Stone', 'Cold', 'Quick', 'Trap', 'Razor', 'Boss', 'Smoke', 'Diesel', 'Loc', 'Shotta', 'Grim', 'Lil', 'Young', 'Real', 'Top']
+const HANDLE_B = ['Mike', 'Rico', 'Tony', 'Chino', 'Mack', 'Vince', 'Loco', 'Dre', 'Cisco', 'Capo', 'Reyes', 'Goon', 'Cash', 'Pesos', 'Don', 'Vato', 'Zilla', 'Trey', 'Wolf', 'Ace', 'Blaze', 'Kane', 'Fox', 'Snow']
+function randomHandle() {
+  const a = HANDLE_A[Math.floor(Math.random() * HANDLE_A.length)]
+  const b = HANDLE_B[Math.floor(Math.random() * HANDLE_B.length)]
+  return `${a}${b}${Math.floor(Math.random() * 900) + 10}`.slice(0, 20)
+}
+
 const PROFILE_KEY        = 'pe_profile_v1'
 const LEGACY_HUSTLE_KEY  = 'pe_hustle_v1'
 const MIGRATED_FLAG_KEY  = 'pe_migrated_v1'
@@ -358,6 +368,14 @@ async function loadProfileForSession({ allowLocalMigration = false } = {}) {
     if (isFreshRow && !alreadyMigrated) {
       const migrated = await migrateFromLocal(row)
       if (migrated) row = { ...row, ...migrated }
+      // Fresh anon account: replace the shared 'SlickRico' default with a unique
+      // random handle so the shared map shows varied player names (players can
+      // still rename via SWAP). Existing accounts are never touched.
+      if (!row.display_name || row.display_name === PLAYER.name) {
+        const handle = randomHandle()
+        await pushToSupabase({ display_name: handle })
+        row = { ...row, display_name: handle }
+      }
       try { localStorage.setItem(MIGRATED_FLAG_KEY, '1') } catch {}
     }
   }
