@@ -352,10 +352,15 @@ export default function TrapHouse({ onBack, isOwner = true }) {
     if (nCust <= 0) return
     idleTsRef.current = rawGap > SALES_OFFLINE_CAP_MS ? now : idleTsRef.current + (nCust / ratePerSec) * 1000
     const jc = { ...jarCountsRef.current }
-    let bankGain = 0, repAccum = 0, jarsSold = 0
+    let bankGain = 0, jarsSold = 0
     for (let i = 0; i < nCust; i++) {
       const inStock = Object.keys(jc).filter(id => Math.floor(jc[id] || 0) >= 1)
-      if (!inStock.length) { repAccum += REP_DELTA.nostock; continue }
+      // Sold out while away → the shop's empty, stop simulating. REP IS NEVER
+      // TOUCHED OFFLINE: you can't restock or re-price when you're gone, so a
+      // sellout must not ding your reputation (and away sales don't farm it up
+      // either — rep is earned by hands-on play). Overpriced jars are still
+      // refused below, so there are no forced high-price sells.
+      if (!inStock.length) break
       const wOf = (id) => Math.floor(jc[id] || 0) * (popRef.current[id] || 1)
       let roll = Math.random() * inStock.reduce((s, id) => s + wOf(id), 0); let best = inStock[0]
       for (const id of inStock) { roll -= wOf(id); if (roll <= 0) { best = id; break } }
@@ -366,16 +371,15 @@ export default function TrapHouse({ onBack, isOwner = true }) {
         const qty = Math.min(rollBasket(), Math.floor(jc[best] || 0))
         jc[best] = Math.floor(jc[best] || 0) - qty
         bankGain += price * qty; jarsSold += qty
-        repAccum += price <= street * 1.05 ? REP_DELTA.happy : REP_DELTA.grumble
-      } else { repAccum += REP_DELTA.refuse }
+      }
+      // refused (overpriced) → no sale, and no rep change while away
     }
     if (bankGain > 0) {
       setBank(b => b + bankGain)
       awaySalesRef.current = { jars: awaySalesRef.current.jars + jarsSold, cash: awaySalesRef.current.cash + bankGain }
     }
     jarCountsRef.current = jc; setJarCounts(jc)
-    if (repAccum) adjustRep(Math.max(-8, Math.min(8, repAccum * 0.15)))   // dampen the aggregate swing
-  }, [adjustRep])
+  }, [])
   useEffect(() => {
     accrueIdleSales()                                   // mount: credit the time away
     const id = setInterval(() => {
