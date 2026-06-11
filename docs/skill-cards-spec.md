@@ -19,26 +19,69 @@ Every skill card has two independent parts:
 
 - **Base** — art + name + family + `perLevelAttack` (a fixed, always-aggressive
   nuke). Levels exactly like other cards: stack 20 → merge → next level, base
-  damage grows per level. **A bad skill roll is never a worthless card** — the base
-  nuke always works. This is the guardrail that makes fully-random fair.
-- **Affixes** — the actual *skills* (Bleed, Loaded Dice, The Hole…), **rolled
-  randomly** and attached to the card instance.
+  damage grows per level.
+- **Signature skill** — the card's headline effect, **FIXED and tied to its art**
+  (shank → bleed, soap-sock → stun, badge → +def). This is its identity, its
+  rarity, and what the collection grid filters by. Always present from Lvl 1.
+- **Bonus skills** — the *random* affixes, rolled **on merge** (not on acquire).
+  These are the gamble (bad-luck / jackpot draws, burn, re-roll).
 
-### Skills per card level (a roll happens at every skill slot)
+> **MODEL A — signature fixed (decided 2026-06-10).** The Lvl 1 skill is the card's
+> known signature that matches its art; the surprises start at merge. Chosen over
+> "everything rolled" because the themed art (a shank *means* bleed) only makes
+> sense if the headline skill is fixed to it, and it keeps the rarity filter stable
+> (a card never jumps buckets when it rolls a bonus skill).
+
+### Skills per card level
 
 | Card level | Skills | How |
 |---|---|---|
-| **Lvl 1** | **1 skill** | Rolled on acquisition (the first "bad-luck or jackpot" moment) |
-| **Lvl 2** | **2 skills** | Merge 20 → keep 1st, **roll a surprise 2nd** |
-| **Lvl 3** | **3 skills** | Merge → keep both, **roll a surprise 3rd** |
+| **Lvl 1** | **1 skill** | The card's **signature** (fixed, matches art) — known, not rolled |
+| **Lvl 2** | **2 skills** | Merge 20 → keep signature, **roll a surprise bonus** |
+| **Lvl 3** | **3 skills** | Merge → **roll a 2nd surprise bonus** |
 | **Lvl 4+** | still 3 (cap) | Further merges only grow base damage |
 
-**Hard cap: 3 active affixes per card.** More than 3 stacked effects per side makes
+**Hard cap: 3 active skills per card.** More than 3 stacked effects per side makes
 the fight unreadable on a phone — that's the real failure mode, not the code. A
-Lvl 3 card = 3 synergistic skills firing = the chase.
+Lvl 3 card = signature + 2 synergistic bonus skills = the chase.
 
-The gamble is live from the **very first Level 1 card** — you don't grind to unlock
-it.
+**A bad bonus roll is never a worthless card** — the signature skill + base nuke
+always work; the bonus slots are upside on top. That guardrail (plus the safety
+valves in §7) is what makes the random bonus rolls fair instead of feel-bad.
+
+---
+
+## 1a. Growth axes (three knobs, distinct on purpose)
+
+A skill card grows three independent ways. They don't overlap — each fills a
+different gap, so the card always has something to chase.
+
+| Axis | Driven by | What it grows |
+|---|---|---|
+| **Card level** | Merge (stack 20 copies) | Base-damage jump + a new bonus-skill slot + effect magnitude (`scalePerLevel`) |
+| **Upgrade** | Hustle (grind, `skillUpgradesStore`) | Incremental potency bumps **between** merges — the per-card Hustle sink |
+| **Skills** | Signature (fixed) + merge rolls | The actual effects on the card |
+
+**Why keep the Hustle upgrade:** merging needs 20 copies (slow, supply-gated), so
+the upgrade is what gives progress *between* merges and is the card's main Hustle
+sink. It also parallels player/crew cards (which have atk/def upgrades) — keeps the
+system consistent.
+
+**Evolve "DMG" → "Potency" in Phase 2.** Today the upgrade is a flat **DMG** stat
+(`skillUpgradesStore`, +5/level, per `(card, level)`, read in combat via
+`SKILL_DMG_PER_LEVEL`). A flat DMG upgrade is **meaningless on a defensive/utility
+card** (The Badge, The Hole barely deal damage). So the upgrade should scale the
+card's **signature potency** instead — same store, same Hustle sink, same per-(card,
+level) keying, just per-card meaning:
+
+- 💀 Skull Crusher → +damage
+- 🔪 Shiv → +bleed %
+- 🛡️ The Badge → +defense %
+- 🕳️ The Hole → +lockdown rolls
+
+**Sequencing:** stays **DMG-only now** (combat only reads `dmgUpgrade`, and effects
+aren't wired yet). The Potency evolution lands in **Phase 2**, alongside wiring the
+effects — that's when bleed %, def %, etc. become real numbers the engine reads.
 
 ---
 
@@ -108,16 +151,22 @@ bias near **7**. Encoded per skill as `slotBias`.
 
 ## 5. Randomness model (Phase 2)
 
-**Fully random affixes on a fixed aggressive base.** Decided 2026-06-10.
+**Model A: fixed signature + fully-random BONUS skills.** Decided 2026-06-10.
 
-- On acquisition, a Lvl 1 card rolls **1 skill** from the weighted pool.
-- Each merge rolls **1 surprise skill** (up to the cap of 3).
-- Rolls are **rarity-weighted** (see pool table) — not uniform.
-- Safety valves make fully-random fair instead of feel-bad (see §7). Without them,
-  fully random is a rip-off; with them it's the core gamble.
+- A Lvl 1 card's skill is its **signature** — fixed, tied to art, **not rolled**.
+- Each **merge** rolls **1 random bonus skill** from the weighted pool (up to the
+  cap of 3 total).
+- Bonus rolls are **rarity-weighted** (see pool table) — not uniform.
+- Safety valves make the random bonus rolls fair instead of feel-bad (see §7).
+  Without them, random is a rip-off; with them it's the core gamble.
 
-**Jackpot:** small chance a merge rolls a rare-tier affix or grants a bonus slot —
+**Jackpot:** small chance a merge rolls a rare-tier bonus or grants an extra slot —
 the "you got lucky" beat.
+
+**Rarity in the collection grid** (display polish deferred to Phase 3): a card is
+filtered by its **signature/base rarity** only — it never changes buckets when it
+rolls a bonus skill. The 1–3 skills' individual rarities surface as on-card pips
+(exact treatment TBD when the affix UI is built).
 
 ---
 
@@ -212,9 +261,10 @@ placeholder in code (all reuse `skill-skull-crusher.jpg`, `// TODO art`) — the
 - **Phase 1 — catalog (DONE).** 5 fixed-affix cards + schema in `SKILLS`. Inert
   `effect` metadata; cards act as nukes today.
 - **Phase 2 — the engine.** Wire `effect` into `BattleDiceModal.resolve()`: the 4
-  primitives + dice nudge, with on-screen status readouts. Tune numbers. Still
-  fixed affixes — prove the give/take *feels* right with hand-tuned cards before
-  adding randomness.
+  primitives + dice nudge, with on-screen status readouts. Tune numbers. Evolve the
+  Hustle upgrade from flat **DMG** → per-card **Potency** (§1a). Still fixed
+  signatures — prove the give/take *feels* right with hand-tuned cards before adding
+  the random bonus rolls.
 - **Phase 3 — the casino.** Random affix roll on acquire + merge-surprise; the
   burn / re-roll-token / scaled-Hustle loop; jackpot rolls. Needs an affix store
   (rolled affixes per card instance) + a re-roll token currency.
