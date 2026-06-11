@@ -174,7 +174,9 @@ export default function App() {
       {/* Screen Content */}
       {renderScreen()}
 
-      <InstallPrompt />
+      {/* Hide the install banner in the immersive Trap House — it overlays the
+          bottom room-dots / controls there. It returns on every other screen. */}
+      {screen !== 'traphouse' && <InstallPrompt />}
 
       {/* Dev-only: tap the card to watch the burn animation (remove once the
           Phase 3 burn-for-tokens flow lands). */}
