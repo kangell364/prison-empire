@@ -199,11 +199,10 @@ function useRaids(territories, homeId, liveFips, fipsCoords) {
         if (cur.length >= maxConcurrent) return cur                // already at your heat's raid cap
         if (Math.random() > spawnChance) return cur                // quiet tick at low bounty
         const underRaid = new Set(cur.map(r => r.facilityId))
-        // Eligible targets: your business facilities + your personal home house
-        // (unless it's mid-relocation). Weighted by tier — richer = more heat.
+        // Eligible targets: your BUSINESS facilities only. Personal trap houses are
+        // PvP-only — only a real player can attack another player's trap house, so
+        // the AI raid spawner never targets a home house.
         const targets = owned.map(f => ({ id: f.id, tier: f.tier, kind: 'business' }))
-        const home = homeId ? getHouse(homeId) : null
-        if (home && !home.moving_until) targets.push({ id: homeId, tier: 2, kind: 'personal' })
         const eligible = targets.filter(t => !underRaid.has(t.id))
         if (!eligible.length) return cur
         const pool = eligible.flatMap(t => Array(t.tier).fill(t))
