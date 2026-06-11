@@ -77,7 +77,7 @@ function terrainOf(gx, gy) {
   return TERRAINS[TERRAINS.length - 1]
 }
 
-export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse, trapHouseName, onTrapHouseTap, onHouseTap, otherHouses, myUserId, raidDrive, onRaidArrive }) {
+export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse, trapHouseName, onTrapHouseTap, onHouseTap, otherHouses, mobHouses, myUserId, raidDrive, onRaidArrive }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const onBlockTapRef = useRef(onBlockTap)
@@ -311,6 +311,30 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
     return () => { try { map.removeLayer(layer) } catch {} }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [othersKey])
+
+  // MOB HOUSES — one big landmark centered on each county's reserved 2×2 blue
+  // square. Same trap-house art, 3× the personal house, with a bold "MOB HOUSE"
+  // label above. Non-interactive for now (gameplay lands later).
+  const mobKey = (mobHouses || []).map(h => `${h.fips}:${h.lat}:${h.lng}`).join('|')
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const houses = (mobHouses || []).filter(h => h.lat != null && h.lng != null)
+    if (!houses.length) return
+    const layer = L.layerGroup().addTo(map)
+    houses.forEach(h => {
+      const icon = L.divIcon({
+        className: '', iconSize: [114, 114], iconAnchor: [57, 57],   // anchor = box center on the square's center
+        html: `<div style="position:relative;width:114px;height:114px">
+          <div style="position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:5px;font-size:14px;font-weight:900;letter-spacing:1.5px;color:#fff;text-shadow:0 1px 3px #000,0 0 8px rgba(0,0,0,.9);white-space:nowrap">MOB HOUSE</div>
+          <div style="width:114px;height:114px;border-radius:24px;background:#1a1510;border:3px solid ${GOLD};display:flex;align-items:center;justify-content:center;font-size:66px;box-shadow:0 4px 18px rgba(0,0,0,.85)">🏚️</div>
+        </div>`,
+      })
+      L.marker([h.lat, h.lng], { icon, interactive: false, zIndexOffset: 900 }).addTo(layer)
+    })
+    return () => { try { map.removeLayer(layer) } catch {} }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mobKey])
 
   // Attack-car drive — the raid "en route" cinematic, SYNCED to the real attack
   // timer. The car leaves the attacker the moment the raid starts and travels at

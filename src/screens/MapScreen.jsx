@@ -6,7 +6,7 @@ import { USStateMap } from '../components/USStateMap'
 import { ScoutScreen } from '../components/ScoutScreen'
 import { TurfMap } from '../components/TurfMap'
 import { BlockSheet } from '../components/BlockSheet'
-import { cellCenter, cellOf, cellKey, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks, setLandTest, setReservedCells, initSharedBlocks } from '../state/blocksStore'
+import { cellCenter, cellOf, cellKey, GRID, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks, setLandTest, setReservedCells, initSharedBlocks } from '../state/blocksStore'
 import { useMapData, buildCityCountyMap, buildUnlockedCountyTest, UNLOCKED_COUNTY_FIPS, HARRIS_CENTER, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
 import { knockOut } from '../state/vitalsStore'
 import { getBounty } from '../state/bountyStore'
@@ -327,10 +327,7 @@ export default function MapScreen({ onNavigate }) {
   // Canada, the ocean) is locked — no NPCs, nothing claimable. Open more later by
   // adding FIPS to UNLOCKED_COUNTY_FIPS in mapData.js. Reuses the land-mask gate.
   useEffect(() => {
-    if (mapData) {
-      setLandTest(buildUnlockedCountyTest(mapData))
-      setReservedCells(buildReservedSquares(mapData, UNLOCKED_COUNTY_FIPS))
-    }
+    if (mapData) setLandTest(buildUnlockedCountyTest(mapData))
   }, [mapData])
 
   // Locked counties/states are uncolored on the overview maps — color (turf /
@@ -463,6 +460,15 @@ export default function MapScreen({ onNavigate }) {
     if (mapData) mapData.counties.features.forEach(f => { m[String(f.id).padStart(5, '0')] = f.properties.name })
     return m
   }, [mapData])
+
+  // Reserved blue 2×2 squares + their MOB-house markers (one per unlocked county —
+  // just Harris today). Installs the un-claimable cells into blocksStore and feeds
+  // the MOB houses to the turf map.
+  const reservedSquares = useMemo(
+    () => buildReservedSquares(mapData, UNLOCKED_COUNTY_FIPS, countyNameByFips),
+    [mapData, countyNameByFips],
+  )
+  useEffect(() => { setReservedCells(reservedSquares.cells) }, [reservedSquares])
 
   // Your held NPC blocks, geocoded to state + county. byState/byCounty drive the
   // "Your Blocks by State" (country view) and "Your Blocks by County" (state
@@ -935,6 +941,7 @@ export default function MapScreen({ onNavigate }) {
           counties={mapData?.counties}
           onBlockTap={(gx, gy) => setBlockSel({ gx, gy })}
           onBack={() => setTurfView(null)}
+          mobHouses={reservedSquares.houses}
           trapHouse={myHouseCoords || (homeCoords ? { lat: homeCoords[1], lng: homeCoords[0] } : null)}
           trapHouseName={myName}
           onTrapHouseTap={() => onNavigate && onNavigate('traphouse')}
@@ -1350,20 +1357,24 @@ function hexToRgba(hex, a) {
 // DOMINANT rival mob's color (intensity scales with its share); dark if only
 // vacant or no facilities. Colors by MOB — the Phase-B projection.
 // One reserved 2×2 block square per county, anchored at the county centroid —
-// painted blue + un-claimable, held back for a future MOB house. Returns a Set of
-// cellKeys (4 per county) that blocksStore checks via isReservedCell.
-function buildReservedSquares(mapData, fipsList) {
-  const set = new Set()
-  if (!mapData) return set
+// painted blue + un-claimable. Returns { cells, houses }: `cells` is the Set of
+// cellKeys (4 per county) that blocksStore checks via isReservedCell; `houses` is
+// one MOB-house marker per county at the SHARED CENTER of its 2×2 square.
+function buildReservedSquares(mapData, fipsList, countyNameByFips) {
+  const cells = new Set()
+  const houses = []
+  if (!mapData) return { cells, houses }
   const byFips = new Map(mapData.counties.features.map(f => [String(f.id).padStart(5, '0'), f]))
   for (const fips of fipsList) {
     const f = byFips.get(fips)
     if (!f) continue
     const [lng, lat] = geoCentroid(f)              // [lng, lat]
     const [gx0, gy0] = cellOf(lng, lat)            // anchor cell of the 2×2
-    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) set.add(cellKey(gx0 + dx, gy0 + dy))
+    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) cells.add(cellKey(gx0 + dx, gy0 + dy))
+    // Center of the 2×2 = the corner shared by all four cells.
+    houses.push({ fips, name: (countyNameByFips && countyNameByFips[fips]) || 'County', lat: (gy0 + 1) * GRID, lng: (gx0 + 1) * GRID })
   }
-  return set
+  return { cells, houses }
 }
 
 function stateColorFor(s, mobColorById) {
