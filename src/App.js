@@ -26,6 +26,8 @@ import { NotificationsModal } from './components/NotificationsModal'
 import { InstallPrompt } from './components/InstallPrompt'
 import { RaidHud } from './components/RaidHud'
 import { ChatScreen } from './components/WorldChat'
+import { CardBurnPreview } from './components/CardBurn'
+import { isDevMode } from './devMode'
 // NOTE: AR camera encounter (src/components/CameraEncounter.jsx) is built but
 // parked — re-import + re-add the header button below to bring it back.
 
@@ -172,6 +174,10 @@ export default function App() {
       {renderScreen()}
 
       <InstallPrompt />
+
+      {/* Dev-only: tap the card to watch the burn animation (remove once the
+          Phase 3 burn-for-tokens flow lands). */}
+      {isDevMode() && <CardBurnPreview />}
 
       {showNotifs && (
         <NotificationsModal onClose={() => setShowNotifs(false)} onNavigate={setScreen} />

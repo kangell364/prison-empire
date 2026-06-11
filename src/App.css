@@ -578,3 +578,29 @@ body {
   100% { transform: scale(1)    rotate(0);     opacity: 1; }
 }
 .landing-stamp { animation: landingStampPop 0.55s cubic-bezier(.18,.89,.32,1.28) forwards; }
+
+/* ---- Card burn (the burn-for-tokens flow) — one-shot, mostly transform/opacity,
+   so it's cheap on mobile (a single short-lived overlay). ---- */
+@keyframes burnCardChar {
+  0%   { transform: scale(1);    opacity: 1;   filter: none; }
+  30%  { transform: scale(1.03); opacity: 1;   filter: brightness(1.3) saturate(1.4); }
+  65%  { transform: scale(0.98); opacity: 0.8; filter: brightness(0.55) sepia(0.7); }
+  100% { transform: scale(0.86); opacity: 0;   filter: brightness(0.1) sepia(1); }
+}
+@keyframes burnFlame {
+  0%   { transform: translateY(18%) scaleY(0.55) scaleX(0.9); opacity: 0; }
+  20%  { opacity: 0.95; }
+  50%  { transform: translateY(-12%) scaleY(1.18) scaleX(1.06); opacity: 1; }
+  80%  { opacity: 0.75; }
+  100% { transform: translateY(-44%) scaleY(0.65) scaleX(0.8); opacity: 0; }
+}
+@keyframes burnEmber {
+  0%   { transform: translate(0,0) scale(1);   opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: translate(var(--ex,0), -130px) scale(0.25); opacity: 0; }
+}
+@keyframes burnGlow {
+  0%   { opacity: 0; }
+  35%  { opacity: 0.85; }
+  100% { opacity: 0; }
+}
