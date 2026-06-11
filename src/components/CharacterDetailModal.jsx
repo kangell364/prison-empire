@@ -58,6 +58,9 @@ export function CharacterDetailModal({
   // objectFit (e.g. 'contain' for a cutout so the whole subject shows).
   heroBg,
   heroFit = 'cover',
+  // Optional custom node rendered after the Upgrade section (before Merge).
+  // Skill cards use it for the rolled bonus-affix panel (re-roll / burn).
+  extraContent,
 }) {
   // KO the player's own portrait when knocked out (this modal opens for the
   // player from Home / leaderboards, and for opponents — only `isYou` greys out).
@@ -318,6 +321,9 @@ export function CharacterDetailModal({
             </div>
           </div>
         )}
+
+        {/* Caller-supplied section (skill cards: the bonus-affix panel). */}
+        {extraContent && <div style={{ padding: '16px 18px 0' }}>{extraContent}</div>}
 
         {/* Merge — appears when a full stack is ready. Sits below the upgrade
             rows so the flow reads: see stats → upgrade → merge to next level. */}

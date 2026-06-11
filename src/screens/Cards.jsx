@@ -17,6 +17,8 @@ import {
   useSkillUpgrades, readSkillUpgrade, getSkillUpgrade, upgradeSkillStat, carrySkillUpgrades,
   SKILL_DMG_PER_LEVEL, SKILL_UPGRADE_COST, MAX_SKILL_UPGRADE_LEVEL,
 } from '../state/skillUpgradesStore'
+import { onMergeRollAffixes } from '../state/skillAffixStore'
+import { SkillAffixPanel } from '../components/SkillAffixPanel'
 import {
   usePlantCardCounts, getOwnedPlantTuples, mergePlantCard, PLANT_STACK_SIZE,
 } from '../state/plantCardsStore'
@@ -335,10 +337,12 @@ export default function Cards({ initialTab = 'player' }) {
             upgradeRows={[{ label: 'POTENCY', color: '#e74c3c', stat: 'dmg', perLevel: SKILL_DMG_PER_LEVEL }]}
             maxUpgradeLevel={MAX_SKILL_UPGRADE_LEVEL}
             costForLevel={SKILL_UPGRADE_COST}
+            extraContent={<SkillAffixPanel skillId={skill.id} level={cardLevel} count={liveCount} />}
             canMerge={liveCount >= SKILL_STACK_SIZE}
             onMerge={() => {
               mergeSkillCard(skill.id, cardLevel)
               carrySkillUpgrades(skill.id, cardLevel, cardLevel + 1)
+              onMergeRollAffixes(skill.id, cardLevel, cardLevel + 1)   // roll the surprise bonus skill
               setSelectedSkill(null)
               setSkillMergeReveal({ card: skill, toLevel: cardLevel + 1 })
             }}

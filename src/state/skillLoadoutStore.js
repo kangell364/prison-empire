@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react'
 import { SKILLS } from '../data/gameData'
 import { getOwnedSkillTuples } from './skillCardsStore'
 import { getSkillUpgrade, SKILL_DMG_PER_LEVEL } from './skillUpgradesStore'
+import { getTileAffixes } from './skillAffixStore'
 
 const KEY = 'pe_skill_loadout_v1'
 
@@ -90,7 +91,9 @@ export function getBattleSkillLoadout() {
     const perHit = skill.perLevelAttack + dmgUpgrade * SKILL_DMG_PER_LEVEL
     // `potency` = the upgrade level; it scales the skill's EFFECT magnitude too
     // (see skillEffects.scaled), not just the per-hit nuke baked into `bonus`.
-    out[slot] = { skillId, level, bonus: level * perHit, potency: dmgUpgrade }
+    // `affixes` = the random BONUS skills rolled onto this tile (Phase 3); they
+    // fire alongside the signature when the slot lands.
+    out[slot] = { skillId, level, bonus: level * perHit, potency: dmgUpgrade, affixes: getTileAffixes(skillId, level) }
   }
   return out
 }

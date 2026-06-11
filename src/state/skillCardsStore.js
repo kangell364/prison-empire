@@ -73,6 +73,20 @@ export function addSkillCard(skillId, level = 1, qty = 1) {
   commit(next)
 }
 
+// Remove up to qty copies from (id, level) — used by the burn-for-tokens flow.
+// Returns the number actually removed (clamped to what you own).
+export function removeSkillCard(skillId, level = 1, qty = 1) {
+  const k = keyOf(skillId, level)
+  const have = state.get(k) || 0
+  const take = Math.min(have, qty)
+  if (take <= 0) return 0
+  const next = new Map(state)
+  const left = have - take
+  if (left > 0) next.set(k, left); else next.delete(k)
+  commit(next)
+  return take
+}
+
 // Merge: consume MERGE_COST from (id, level), add 1 at (id, level+1).
 // No-op if count < MERGE_COST. Returns the new (level+1) count or null.
 export function mergeSkillCard(skillId, level) {

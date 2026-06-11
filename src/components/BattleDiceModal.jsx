@@ -221,8 +221,16 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
       : 0
 
     // Effects cast by skills that fired (fizzle gates the effect, not the swing).
+    // A player skill fires its SIGNATURE plus any rolled BONUS affixes (Phase 3);
+    // bonus affixes don't fizzle (only the prison-gear signature can misfire).
     let newFx = []
-    if (pSkillFires && pSkillDef.effect) newFx = newFx.concat(effectInstancesFor(pSkillDef, pSlot.level || 1, 'player', base, pFizzle, pSlot.potency || 0))
+    if (pSkillFires) {
+      const lvl = pSlot.level || 1, pot = pSlot.potency || 0
+      if (pSkillDef.effect) newFx = newFx.concat(effectInstancesFor(pSkillDef, lvl, 'player', base, pFizzle, pot))
+      for (const af of (pSlot.affixes || [])) {
+        newFx = newFx.concat(effectInstancesFor({ id: af.id, shortName: af.name, effect: af.effect }, lvl, 'player', base, false, pot))
+      }
+    }
     if (oSkillFires && oSkillDef.effect) newFx = newFx.concat(effectInstancesFor(oSkillDef, oSlot.level || 1, 'opp', base, oFizzle, oSlot.dmgUpgrade || 0))
 
     // Standing modifiers shift atk/def this roll (fight buffs cast now take hold

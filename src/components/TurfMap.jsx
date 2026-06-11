@@ -135,7 +135,7 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
       // out and still see colored turf (a generous metro-wide view). Past the cap
       // it's too zoomed out for blocks to be useful, so we stop drawing.
       if ((x1 - x0) * (y1 - y0) > 3000) return
-      const showIcons = map.getZoom() >= 13    // NPC icons only up close (perf + clutter)
+      const showIcons = map.getZoom() >= OPEN_ZOOM  // trap-house icons from the default open zoom up (only owned blocks get one, so cheap)
       layer = L.layerGroup().addTo(map)
       const ownedHere = []                     // your blocks in this viewport (for payout pulse)
       for (let gx = x0; gx < x1; gx++) for (let gy = y0; gy < y1; gy++) {
