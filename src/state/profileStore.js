@@ -28,6 +28,7 @@ function randomHandle() {
 }
 
 const PROFILE_KEY        = 'pe_profile_v1'
+const HANDLE_FLAG_KEY    = 'pe_handle_assigned_v1'   // one-time random-handle assignment
 const LEGACY_HUSTLE_KEY  = 'pe_hustle_v1'
 const MIGRATED_FLAG_KEY  = 'pe_migrated_v1'
 
@@ -368,15 +369,17 @@ async function loadProfileForSession({ allowLocalMigration = false } = {}) {
     if (isFreshRow && !alreadyMigrated) {
       const migrated = await migrateFromLocal(row)
       if (migrated) row = { ...row, ...migrated }
-      // Fresh anon account: replace the shared 'SlickRico' default with a unique
-      // random handle so the shared map shows varied player names (players can
-      // still rename via SWAP). Existing accounts are never touched.
-      if (!row.display_name || row.display_name === PLAYER.name) {
-        const handle = randomHandle()
-        await pushToSupabase({ display_name: handle })
-        row = { ...row, display_name: handle }
-      }
       try { localStorage.setItem(MIGRATED_FLAG_KEY, '1') } catch {}
+    }
+    // One-time: any account still on the shared 'SlickRico' default (fresh OR
+    // existing) gets a unique random handle, so the shared map shows varied names
+    // instead of a wall of identical defaults. Runs once per device (flag-gated);
+    // players can still rename via SWAP afterward.
+    if ((!row.display_name || row.display_name === PLAYER.name) && localStorage.getItem(HANDLE_FLAG_KEY) !== '1') {
+      const handle = randomHandle()
+      await pushToSupabase({ display_name: handle })
+      row = { ...row, display_name: handle }
+      try { localStorage.setItem(HANDLE_FLAG_KEY, '1') } catch {}
     }
   }
 
