@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { SKILLS } from '../data/gameData'
 import { getBattleSkillLoadout } from '../state/skillLoadoutStore'
 import { SKILL_DMG_PER_LEVEL } from '../state/skillUpgradesStore'
+import { effectInstancesFor, rollFizzle, addEffects, tickEffects, slotMutedFor, statDeltas, applyDiceNudge } from '../combat/skillEffects'
 import { SkillCardPopup } from './SkillCardPopup'
 import { CharacterDetailModal } from './CharacterDetailModal'
 import { sfx } from '../sounds'
@@ -143,6 +144,12 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
   const [oppHit,    setOppHit]    = useState({ amount: 0, key: 0 })
   const [landedSlot, setLandedSlot] = useState(null)
   const [sessionXp, setSessionXp] = useState(0)   // running net XP this PvP fight
+  const fxRef = useRef([])                         // active skill effects (source of truth, mutated in resolve)
+  const [fxView, setFxView] = useState([])         // mirror of fxRef for status readouts
+  const equippedSlots = useMemo(() => ({
+    player: new Set(Object.keys(playerEquippedMap).map(Number)),
+    opp:    new Set(Object.keys(oppEquippedMap).map(Number)),
+  }), [playerEquippedMap, oppEquippedMap])
 
   // Worn out in either mode now: the player fights on real health, so hitting 0
   // means back off and heal (a duel loss is the same "out of health" state).
@@ -173,48 +180,87 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
         const finalA = 1 + Math.floor(Math.random() * 6)
         const finalB = 1 + Math.floor(Math.random() * 6)
         setDiceA(finalA); setDiceB(finalB)
-        const slot = finalA + finalB
+        const rawSlot = finalA + finalB
+        const slot = applyDiceNudge(fxRef.current, rawSlot, equippedSlots)   // Loaded Dice steers the roll
         setHighlight(slot); setLandedSlot(slot)
-        resolve(slot)
+        resolve(slot, rawSlot)
       }
     }, 80)
   }
 
   useEffect(() => () => { if (tickRef.current) clearInterval(tickRef.current) }, [])
 
-  const resolve = (slot) => {
+  const resolve = (slot, rawSlot = slot) => {
+    const base = {
+      player: { atk: stats.playerBaseAttack, def: stats.playerBaseDefense },
+      opp:    { atk: stats.oppBaseAttack,    def: stats.oppBaseDefense },
+    }
+    const maxHp = { player: maxPlayerHp, opp: maxOppHp }
+    const preFx = fxRef.current
+
+    // Tick standing effects (DOT damage, durations, refunds) BEFORE this roll's
+    // skills resolve — a freshly-cast effect first ticks next roll.
+    const ticked = tickEffects(preFx, maxHp)
+
+    // Skill firing — honor lockdown (disable) and fizzle (prison-gear misfire).
     const pSlot       = playerLoadout[slot]
     const pSkillDef   = pSlot ? SKILLS.find(s => s.id === pSlot.skillId) : null
-    const pSkillFires = !!(pSkillDef && pSlot.bonus > 0)
+    const pMuted      = pSkillDef ? slotMutedFor(preFx, 'player', slot) : false
+    const pFizzle     = pSkillDef ? rollFizzle(pSkillDef) : false
+    const pSkillFires = !!(pSkillDef && pSlot.bonus > 0 && !pMuted)
     const pSkillBonus = pSkillFires ? pSlot.bonus : 0
 
-    const oSlot      = oppLoadout[slot]
-    const oSkillDef  = oSlot ? SKILLS.find(s => s.id === oSlot.skillId) : null
-    const oSkillFires = !!oSkillDef
-    // Include any authored DMG upgrades so a boss's "+N DMG" actually counts —
-    // matches the player's effective-damage formula.
+    const oSlot       = oppLoadout[slot]
+    const oSkillDef   = oSlot ? SKILLS.find(s => s.id === oSlot.skillId) : null
+    const oMuted      = oSkillDef ? slotMutedFor(preFx, 'opp', slot) : false
+    const oFizzle     = oSkillDef ? rollFizzle(oSkillDef) : false
+    const oSkillFires = !!(oSkillDef && !oMuted)
+    // Include any authored DMG upgrades so a boss's "+N DMG" actually counts.
     const oSkillBonus = oSkillFires
       ? oSlot.level * (oSkillDef.perLevelAttack + (oSlot.dmgUpgrade || 0) * SKILL_DMG_PER_LEVEL)
       : 0
 
-    const playerAttack  = stats.playerBaseAttack + pSkillBonus
-    const oppAttack     = stats.oppBaseAttack + oSkillBonus
+    // Effects cast by skills that fired (fizzle gates the effect, not the swing).
+    let newFx = []
+    if (pSkillFires && pSkillDef.effect) newFx = newFx.concat(effectInstancesFor(pSkillDef, pSlot.level || 1, 'player', base, pFizzle))
+    if (oSkillFires && oSkillDef.effect) newFx = newFx.concat(effectInstancesFor(oSkillDef, oSlot.level || 1, 'opp', base, oFizzle))
+
+    // Standing modifiers shift atk/def this roll (fight buffs cast now take hold
+    // next roll — they're committed below).
+    const pMod = statDeltas(preFx, 'player')
+    const oMod = statDeltas(preFx, 'opp')
+    const playerAttack  = Math.max(1, stats.playerBaseAttack  + pSkillBonus + pMod.atkDelta)
+    const playerDefense = Math.max(1, stats.playerBaseDefense + pMod.defDelta)
+    const oppAttack     = Math.max(1, stats.oppBaseAttack     + oSkillBonus + oMod.atkDelta)
+    const oppDefense    = Math.max(1, stats.oppBaseDefense    + oMod.defDelta)
+
     // Scale damage onto the real-health pool (see duelScale). Uniform on both
     // sides, so the per-turn win/lose comparison and round count are unchanged.
-    const youDealt = Math.max(1, Math.round(dmg(playerAttack, stats.oppBaseDefense) * duelScale))
-    const oppDealt = Math.max(1, Math.round(dmg(oppAttack, stats.playerBaseDefense) * duelScale))
+    const youDealt = Math.max(1, Math.round(dmg(playerAttack, oppDefense) * duelScale))
+    const oppDealt = Math.max(1, Math.round(dmg(oppAttack, playerDefense) * duelScale))
 
-    const newOppHp    = Math.max(0, oppHp - youDealt)
-    const newPlayerHp = Math.max(0, playerHp - oppDealt)
+    // Net HP change = combat hit + this roll's DOT − any refund (The Hole).
+    const oppLoss    = youDealt + ticked.dmg.opp    - ticked.heal.opp
+    const playerLoss = oppDealt + ticked.dmg.player - ticked.heal.player
+    const newOppHp    = Math.max(0, oppHp - oppLoss)
+    const newPlayerHp = Math.max(0, playerHp - playerLoss)
     setOppHp(newOppHp); setPlayerHp(newPlayerHp)
     if (youDealt > 0) setOppHit(h    => ({ amount: youDealt, key: h.key + 1 }))
     if (oppDealt > 0) setPlayerHit(h => ({ amount: oppDealt, key: h.key + 1 }))
 
-    // Persist this hit immediately, both modes: attrition also drops boss HP for
-    // good; a duel just spends the player's real health. Spending live (not once
-    // at resolve) means it's charged exactly as dealt and leaving mid-fight keeps
-    // the wounds you took.
-    if (onHit) onHit({ dealtToOpp: youDealt, dealtToPlayer: oppDealt })
+    // Persist this hit immediately, both modes: attrition drops boss HP for good;
+    // a duel spends real health. DOT counts as dealt; refunds reduce the spend.
+    if (onHit) onHit({ dealtToOpp: Math.max(0, oppLoss), dealtToPlayer: Math.max(0, playerLoss) })
+
+    // Commit the effect runtime: ticked survivors + newly cast.
+    const nextFx = addEffects(ticked.effects, newFx)
+    fxRef.current = nextFx
+    setFxView(nextFx)
+
+    // Contraband: 2× payout when THIS slot lands the KO. (Actual reward doubling
+    // is caller-side — Phase 2b; surfaced in the log for now.)
+    const payoutHit = pSkillFires && !pFizzle && pSkillDef.effect &&
+      pSkillDef.effect.kind === 'modifier' && pSkillDef.effect.stat === 'payout' && newOppHp <= 0
 
     // PvP (duel) per-turn XP: whoever deals more damage WINS the turn. Win = +xp,
     // lose = −xp, even = nothing. Applied live so picking a bad matchup bleeds XP.
@@ -236,15 +282,20 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
 
     const roundLog = []
     roundLog.push({ side: 'round', text: `— Round (slot ${slot}) —`, color: '#666' })
-    roundLog.push(pSkillFires
-      ? { side: 'you', text: `You use ${pSkillDef.shortName}! +${pSkillBonus} attack`, color: GOLD }
+    if (rawSlot !== slot) roundLog.push({ side: 'you', text: `🎲 Loaded Dice nudged the roll ${rawSlot} → ${slot}`, color: GOLD })
+    for (const l of ticked.logs) roundLog.push({ side: l.side, text: l.text, color: l.kind === 'refund' ? GREEN : l.kind === 'expire' ? '#888' : RED })
+    roundLog.push(
+      pMuted ? { side: 'you', text: `Your slot-${slot} skill is LOCKED DOWN`, color: '#888' }
+      : pSkillFires ? { side: 'you', text: `You use ${pSkillDef.shortName}!${pFizzle ? ' …but it misfired' : ''} +${pSkillBonus} atk`, color: pFizzle ? '#888' : GOLD }
       : { side: 'you', text: `You don't use a skill (slot ${slot} empty)`, color: '#888' })
-    roundLog.push(oSkillFires
-      ? { side: 'opp', text: `${opponent.name} uses ${oSkillDef.shortName}! +${oSkillBonus} attack`, color: ORANGE }
+    roundLog.push(
+      oMuted ? { side: 'opp', text: `${opponent.name}'s slot-${slot} skill is LOCKED DOWN`, color: '#888' }
+      : oSkillFires ? { side: 'opp', text: `${opponent.name} uses ${oSkillDef.shortName}!${oFizzle ? ' …but it misfired' : ''} +${oSkillBonus} atk`, color: oFizzle ? '#888' : ORANGE }
       : { side: 'opp', text: `${opponent.name} doesn't use a skill`, color: '#888' })
     roundLog.push({ side: 'you', text: `You hit ${opponent.name} for ${youDealt} (HP ${newOppHp.toLocaleString()})`, color: BLUE })
     roundLog.push({ side: 'opp', text: `${opponent.name} hits you for ${oppDealt} (HP ${newPlayerHp.toLocaleString()})`, color: RED })
     if (attackLine) roundLog.push(attackLine)
+    if (payoutHit) roundLog.push({ side: 'result', text: `📦 CONTRABAND — knockout payday! (2× reward)`, color: GOLD })
 
     let result = null
     if (newOppHp <= 0 && newPlayerHp <= 0) result = attrition ? 'win' : 'draw'  // attrition: boss down = you win
@@ -344,6 +395,8 @@ export function BattleDiceModal({ opponent, mode = 'duel', oppStartHp, cost, rew
             onClick={() => setCardView({ character: opponent, skillLoadout: oppLoadout })}
             outcome={outcome === 'win' ? 'loser' : (outcome === 'lose' || outcome === 'wornout') ? 'winner' : null} />
         </div>
+
+        <EffectBar effects={fxView} oppName={opponent.name} />
 
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 14 }}>
           <SlotGrid side="you" equipped={playerEquippedMap} learned={playerLearned} loadout={playerLoadout} highlight={highlight} landed={landedSlot} color={BLUE} />
@@ -532,6 +585,32 @@ function SlotGrid({ side, equipped, learned, loadout = {}, highlight, landed, co
       {popup && (
         <SkillCardPopup skill={popup.skill} level={popup.level} dmgPerLevel={popup.dmg} onClose={() => setPopup(null)} />
       )}
+    </div>
+  )
+}
+
+// Active-effect readout: one chip per live effect, tinted by who cast it (your
+// skills BLUE, opponent's ORANGE) with an icon, who it hits, and rolls left.
+function EffectBar({ effects, oppName }) {
+  if (!effects || effects.length === 0) return null
+  const icon = (e) =>
+    e.kind === 'dot' ? '🩸'
+    : e.kind === 'disable' ? '🔒'
+    : e.kind === 'dice' ? '🎲'
+    : ((e.atkDelta || 0) + (e.defDelta || 0) >= 0 ? '🛡️' : '🔻')   // modifier: net buff vs debuff
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 10, justifyContent: 'center' }}>
+      {effects.map((e, i) => {
+        const mine = e.owner === 'player'
+        const col  = mine ? BLUE : ORANGE
+        const tgt  = e.appliesTo === 'player' ? 'you' : 'opp'
+        const dur  = e.rollsLeft === Infinity ? '∞' : e.rollsLeft
+        return (
+          <span key={i} style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 8, background: '#0d0d15', border: `0.5px solid ${col}66`, color: col, whiteSpace: 'nowrap' }}>
+            {icon(e)} {e.label} →{tgt} ·{dur}
+          </span>
+        )
+      })}
     </div>
   )
 }
