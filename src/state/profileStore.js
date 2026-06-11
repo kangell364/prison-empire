@@ -8,7 +8,8 @@
 //     env vars are missing — keeps the app working in CI / preview / before
 //     the user creates a Supabase project.
 //
-// Phase 1 scope: hustle, steel, cred, snitches_left, display_name. Other
+// Phase 1 scope: hustle, cred, snitches_left, display_name. (Steel was removed;
+// CASH lives client-side in cashStore.) Other
 // PLAYER fields (level, XP, traits, pools, skills) still come from static
 // gameData — they get their own phases.
 
@@ -35,7 +36,6 @@ const MIGRATED_FLAG_KEY  = 'pe_migrated_v1'
 const DEFAULTS = {
   display_name:   PLAYER.name,
   hustle:         RESOURCES.hustle.value,
-  steel:          RESOURCES.steel.value,
   cred:           0,
   snitches_left:  RESOURCES.snitch.value,
   player_look_id: DEFAULT_LOOK_ID,
@@ -96,7 +96,6 @@ export async function updatePassword(newPassword) {
 
 export function getProfile()      { return state }
 export function getHustle()       { return state.hustle }
-export function getSteel()        { return state.steel }
 export function getDisplayName()  { return state.display_name }
 export function getUserId()       { return userId }
 
@@ -110,7 +109,6 @@ export function useProfile() {
 }
 
 export function useHustle()       { return useProfile().hustle }
-export function useSteel()        { return useProfile().steel }
 export function useDisplayName()  { return useProfile().display_name }
 
 // The player's LIVE card identity (cosmetic look + name) — the ONE source every
@@ -137,18 +135,6 @@ export function addHustle(delta) { setHustle(state.hustle + delta) }
 export function spendHustle(cost) {
   if (cost > state.hustle) return false
   setHustle(state.hustle - cost)
-  return true
-}
-
-export function setSteel(v) {
-  v = Math.max(0, Math.floor(v))
-  commit({ steel: v })
-}
-export function addSteel(delta) { setSteel(state.steel + delta) }
-
-export function spendSteel(cost) {
-  if (cost > state.steel) return false
-  setSteel(state.steel - cost)
   return true
 }
 

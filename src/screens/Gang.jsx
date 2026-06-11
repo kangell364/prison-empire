@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { PLAYER, CARDS_COLLECTION, RARITY_COLORS } from '../data/gameData'
-import { useDisplayName, useSteel, spendSteel, useHustle, spendHustle } from '../state/profileStore'
+import { useDisplayName, useHustle, spendHustle } from '../state/profileStore'
+import { useCash, spendCash } from '../state/cashStore'
 import { useProgress } from '../state/progressionStore'
 import { baseAtk, baseDef, atkOf, defOf } from '../state/crewStore'
 import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
@@ -12,7 +13,7 @@ import {
   setEnrollment, setMinLevel, syncPlayerMember,
   donateToTreasury, buyPerk, getContribution, gangLevelProgress,
   PERKS, perkCost,
-  CREATE_MIN_LEVEL, FOUND_COST_STEEL, ROLES, ENROLLMENT, PLAYER_MEMBER_ID,
+  CREATE_MIN_LEVEL, FOUND_COST_CASH, ROLES, ENROLLMENT, PLAYER_MEMBER_ID,
 } from '../state/gangStore'
 import { sfx } from '../sounds'
 import { Avatar } from '../components/Avatar'
@@ -62,13 +63,13 @@ export default function Gang({ onBack, onNavigate }) {
 // Not in a gang — found your own or browse the AI gangs.
 // ---------------------------------------------------------------------
 function NotInGang({ player }) {
-  const steel = useSteel()
+  const cash = useCash()
   const [showFound, setShowFound] = useState(false)
   const browse = useBrowseGangs()
-  const canFound = player.level >= CREATE_MIN_LEVEL && steel >= FOUND_COST_STEEL
+  const canFound = player.level >= CREATE_MIN_LEVEL && cash >= FOUND_COST_CASH
   const lockReason = player.level < CREATE_MIN_LEVEL
     ? `Reach Level ${CREATE_MIN_LEVEL} to found a gang`
-    : steel < FOUND_COST_STEEL ? `Need ${FOUND_COST_STEEL} Steel to found a gang` : ''
+    : cash < FOUND_COST_CASH ? `Need $${FOUND_COST_CASH.toLocaleString()} Cash to found a gang` : ''
 
   return (
     <>
@@ -87,7 +88,7 @@ function NotInGang({ player }) {
             disabled={!canFound}
             style={{ width: '100%', marginTop: 14, padding: 13, opacity: canFound ? 1 : 0.5 }}
           >
-            Found a Gang · {FOUND_COST_STEEL} Steel
+            Found a Gang · ${FOUND_COST_CASH.toLocaleString()}
           </button>
           {!canFound && <div style={{ color: RED, fontSize: 11, marginTop: 8 }}>{lockReason}</div>}
         </div>
@@ -101,7 +102,7 @@ function NotInGang({ player }) {
         </div>
       </div>
 
-      {showFound && <FoundGangModal player={player} steel={steel} onClose={() => setShowFound(false)} />}
+      {showFound && <FoundGangModal player={player} cash={cash} onClose={() => setShowFound(false)} />}
     </>
   )
 }
@@ -157,7 +158,7 @@ function BrowseRow({ gang, player }) {
   )
 }
 
-function FoundGangModal({ player, steel, onClose }) {
+function FoundGangModal({ player, cash, onClose }) {
   const [name, setName] = useState('')
   const [tag, setTag] = useState('')
   const [crest, setCrest] = useState(CRESTS[0])
@@ -166,10 +167,8 @@ function FoundGangModal({ player, steel, onClose }) {
 
   const create = () => {
     if (!name.trim()) return
-    // Live gangs: the found_gang RPC charges Steel server-side — don't double-spend.
-    if (liveGangsEnabled()) {
-      if (steel < FOUND_COST_STEEL) { sfx.deny?.(); return }
-    } else if (!spendSteel(FOUND_COST_STEEL)) { sfx.deny?.(); return }
+    // Cash is client-only, so charge it client-side for both backends.
+    if (cash < FOUND_COST_CASH || !spendCash(FOUND_COST_CASH)) { sfx.deny?.(); return }
     foundGang({ name, tag, crest, enrollment, minLevel }, player)
     sfx.buy?.()
     onClose()
@@ -223,10 +222,10 @@ function FoundGangModal({ player, steel, onClose }) {
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-dark" style={{ flex: 1, padding: 12 }} onClick={onClose}>Cancel</button>
           <button className="btn btn-gold" style={{ flex: 1, padding: 12, opacity: name.trim() ? 1 : 0.5 }} disabled={!name.trim()} onClick={create}>
-            Found · {FOUND_COST_STEEL} Steel
+            Found · ${FOUND_COST_CASH.toLocaleString()}
           </button>
         </div>
-        {steel < FOUND_COST_STEEL && <div style={{ color: RED, fontSize: 11, marginTop: 8, textAlign: 'center' }}>Not enough Steel ({steel}/{FOUND_COST_STEEL})</div>}
+        {cash < FOUND_COST_CASH && <div style={{ color: RED, fontSize: 11, marginTop: 8, textAlign: 'center' }}>Not enough Cash (${cash.toLocaleString()}/${FOUND_COST_CASH.toLocaleString()})</div>}
       </div>
     </div>
   )

@@ -650,7 +650,7 @@ export default function MapScreen({ onNavigate }) {
               <div style={{ width: 34, height: 34, borderRadius: 9, background: `${RED}1f`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><i className="ti ti-user-x" style={{ color: RED, fontSize: 18 }} /></div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: RED, fontSize: 11, fontWeight: 600, letterSpacing: 0.5 }}>{e.crew.toUpperCase()} CREW MUSCLED IN</div>
-                <div style={{ color: '#fff', fontSize: 13 }}>Bought out {e.npc} — you cashed out {e.payout.toLocaleString()} Hustle</div>
+                <div style={{ color: '#fff', fontSize: 13 }}>Bought out {e.npc} — you cashed out ${e.payout.toLocaleString()}</div>
               </div>
               <i className="ti ti-x" style={{ color: DIM, fontSize: 16 }} />
             </div>
@@ -1082,8 +1082,8 @@ function PlayButton({ emoji, label, sub, tint, onClick, disabled }) {
   )
 }
 
-// The Attack plan — your muscle vs their house, the Steel cost, and the
-// "Send the Hit" launch. Launch spends Steel + creates the timed raid row
+// The Attack plan — your muscle vs their house, the Hustle cost, and the
+// "Send the Hit" launch. Launch spends Hustle + creates the timed raid row
 // (raidsStore.launchRaid, run by the parent) and fires the attack-car drive.
 function AttackPlan({ house, name, myPower, hp, hpMax, onBack, onClose, onLaunch }) {
   const hustle = useHustle()

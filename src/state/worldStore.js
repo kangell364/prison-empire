@@ -23,7 +23,8 @@ import {
   DEFAULT_LOOK_ID, STARTER_CARD_IDS,
 } from '../data/gameData'
 import { AI_MOBS } from '../data/mobs'
-import { addHustle, addSteel, spendSteel } from './profileStore'
+import { addHustle } from './profileStore'
+import { addCash, spendCash } from './cashStore'
 import { scatterToBlock } from './blocksStore'
 
 const KEY                   = 'pe_world_v1'
@@ -298,24 +299,25 @@ export function raidHouse(houseId, gangName) {
   return { lost: false, loyalty: next, gang: gangName }
 }
 
-// Spend Steel (cost computed by the caller) to restore a held house's hp.
+// Spend Cash (cost computed by the caller) to restore a held house's hp.
 export function reinforceHouse(houseId, cost) {
   const h = world.houses[houseId]
   if (!h || h.owner_player_id !== 'you') return { ok: false, reason: 'not-yours' }
   const cur = effectiveHp(h)
   if (cur >= h.hp_max) return { ok: false, reason: 'full' }
-  if (!spendSteel(cost)) return { ok: false, reason: 'broke' }
+  if (!spendCash(cost)) return { ok: false, reason: 'broke' }
   const next = Math.min(h.hp_max, cur + REINFORCE_AMOUNT)
   commit(setHouse(houseId, { hp: next, hpAt: Date.now() }))
   return { ok: true, loyalty: next, cost }
 }
 
-// Bank a held house's accrued income (amount computed by the caller).
+// Bank a held house's accrued income (amount computed by the caller). Houses pay
+// Hustle (progression) plus Cash (the territory cut — was Steel before removal).
 export function collectHouse(houseId, got) {
   const h = world.houses[houseId]
-  if (!h || h.owner_player_id !== 'you') return { hustle: 0, steel: 0 }
+  if (!h || h.owner_player_id !== 'you') return { hustle: 0, cash: 0 }
   if (got.hustle > 0) addHustle(got.hustle)
-  if (got.steel > 0) addSteel(got.steel)
+  if (got.cash > 0) addCash(got.cash)
   commit(setHouse(houseId, { lastCollectedAt: Date.now() }))
   return got
 }
@@ -377,8 +379,8 @@ export function applyHomeRaid(houseId, gang, respawnFips, respawnCoords) {
 // Pending uncollected income for a business house you hold (capped).
 export function housePendingIncome(houseId) {
   const h = world.houses[houseId]
-  if (!h || h.owner_player_id !== 'you' || h.kind !== 'business') return { hustle: 0, steel: 0 }
+  if (!h || h.owner_player_id !== 'you' || h.kind !== 'business') return { hustle: 0, cash: 0 }
   const hrs = Math.min(INCOME_CAP_HRS, hoursSince(h.lastCollectedAt))
-  const { hustlePerHr, steelPerHr } = tierIncome(h.tier)
-  return { hustle: Math.floor(hustlePerHr * hrs), steel: Math.floor(steelPerHr * hrs) }
+  const { hustlePerHr, cashPerHr } = tierIncome(h.tier)
+  return { hustle: Math.floor(hustlePerHr * hrs), cash: Math.floor(cashPerHr * hrs) }
 }

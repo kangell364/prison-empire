@@ -14,7 +14,7 @@ import { SwapLookModal } from '../components/SwapLookModal'
 import { StoreModal } from '../components/StoreModal'
 import { DailyBonus } from '../components/DailyBonus'
 import { useGang } from '../state/gangStore'
-import { useRoomBank } from '../state/roomBankStore'
+import { useCash } from '../state/cashStore'
 import { sfx } from '../sounds'
 
 export default function Dashboard({ onNavigate }) {
@@ -25,7 +25,7 @@ export default function Dashboard({ onNavigate }) {
   const prog = useProgress()
   const xpNeed = xpForLevel(prog.level)
   const xpPct = Math.round((prog.xp / xpNeed) * 100)
-  const trapBank = useRoomBank()           // same BANK shown in the trap house first room
+  const trapBank = useCash()               // global Cash balance (the trap-house BANK)
   // Live "Your Turf" block economy — re-renders when blocks change (recruit /
   // poach / collect / AI poach).
   useBlocksVersion()
@@ -223,14 +223,14 @@ export default function Dashboard({ onNavigate }) {
       <div className="section">
         <div className="section-label">Your Turf</div>
         <div className="card">
-          {/* Live block economy — total Hustle/hr from every block you run. */}
+          {/* Live block economy — total Cash/hr from every block you run. */}
           <div style={{ padding: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
               <div style={{ color: '#fff', fontSize: 16, fontWeight: 500 }}>Block Income</div>
               <div style={{ color: '#666', fontSize: 11 }}>{blocksOwned}/{blockCap()} blocks</div>
             </div>
             <div style={{ color: '#555', fontSize: 11, marginTop: 2 }}>
-              {blocksOwned === 0 ? 'Claim turf on the map to start earning passive Hustle.' : 'Auto-pays every hour — same clock for every player'}
+              {blocksOwned === 0 ? 'Claim turf on the map to start earning passive Cash.' : 'Auto-pays every hour — same clock for every player'}
             </div>
             <div style={{ display: 'flex', gap: 22, marginTop: 12 }}>
               <div>
@@ -239,7 +239,7 @@ export default function Dashboard({ onNavigate }) {
               </div>
               <div>
                 <div style={{ color: '#c9a84c', fontSize: 15, fontWeight: 500 }}>+{blockIncomeHr.toLocaleString()}</div>
-                <div style={{ color: '#444', fontSize: 10 }}>Hustle/hr</div>
+                <div style={{ color: '#444', fontSize: 10 }}>Cash/hr</div>
               </div>
             </div>
             {/* Global hourly payout — same countdown for everyone, auto-banks at 0. */}

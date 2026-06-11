@@ -3,7 +3,7 @@ import { sfx } from '../sounds'
 import { PLANTS, plantCashValue, RARITY_COLORS } from '../data/gameData'
 import { getOwnedPlantTuples } from '../state/plantCardsStore'
 import { getPlantUpgrade, PLANT_YIELD_PER_LEVEL } from '../state/plantUpgradesStore'
-import { setRoomBank } from '../state/roomBankStore'
+import { useCash, addCash, spendCash } from '../state/cashStore'
 import { useActiveRaids } from '../state/raidsStore'
 import { Avatar } from '../components/Avatar'
 import { SlotMachine } from '../components/SlotMachine'
@@ -116,9 +116,10 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   // Persisted operating state — lazy-loaded from localStorage so the line resumes.
   const [saved] = useState(loadSaved)
   const [planted, setPlanted] = useState(() => Array.isArray(saved.planted) ? saved.planted : [])  // placed plant slots (each brings its bud + path)
-  const [bank, setBank] = useState(() => typeof saved.bank === 'number' ? saved.bank : 200000)      // this store's bank balance ($) — full bank for testing
-  // Mirror the bank to roomBankStore so the home-screen trap-house card shows the same number.
-  useEffect(() => { setRoomBank(bank) }, [bank])
+  // The shop's BANK is the global CASH balance now — jar sales feed the real
+  // empire currency (spent on turf/war), not an isolated local pot. Reactive via
+  // useCash; mutations go through addCash/spendCash.
+  const bank = useCash()
   // Shop reputation (0–100) — drives the customer arrival rate.
   const [rep, setRep] = useState(() => typeof saved.rep === 'number' ? saved.rep : REP_START)
   // Per-strain popularity multiplier (a rotating "hot strain" sits above 1) — weights
@@ -228,7 +229,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
     jarCountsRef.current = { ...jc, [best]: Math.floor(jc[best] || 0) - qty }   // sync
     setJarCounts(j => ({ ...j, [best]: Math.max(0, Math.floor(j[best] || 0) - qty) }))
     const value = price * qty
-    setBank(b => b + value)
+    addCash(value)
     const ratio = price / street
     const reaction = ratio <= 0.95 ? 'cheap' : ratio <= 1.05 ? 'happy' : 'grumble'
     adjustRep(REP_DELTA[reaction])
@@ -377,7 +378,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
       // refused (overpriced) → no sale, and no rep change while away
     }
     if (bankGain > 0) {
-      setBank(b => b + bankGain)
+      addCash(bankGain)
       awaySalesRef.current = { jars: awaySalesRef.current.jars + jarsSold, cash: awaySalesRef.current.cash + bankGain }
     }
     jarCountsRef.current = jc; setJarCounts(jc)
@@ -421,21 +422,21 @@ export default function TrapHouse({ onBack, isOwner = true }) {
   }, [])
 
   // Persist the operating state on every change so a reload resumes the line:
-  // plants, bank, grow-box buds, table cards/levels, right-box raw buds, left-box
-  // jars, the generation clock, prices, reputation, popularity, and the sales clock.
+  // plants, grow-box buds, table cards/levels, right-box raw buds, left-box jars,
+  // the generation clock, prices, reputation, popularity, and the sales clock.
+  // (BANK/Cash persists separately in cashStore.)
   useEffect(() => {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
-        planted, bank, budCounts, tableCards, cardLevels, packCounts, jarCounts, prices, rep, popularity,
+        planted, budCounts, tableCards, cardLevels, packCounts, jarCounts, prices, rep, popularity,
         lastTick: lastTickRef.current, lastSaleTs: idleTsRef.current,
       }))
     } catch {}
-  }, [planted, bank, budCounts, tableCards, cardLevels, packCounts, jarCounts, prices, rep, popularity])
+  }, [planted, budCounts, tableCards, cardLevels, packCounts, jarCounts, prices, rep, popularity])
 
-  // Place a plant slot, charging the bank (no-op if you can't afford it).
+  // Place a plant slot, charging Cash (no-op if you can't afford it).
   const placeSlot = (slot, cost) => {
-    if (bank < cost || planted.includes(slot)) return
-    setBank(b => b - cost)
+    if (planted.includes(slot) || !spendCash(cost)) return
     setPlanted(p => [...p, slot])
     sfx.buy?.()
   }
@@ -577,7 +578,7 @@ export default function TrapHouse({ onBack, isOwner = true }) {
         {cur.key === 'pack' && <PackingRoom skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} packCounts={packCounts} jarCounts={jarCounts} tableCards={tableCards} cardLevels={cardLevels} />}
         {cur.key === 'grow' && <GrowRoom planted={planted} bank={bank} onPlace={placeSlot} budCounts={budCounts} budResync={budResync} onBudLand={advanceNow} tableCards={tableCards} cardLevels={cardLevels} onAdd={setPicking} onUproot={uprootTable} skatePhase={skate.phase} skateStart={skate.start} onSkateClick={startSkate} />}
         {cur.key === 'dust' && <DustRoom art={cur.art} />}
-        {cur.key === 'casino' && <SlotMachine cash={bank} onCashDelta={(d) => setBank(b => Math.max(0, b + d))} />}
+        {cur.key === 'casino' && <SlotMachine cash={bank} onCashDelta={(d) => addCash(d)} />}
       </div>
 
       {/* Arrows — step between rooms. Left = toward the front, right = deeper. */}

@@ -13,13 +13,14 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { supabase, isSupabaseConfigured } from '../supabase'
-import { getUserId, useAuth, spendHustle, addHustle, spendSteel, addSteel } from './profileStore'
+import { getUserId, useAuth, spendHustle, addHustle } from './profileStore'
+import { spendCash, addCash } from './cashStore'
 import { harrisSpotFor } from './sharedHousesStore'
 
 const COUNTY_FIPS = '48201'                       // Harris (MVP single county)
 
 export const RAID_HUSTLE_COST = 200               // Hustle to send a raid
-export const REINFORCE_COST   = 120               // Steel to patch your own house
+export const REINFORCE_COST   = 12000             // Cash to patch your own house (tunable)
 export const REINFORCE_AMOUNT = 30                // HP restored per reinforce
 
 // Attack travel time scales with the DISTANCE between the two trap houses:
@@ -89,18 +90,18 @@ export async function resolveRaid(id) {
   return data
 }
 
-// Reinforce YOUR OWN house — spend Steel, bump hp (RLS lets the owner update
+// Reinforce YOUR OWN house — spend Cash, bump hp (RLS lets the owner update
 // their own row directly, so no RPC needed). `house` is your houses row.
 export async function reinforceMyHouse(house) {
   if (!isSupabaseConfigured || !house) return { ok: false, error: 'offline' }
   const max = house.hp_max != null ? house.hp_max : 100
   const cur = house.hp != null ? house.hp : max
   if (cur >= max) return { ok: false, error: 'full' }
-  if (!spendSteel(REINFORCE_COST)) return { ok: false, error: 'broke' }
+  if (!spendCash(REINFORCE_COST)) return { ok: false, error: 'broke' }
   const next = Math.min(max, cur + REINFORCE_AMOUNT)
   const { error } = await supabase.from('houses')
     .update({ hp: next, updated_at: new Date().toISOString() }).eq('id', house.id)
-  if (error) { addSteel(REINFORCE_COST); return { ok: false, error: error.message } }
+  if (error) { addCash(REINFORCE_COST); return { ok: false, error: error.message } }
   return { ok: true, hp: next }
 }
 

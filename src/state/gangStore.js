@@ -1,7 +1,7 @@
 // Gang (clan) store — simulated single-player version.
 //
 // New players aren't in a gang. They can either FOUND their own (gated behind a
-// level + a Steel cost) or JOIN one of the simulated AI gangs you can browse.
+// level + a Cash cost) or JOIN one of the simulated AI gangs you can browse.
 // When real multiplayer (Supabase) lands, the AI browse list is swapped for real
 // gangs and these same screens keep working.
 //
@@ -15,7 +15,7 @@ const KEY = 'pe_gang_v1'
 
 // ---- tuning knobs ---------------------------------------------------
 export const CREATE_MIN_LEVEL = 10     // level required to FOUND a gang
-export const FOUND_COST_STEEL  = 25    // Steel spent to found a gang
+export const FOUND_COST_CASH   = 25000 // Cash spent to found a gang (tunable)
 export const GANG_CAPACITY     = 30    // MAX members per gang (1 boss + 29)
 const GANG_BASE_CAPACITY       = 6     // capacity at Lv 1 (1 boss + 5)
 // Capacity grows +2 per gang level, capped at GANG_CAPACITY — so the OG must
@@ -433,10 +433,10 @@ function playerMember(player, role) {
 }
 
 // Found your own gang — you become the Boss. Seeds 2 AI lieutenants so the
-// roster doesn't look dead on day one. Caller must pre-check level + Steel.
+// roster doesn't look dead on day one. Caller pre-checks level + spends the Cash
+// (Cash is client-only, so it's charged client-side for both backends).
 export function foundGang({ name, tag, crest, enrollment = ENROLLMENT.APPLY, minLevel = 0 }, player) {
-  // Live: real server gang via RPC (charges Steel server-side — the caller must
-  // NOT pre-spend). Otherwise the local AI-seeded gang below.
+  // Live: real server gang via RPC. Otherwise the local AI-seeded gang below.
   if (isSupabaseConfigured) { foundGangLive({ name, tag, crest, enrollment, minLevel }, player); return }
   const seed = makeRoster(2, Math.max(1, (player.level || 1) - 1))
     .map(m => ({ ...m, role: ROLES.MEMBER }))

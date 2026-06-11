@@ -442,10 +442,10 @@ export const DEFAULT_LOOK_ID = 'look_1'
 // lands in the right place. Tier sets the prize + difficulty. Admin-curated:
 // add map targets by appending here. See [[project-gang-territory-design]].
 export const FACILITY_TIERS = {
-  1: { label: 'County Jail',          hustlePerHr: 50,   steelPerHr: 20  },
-  2: { label: 'State Prison',         hustlePerHr: 150,  steelPerHr: 60  },
-  3: { label: 'Federal Penitentiary', hustlePerHr: 400,  steelPerHr: 160 },
-  4: { label: 'Supermax',             hustlePerHr: 1000, steelPerHr: 400 },
+  1: { label: 'County Jail',          hustlePerHr: 50,   cashPerHr: 20  },
+  2: { label: 'State Prison',         hustlePerHr: 150,  cashPerHr: 60  },
+  3: { label: 'Federal Penitentiary', hustlePerHr: 400,  cashPerHr: 160 },
+  4: { label: 'Supermax',             hustlePerHr: 1000, cashPerHr: 400 },
 }
 
 export const FACILITIES = [

@@ -99,10 +99,10 @@ export function applyHit(facilityId) { return hitHouse(facilityId) }
 // An enemy raid landed on a facility you hold. Returns { lost, loyalty, gang }.
 export function applyRaid(facilityId, gang) { return raidHouse(facilityId, gang) }
 
-// Steel cost to reinforce (scales with tier).
+// Cash cost to reinforce (scales with tier). Tunable.
 export function reinforceCost(facilityId) {
   const fac = FACILITY_BY_ID.get(facilityId)
-  return fac ? fac.tier * 150 : 0
+  return fac ? fac.tier * 1500 : 0
 }
 
 export function reinforce(facilityId) {

@@ -19,7 +19,8 @@
 
 import { useEffect, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../supabase'
-import { addHustle, spendHustle, getUserId } from './profileStore'
+import { spendHustle, getUserId } from './profileStore'
+import { addCash } from './cashStore'
 import { gangBlockIncomeMult } from './gangStore'
 import { getProgress } from './progressionStore'
 
@@ -326,7 +327,7 @@ export function aiPoachBlock(gx, gy, crew) {
   const stake = effectiveLoyalty(b)
   const price = Math.round(stake * POACH_MULT)
   const payout = Math.round(stake + (price - stake) * PAYOUT_CUT)
-  addHustle(payout)
+  addCash(payout)
   overrides[key] = {
     owner: crew, ownerKind: 'ai', npc: b.npc, baseLoyalty: b.baseLoyalty,
     incomePerHr: b.incomePerHr, loyalty: price, basePaid: price,
@@ -442,12 +443,12 @@ function claimLanding(gx, gy) {
   return cellCenter(gx, gy)
 }
 
-// Bank a held block's accrued income.
+// Bank a held block's accrued income (paid in Cash — turf is the empire economy).
 export function collect(gx, gy) {
   const got = pendingIncome(gx, gy)
   const o = overrides[cellKey(gx, gy)]
   if (!o || o.owner !== 'you') return 0
-  if (got > 0) addHustle(got)
+  if (got > 0) addCash(got)
   o.lastCollectedAt = Date.now()
   commit()
   return got
@@ -455,20 +456,20 @@ export function collect(gx, gy) {
 
 // ---- home-screen "Your Turf" aggregates ----------------------------
 
-// Total Hustle/hr across every block you hold.
+// Total Cash/hr across every block you hold.
 export function yourBlockIncomePerHr() {
   const base = yourBlocks().reduce((sum, b) => sum + (b.incomePerHr || 0), 0)
   return Math.round(base * gangBlockIncomeMult())
 }
 
-// Total uncollected (pending) Hustle waiting across all your blocks.
+// Total uncollected (pending) Cash waiting across all your blocks.
 export function yourPendingIncome() {
   const base = yourBlocks().reduce((sum, b) => sum + pendingIncome(b.gx, b.gy), 0)
   return Math.round(base * gangBlockIncomeMult())
 }
 
 // Bank pending income from ALL your blocks in one pass (single credit + commit).
-// Returns the total Hustle banked.
+// Returns the total Cash banked.
 export function collectAllBlocks() {
   let total = 0
   const now = Date.now()
@@ -479,7 +480,7 @@ export function collectAllBlocks() {
     if (got > 0) { total += got; o.lastCollectedAt = now }
   }
   total = Math.round(total * gangBlockIncomeMult())   // gang 'plug' perk boost
-  if (total > 0) { addHustle(total); commit() }
+  if (total > 0) { addCash(total); commit() }
   return total
 }
 
@@ -505,7 +506,7 @@ export function resetTurf() {
 const PAYOUT_PERIOD_MS  = 3_600_000               // 1 hour
 const PAYOUT_BUCKET_KEY = 'pe_block_payout_bucket_v1'
 
-// Payout event bus — fired with the Hustle amount whenever a payout banks, so
+// Payout event bus — fired with the Cash amount whenever a payout banks, so
 // any screen (e.g. the home card's chime) can react without owning the ticker.
 const payoutListeners = new Set()
 export function subscribePayout(fn) { payoutListeners.add(fn); return () => payoutListeners.delete(fn) }
@@ -516,7 +517,7 @@ export function msToNextPayout() { return PAYOUT_PERIOD_MS - (Date.now() % PAYOU
 function payoutBucket() { return Math.floor(Date.now() / PAYOUT_PERIOD_MS) }
 
 // If the global hour rolled over since our last payout, auto-bank all block
-// income. First ever run just starts the clock (no payout). Returns Hustle paid
+// income. First ever run just starts the clock (no payout). Returns Cash paid
 // and notifies payout subscribers when paid > 0.
 export function runDueBlockPayout() {
   let last = null

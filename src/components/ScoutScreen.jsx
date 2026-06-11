@@ -1,16 +1,18 @@
 import React from 'react'
 import { ALL_CITIES, FACILITY_TIERS, PLAYER } from '../data/gameData'
-import { useDisplayName, useSteel } from '../state/profileStore'
+import { useDisplayName } from '../state/profileStore'
+import { useCash } from '../state/cashStore'
 import {
   useTerritories, effectiveLoyalty, pendingIncome, collect,
   tierIncome, holderPower, LOYALTY_MAX, HIT_DAMAGE,
   reinforce, reinforceCost, REINFORCE_AMOUNT,
 } from '../state/territoriesStore'
 
-const GOLD = '#c9a84c'
-const RED  = '#e74c3c'
-const BLUE = '#4a9eff'
-const DIM  = '#555'
+const GOLD  = '#c9a84c'
+const RED   = '#e74c3c'
+const BLUE  = '#4a9eff'
+const GREEN = '#42d778'
+const DIM   = '#555'
 
 // Tier badge colors — escalate from drab county jail to gold supermax.
 const TIER_COLOR = { 1: '#7f8c8d', 2: BLUE, 3: '#a855f7', 4: GOLD }
@@ -24,7 +26,7 @@ const CITY_BY_ID = new Map(ALL_CITIES.map(c => [c.id, c]))
 export function ScoutScreen({ facility, inFlight, incomingRaid, onAttack, onClose }) {
   const territories = useTerritories()
   const playerName  = useDisplayName()
-  const steel       = useSteel()
+  const cash        = useCash()
   if (!facility) return null
 
   const rec     = territories[facility.id] || null
@@ -43,7 +45,7 @@ export function ScoutScreen({ facility, inFlight, incomingRaid, onAttack, onClos
   const hitsToFlip = Math.max(1, Math.ceil(loyalty / HIT_DAMAGE))
   const pending    = pendingIncome(facility.id)
   const reinCost   = reinforceCost(facility.id)
-  const canAfford  = steel >= reinCost
+  const canAfford  = cash >= reinCost
   const atMaxDef   = loyalty >= LOYALTY_MAX
 
   return (
@@ -76,8 +78,8 @@ export function ScoutScreen({ facility, inFlight, incomingRaid, onAttack, onClos
             <div style={{ color: DIM, fontSize: 11 }}>Hustle/hr</div>
           </div>
           <div style={{ background: '#1e1e2a', borderRadius: 12, padding: 12, textAlign: 'center' }}>
-            <div style={{ color: BLUE, fontSize: 18, fontWeight: 500 }}>+{income.steelPerHr}</div>
-            <div style={{ color: DIM, fontSize: 11 }}>Steel/hr</div>
+            <div style={{ color: GREEN, fontSize: 18, fontWeight: 500 }}>+{income.cashPerHr}</div>
+            <div style={{ color: DIM, fontSize: 11 }}>Cash/hr</div>
           </div>
         </div>
 
@@ -156,8 +158,8 @@ export function ScoutScreen({ facility, inFlight, incomingRaid, onAttack, onClos
             <i className="ti ti-shield-plus" /> {atMaxDef
               ? 'Defense Maxed'
               : !canAfford
-                ? `Reinforce — need ${reinCost.toLocaleString()} Steel`
-                : `Reinforce +${REINFORCE_AMOUNT} Def — ${reinCost.toLocaleString()} Steel`}
+                ? `Reinforce — need $${reinCost.toLocaleString()}`
+                : `Reinforce +${REINFORCE_AMOUNT} Def — $${reinCost.toLocaleString()}`}
           </button>
         )}
 
@@ -165,12 +167,12 @@ export function ScoutScreen({ facility, inFlight, incomingRaid, onAttack, onClos
         {isYours && (
           <button
             className="btn btn-gold btn-full"
-            style={{ padding: 14, marginBottom: 10, opacity: pending.hustle + pending.steel > 0 ? 1 : 0.5 }}
-            disabled={pending.hustle + pending.steel === 0}
+            style={{ padding: 14, marginBottom: 10, opacity: pending.hustle + pending.cash > 0 ? 1 : 0.5 }}
+            disabled={pending.hustle + pending.cash === 0}
             onClick={() => collect(facility.id)}
           >
-            <i className="ti ti-coin" /> {pending.hustle + pending.steel > 0
-              ? `Collect +${pending.hustle.toLocaleString()} Hustle · +${pending.steel.toLocaleString()} Steel`
+            <i className="ti ti-coin" /> {pending.hustle + pending.cash > 0
+              ? `Collect +${pending.hustle.toLocaleString()} Hustle · +$${pending.cash.toLocaleString()}`
               : 'Nothing to collect yet'}
           </button>
         )}

@@ -101,7 +101,7 @@ function IncomingBanner({ raid, myHouse, onReinforce, onTap }) {
           borderRadius: 8, padding: '5px 12px', fontSize: 11, fontWeight: 700, cursor: full ? 'default' : 'pointer',
         }}>
           <i className="ti ti-shield-half-filled" style={{ marginRight: 5 }} />
-          {full ? 'House at full HP' : `Reinforce · ${REINFORCE_COST} Steel`}
+          {full ? 'House at full HP' : `Reinforce · $${REINFORCE_COST.toLocaleString()}`}
         </button>
       </div>
     </div>
