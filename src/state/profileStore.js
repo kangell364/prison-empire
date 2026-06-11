@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../supabase'
 import { RESOURCES, PLAYER, PLAYER_LOOKS, DEFAULT_LOOK_ID } from '../data/gameData'
+import { checkName } from './nameModeration'
 
 const PROFILE_KEY        = 'pe_profile_v1'
 const LEGACY_HUSTLE_KEY  = 'pe_hustle_v1'
@@ -143,13 +144,17 @@ export function spendSteel(cost) {
 export const NAME_MAX_LEN = 20
 
 export function setDisplayName(name) {
-  if (typeof name !== 'string') return
+  if (typeof name !== 'string') return false
   // Hard cap at 20 characters — spaces count (slice is by code unit, so every
   // typed character including spaces counts toward the limit). Enforced here so
   // every entry point obeys it, not just the rename input's maxLength.
   const capped = name.slice(0, NAME_MAX_LEN)
-  if (!capped.trim()) return                 // reject blank / whitespace-only
+  if (!capped.trim()) return false           // reject blank / whitespace-only
+  // Profanity backstop — every entry point obeys the name filter, not just the
+  // rename dialog (which also pre-checks so it can explain WHY before saving).
+  if (!checkName(capped).ok) return false
   commit({ display_name: capped.trim() })
+  return true
 }
 
 export function getPlayerLookId()  { return state.player_look_id }

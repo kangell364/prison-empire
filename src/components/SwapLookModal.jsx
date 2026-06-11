@@ -4,6 +4,7 @@ import {
   usePlayerLook, setPlayerLook,
   useDisplayName, setDisplayName, NAME_MAX_LEN,
 } from '../state/profileStore'
+import { checkName } from '../state/nameModeration'
 import { CharacterDetailModal } from './CharacterDetailModal'
 import { sfx } from '../sounds'
 
@@ -29,6 +30,7 @@ export function SwapLookModal({ onClose }) {
   const [detail, setDetail]           = useState(null)   // a look opened in the big card view
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft]     = useState(name)
+  const [nameErr, setNameErr]         = useState(null)   // profanity-filter explanation
   const [tab, setTab]                 = useState('men')  // 'men' | 'women' | 'baddies'
 
   // MEN = no category tag; the others match on `sex`.
@@ -44,7 +46,11 @@ export function SwapLookModal({ onClose }) {
   }
 
   const saveName = () => {
+    // Screen the name before saving so we can explain WHY if it's rejected.
+    const verdict = checkName(nameDraft)
+    if (!verdict.ok) { setNameErr(verdict.reason); sfx.deny?.(); return }
     setDisplayName(nameDraft)
+    setNameErr(null)
     setEditingName(false)
     sfx.tap?.()
   }
@@ -59,7 +65,7 @@ export function SwapLookModal({ onClose }) {
         <div style={{ color: '#fff', fontSize: 15, fontWeight: 600 }}>Choose Your Card</div>
         <button
           className="btn"
-          onClick={() => { setNameDraft(name); setEditingName(true) }}
+          onClick={() => { setNameDraft(name); setNameErr(null); setEditingName(true) }}
           style={{ padding: '8px 12px', background: '#1e1e2a', border: '0.5px solid #2a2a3a', color: '#c9a84c', fontSize: 12, borderRadius: 10 }}
         >
           <i className="ti ti-edit" /> Change Name
@@ -124,16 +130,23 @@ export function SwapLookModal({ onClose }) {
             <div style={{ color: '#fff', fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Change Name</div>
             <input
               value={nameDraft}
-              onChange={e => setNameDraft(e.target.value.slice(0, NAME_MAX_LEN))}
+              onChange={e => { setNameDraft(e.target.value.slice(0, NAME_MAX_LEN)); if (nameErr) setNameErr(null) }}
               maxLength={NAME_MAX_LEN}
               autoFocus
               onKeyDown={e => { if (e.key === 'Enter') saveName() }}
-              style={{ width: '100%', boxSizing: 'border-box', background: '#0a0a0f', border: '0.5px solid #2a2a3a', borderRadius: 10, padding: '12px 14px', color: '#fff', fontSize: 15, marginBottom: 6 }}
+              style={{ width: '100%', boxSizing: 'border-box', background: '#0a0a0f', border: `0.5px solid ${nameErr ? '#e74c3c' : '#2a2a3a'}`, borderRadius: 10, padding: '12px 14px', color: '#fff', fontSize: 15, marginBottom: 6 }}
             />
             {/* Live counter — counts every character including spaces. */}
-            <div style={{ textAlign: 'right', color: nameDraft.length >= NAME_MAX_LEN ? '#e74c3c' : '#555', fontSize: 11, marginBottom: 14 }}>
+            <div style={{ textAlign: 'right', color: nameDraft.length >= NAME_MAX_LEN ? '#e74c3c' : '#555', fontSize: 11, marginBottom: nameErr ? 8 : 14 }}>
               {nameDraft.length}/{NAME_MAX_LEN}
             </div>
+            {/* Profanity-filter explanation — why this name was rejected. */}
+            {nameErr && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: '#2a1414', border: '0.5px solid #e74c3c55', borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>
+                <i className="ti ti-alert-triangle" style={{ color: '#e74c3c', fontSize: 15, marginTop: 1, flexShrink: 0 }} />
+                <div style={{ color: '#e9b3b3', fontSize: 12, lineHeight: 1.45 }}>{nameErr}</div>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-dark" style={{ flex: 1, padding: 12 }} onClick={() => setEditingName(false)}>Cancel</button>
               <button className="btn btn-primary" style={{ flex: 1, padding: 12 }} onClick={saveName} disabled={!nameDraft.trim()}>Save</button>
