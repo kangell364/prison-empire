@@ -52,6 +52,13 @@ const HOME_INCOME_MULT = 1.25
 const HOME_COST_MULT   = 0.85
 
 export const CREW_COLORS = { red: '#e74c3c', blue: '#4a9eff', purple: '#9b59b6', you: '#c9a84c' }
+// Reserved squares: a 2×2 block cluster per county, painted BLUE, with no NPC and
+// un-claimable — held back for a future MOB house. Installed once map data loads
+// (setReservedCells), checked per cell by isReservedCell.
+export const RESERVED_BLUE = '#3b82f6'
+let reservedCells = null   // Set<cellKey> | null
+export function setReservedCells(set) { reservedCells = set || null; listeners.forEach(f => f(overrides)) }
+export function isReservedCell(gx, gy) { return !!(reservedCells && reservedCells.has(cellKey(gx, gy))) }
 const NPC_NAMES = ['Tre', 'Paco', 'Big L', 'Smoke', 'Reek', 'Vinnie', 'Tommy', 'Los', 'Deuce', 'Mac', 'Cash', 'Slim', 'Boomer', 'Rico', 'Tank']
 
 // ---- grid helpers --------------------------------------------------
@@ -266,6 +273,12 @@ export function effectiveLoyalty(b) {
 }
 
 export function getBlock(gx, gy) {
+  // Reserved squares are always blue, NPC-free, and un-ownable — they ignore any
+  // procedural owner or stale override (held back for a future MOB house).
+  if (isReservedCell(gx, gy) && isLandCell(gx, gy)) {
+    return { owner: null, ownerKind: 'reserved', reserved: true, color: RESERVED_BLUE,
+             loyalty: 0, baseLoyalty: 0, incomePerHr: 0, npc: null, land: true, gx, gy }
+  }
   const def = blockDefault(gx, gy)
   const k = cellKey(gx, gy)
   const mine = overrides[k]
@@ -345,6 +358,7 @@ export function pendingIncome(gx, gy) {
 export function recruit(gx, gy, homeTurf) {
   const b = getBlock(gx, gy)
   if (b.land === false) return { ok: false, reason: 'offmap' }
+  if (b.reserved) return { ok: false, reason: 'reserved' }
   if (b.owner) return { ok: false, reason: 'taken' }
   if (yourBlockCount() >= blockCap()) return { ok: false, reason: 'cap' }
   const cost = recruitCost(b, homeTurf)

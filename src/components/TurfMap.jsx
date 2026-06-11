@@ -11,7 +11,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { geoBounds, geoContains } from 'd3-geo'
-import { GRID, getBlock, subscribeBlocks, subscribeActivity, subscribePayout, CREW_COLORS } from '../state/blocksStore'
+import { GRID, getBlock, subscribeBlocks, subscribeActivity, subscribePayout, CREW_COLORS, RESERVED_BLUE } from '../state/blocksStore'
 import { getMyGangId, subscribeGang } from '../state/gangStore'
 import { blockColor } from '../state/gangTurf'
 
@@ -148,6 +148,18 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
       for (let gx = x0; gx < x1; gx++) for (let gy = y0; gy < y1; gy++) {
         const blk = getBlock(gx, gy)
         if (blk.land === false) continue   // ocean / Canada / Mexico — off the board, draw nothing
+        // Reserved square — a solid BLUE, un-claimable cell (the 4 abut into one
+        // large 2×2 square per county). No border so they merge seamlessly; not
+        // interactive (held for a future MOB house).
+        if (blk.reserved) {
+          const [rcy, rcx] = blockCenter(gx, gy)
+          const rstyle = { color: RESERVED_BLUE, weight: 0, fillColor: RESERVED_BLUE, fillOpacity: 0.5, interactive: false }
+          ;(HEX
+            ? L.polygon(hexCorners(rcy, rcx), rstyle)
+            : L.rectangle([[rcy - GRID / 2, rcx - GRID / 2], [rcy + GRID / 2, rcx + GRID / 2]], rstyle)
+          ).addTo(layer)
+          continue
+        }
         const owner = blk.owner
         const terr = (!owner && TERRAIN) ? terrainOf(gx, gy) : null
         // Relative 3-color allegiance: GOLD = your block, GREEN = your gang's

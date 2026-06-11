@@ -6,7 +6,7 @@ import { USStateMap } from '../components/USStateMap'
 import { ScoutScreen } from '../components/ScoutScreen'
 import { TurfMap } from '../components/TurfMap'
 import { BlockSheet } from '../components/BlockSheet'
-import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks, setLandTest, initSharedBlocks } from '../state/blocksStore'
+import { cellCenter, cellOf, cellKey, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks, setLandTest, setReservedCells, initSharedBlocks } from '../state/blocksStore'
 import { useMapData, buildCityCountyMap, buildUnlockedCountyTest, UNLOCKED_COUNTY_FIPS, HARRIS_CENTER, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
 import { knockOut } from '../state/vitalsStore'
 import { getBounty } from '../state/bountyStore'
@@ -327,7 +327,10 @@ export default function MapScreen({ onNavigate }) {
   // Canada, the ocean) is locked — no NPCs, nothing claimable. Open more later by
   // adding FIPS to UNLOCKED_COUNTY_FIPS in mapData.js. Reuses the land-mask gate.
   useEffect(() => {
-    if (mapData) setLandTest(buildUnlockedCountyTest(mapData))
+    if (mapData) {
+      setLandTest(buildUnlockedCountyTest(mapData))
+      setReservedCells(buildReservedSquares(mapData, UNLOCKED_COUNTY_FIPS))
+    }
   }, [mapData])
 
   // Locked counties/states are uncolored on the overview maps — color (turf /
@@ -1346,6 +1349,23 @@ function hexToRgba(hex, a) {
 // State fill (country view): gold if you hold any facility there; otherwise the
 // DOMINANT rival mob's color (intensity scales with its share); dark if only
 // vacant or no facilities. Colors by MOB — the Phase-B projection.
+// One reserved 2×2 block square per county, anchored at the county centroid —
+// painted blue + un-claimable, held back for a future MOB house. Returns a Set of
+// cellKeys (4 per county) that blocksStore checks via isReservedCell.
+function buildReservedSquares(mapData, fipsList) {
+  const set = new Set()
+  if (!mapData) return set
+  const byFips = new Map(mapData.counties.features.map(f => [String(f.id).padStart(5, '0'), f]))
+  for (const fips of fipsList) {
+    const f = byFips.get(fips)
+    if (!f) continue
+    const [lng, lat] = geoCentroid(f)              // [lng, lat]
+    const [gx0, gy0] = cellOf(lng, lat)            // anchor cell of the 2×2
+    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) set.add(cellKey(gx0 + dx, gy0 + dy))
+  }
+  return set
+}
+
 function stateColorFor(s, mobColorById) {
   if (!s || s.total === 0) return '#1e1e2a'
   // Your mob = GREEN (matches the GOLD/GREEN/RED block scheme: green = yours-good).
