@@ -4,8 +4,10 @@
 //   rival  → Poach the member's loyalty (+10%) to take the block
 // Home-turf blocks (near your trap house) are cheaper + earn more.
 
-import React from 'react'
-import { useHustle } from '../state/profileStore'
+import React, { useEffect } from 'react'
+import { useHustle, useDisplayName, usePlayerLook, resolveLook } from '../state/profileStore'
+import { usePlayers } from '../state/playersStore'
+import { Avatar } from './Avatar'
 import {
   getBlock, useBlocksVersion, effectiveLoyalty, poachPrice, recruitCost,
   pendingIncome, onCooldown, cooldownLeft, recruit, poach, collect,
@@ -19,10 +21,24 @@ const DIM  = '#666'
 export function BlockSheet({ gx, gy, homeTurf, onClose }) {
   useBlocksVersion()
   const hustle = useHustle()
+  const myName = useDisplayName()
+  const myLook = resolveLook(usePlayerLook())
+  const { players, name: playerName, refresh } = usePlayers()
   const b = getBlock(gx, gy)
   const yours  = b.owner === 'you'
   const vacant = !b.owner
   const color  = yours ? GOLD : (b.color || DIM)
+
+  // Who actually HOLDS this block — show their player card (avatar + name) so you
+  // can see who you're taking it from. Real players only (you or a rival with an
+  // owner_id); ambient AI crews have no player behind them.
+  const holder = yours
+    ? { name: myName, look: myLook }
+    : (b.owner === 'rival' && b.owner_id)
+      ? { name: playerName(b.owner_id), look: resolveLook(players[b.owner_id]?.player_look_id) }
+      : null
+  // Pull names/looks if this rival isn't in the directory yet.
+  useEffect(() => { if (b.owner_id && !players[b.owner_id]) refresh() }, [b.owner_id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loyalty = effectiveLoyalty(b)
   const cost    = vacant ? recruitCost(b, homeTurf) : poachPrice(b, homeTurf)
@@ -38,16 +54,25 @@ export function BlockSheet({ gx, gy, homeTurf, onClose }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 230, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, background: '#13131f', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: '18px 18px 100px', borderTop: `2px solid ${color}` }}>
-        {/* Header */}
+        {/* Header — the HOLDER's player card (avatar + name) when a real player
+            holds it, so you see who you're taking the block from; the NPC working
+            the corner sits underneath as secondary detail. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-          <div style={{ width: 46, height: 46, borderRadius: 12, background: `${color}22`, border: `1px solid ${color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🕴️</div>
+          {holder
+            ? <Avatar src={holder.look?.avatar} emoji={holder.look?.emoji} size={46} radius={12} style={{ border: `1px solid ${color}` }} />
+            : <div style={{ width: 46, height: 46, borderRadius: 12, background: `${color}22`, border: `1px solid ${color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🕴️</div>}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ color, fontSize: 11, letterSpacing: 1, fontWeight: 700 }}>
               {yours ? 'YOUR BLOCK' : vacant ? 'UNCLAIMED BLOCK' : `${b.owner.toUpperCase()} CREW`}
             </div>
-            <div style={{ color: '#fff', fontSize: 17, fontWeight: 600 }}>
-              {vacant ? 'Open Corner' : b.npc}
-              {!vacant && <span style={{ color: DIM, fontSize: 12, fontWeight: 400 }}> · working the block</span>}
+            {/* Holding player's name — above the NPC name. */}
+            {holder && (
+              <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {holder.name}
+              </div>
+            )}
+            <div style={{ color: holder ? DIM : '#fff', fontSize: holder ? 12.5 : 17, fontWeight: holder ? 400 : 600 }}>
+              {vacant ? 'Open Corner' : <>🕴️ {b.npc}{!vacant && <span style={{ color: DIM, fontSize: 12, fontWeight: 400 }}> · working the block</span>}</>}
             </div>
           </div>
           {homeTurf && <div style={{ background: `${GOLD}22`, border: `0.5px solid ${GOLD}`, color: GOLD, fontSize: 9, fontWeight: 800, letterSpacing: 1, borderRadius: 6, padding: '3px 7px' }}>HOME TURF</div>}

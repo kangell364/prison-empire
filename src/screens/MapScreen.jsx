@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
-import { ALL_CITIES, FACILITIES, FACILITY_TIERS, PLAYER_HOME_FACILITY_ID, AI_GANGS } from '../data/gameData'
+import { ALL_CITIES, FACILITIES, AI_GANGS } from '../data/gameData'
 import { CountdownRing } from '../components/CountdownRing'
 import { USCountryMap } from '../components/USCountryMap'
 import { USStateMap } from '../components/USStateMap'
@@ -7,7 +7,7 @@ import { ScoutScreen } from '../components/ScoutScreen'
 import { TurfMap } from '../components/TurfMap'
 import { BlockSheet } from '../components/BlockSheet'
 import { cellCenter, HOME_RADIUS_DEG, yourBlocks, aiPoachBlock, useYourBlocks, setLandTest, initSharedBlocks } from '../state/blocksStore'
-import { useMapData, buildCityCountyMap, buildUnlockedCountyTest, UNLOCKED_COUNTY_FIPS, HARRIS_CENTER, STATE_CODE_TO_FIPS, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
+import { useMapData, buildCityCountyMap, buildUnlockedCountyTest, UNLOCKED_COUNTY_FIPS, HARRIS_CENTER, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
 import { knockOut } from '../state/vitalsStore'
 import { getBounty } from '../state/bountyStore'
 import { useDisplayName, useAuth, resolveLook, useHustle } from '../state/profileStore'
@@ -584,32 +584,6 @@ export default function MapScreen({ onNavigate }) {
     return { yours, enemy, vacant }
   }, [territories])
 
-  const homeState = useMemo(() => {
-    const home = FACILITY_BY_ID.get(PLAYER_HOME_FACILITY_ID)
-    return home ? cityById.get(home.cityId)?.state : null
-  }, [cityById])
-
-  // Guided next-target (the "Lighthouse" pattern): always surface one clear,
-  // easy objective so a new player is never lost. Prefer a vacant facility in
-  // the home region, then any vacant, then the lowest-tier rival.
-  const recommended = useMemo(() => {
-    const notYours = FACILITIES.filter(f => (territories[f.id]?.owner ?? null) !== 'you')
-    const isVacant = f => !(territories[f.id]?.owner)
-    const vacantHome = notYours.filter(f => isVacant(f) && cityById.get(f.cityId)?.state === homeState)
-    const vacantAny  = notYours.filter(isVacant)
-    const pool = vacantHome.length ? vacantHome : vacantAny.length ? vacantAny : notYours
-    return [...pool].sort((a, b) => a.tier - b.tier)[0] || null
-  }, [territories, homeState, cityById])
-
-  const goToFacility = (f) => {
-    const city = cityById.get(f.cityId)
-    if (city) {
-      const fips = STATE_CODE_TO_FIPS[city.state]
-      setStateView({ fips, code: city.state, name: stateNameByFips[fips] || city.state })
-    }
-    setSelectedFacility(f)
-  }
-
   // Tick the relocation countdown and land the move when the timer elapses.
   useEffect(() => {
     if (!homeHouse?.moving_until) return
@@ -725,30 +699,6 @@ export default function MapScreen({ onNavigate }) {
         )}
       </div>
 
-      {/* Recommended target */}
-      {recommended && (
-        <div style={{ padding: '12px 16px 0' }}>
-          <div
-            onClick={() => { sfx.tap(); goToFacility(recommended) }}
-            style={{
-              background: 'linear-gradient(135deg, #1a1510, #251e0a)', border: `0.5px solid ${GOLD}44`,
-              borderRadius: 14, padding: 12, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
-            }}
-          >
-            <div style={{ width: 34, height: 34, borderRadius: 10, background: `${GOLD}1f`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className="ti ti-target-arrow" style={{ color: GOLD, fontSize: 18 }} />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: GOLD, fontSize: 11, letterSpacing: 1, fontWeight: 600 }}>RECOMMENDED TARGET</div>
-              <div style={{ color: '#fff', fontSize: 13, marginTop: 1 }}>
-                {recommended.name} · {(territories[recommended.id]?.owner ?? null) ? FACILITY_TIERS[recommended.tier].label : 'unclaimed'}
-              </div>
-            </div>
-            <i className="ti ti-chevron-right" style={{ color: DIM, fontSize: 18 }} />
-          </div>
-        </div>
-      )}
-
       {/* Map */}
       <div className="section" style={{ marginTop: 14 }}>
         <div className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -808,7 +758,7 @@ export default function MapScreen({ onNavigate }) {
           )}
           <div style={{ display: 'flex', justifyContent: 'center', gap: 16, padding: '10px 12px', borderTop: `0.5px solid ${GOLD}22` }}>
             {[
-              { color: GOLD, label: 'Your Mob' },
+              { color: '#2ecc71', label: 'Your Mob' },
               { color: RED, label: 'Rival Mobs' },
             ].map(l => (
               <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -1398,7 +1348,8 @@ function hexToRgba(hex, a) {
 // vacant or no facilities. Colors by MOB — the Phase-B projection.
 function stateColorFor(s, mobColorById) {
   if (!s || s.total === 0) return '#1e1e2a'
-  if (s.yours > 0) return `rgba(201,168,76,${(0.3 + Math.min(1, s.yours / s.total) * 0.5).toFixed(2)})`
+  // Your mob = GREEN (matches the GOLD/GREEN/RED block scheme: green = yours-good).
+  if (s.yours > 0) return `rgba(46,204,113,${(0.3 + Math.min(1, s.yours / s.total) * 0.5).toFixed(2)})`
   let domId = null, domN = 0
   for (const id in s.mobCounts) if (s.mobCounts[id] > domN) { domN = s.mobCounts[id]; domId = id }
   if (domId) return hexToRgba(mobColorById[domId] || '#e74c3c', 0.3 + Math.min(1, domN / s.total) * 0.5)

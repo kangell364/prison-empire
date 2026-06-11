@@ -95,16 +95,20 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
-    // Open centered on the player's own trap house (so it's in view) at a
-    // metro-wide zoom; fall back to the county center, then the US view.
-    const openCenter = (trapHouse && trapHouse.lat != null) ? [trapHouse.lat, trapHouse.lng] : center
+    // Open on the EXPLICIT center when one was passed (a ZIP search, a tapped
+    // county, your blocks there) — only fall back to the player's trap house, then
+    // the US view, when no center was given. (center wins so ZIP search lands you
+    // on the searched area, not back on your house.)
+    const openCenter = center || (trapHouse && trapHouse.lat != null ? [trapHouse.lat, trapHouse.lng] : null)
     const map = L.map(containerRef.current, {
       center: openCenter || [39.8283, -98.5795],
       zoom: openCenter ? OPEN_ZOOM : 5,
       minZoom: 4, maxZoom: 18,
       maxBounds: [[15, -170], [72, -50]], maxBoundsViscosity: 0.7,
       zoomControl: true, attributionControl: false,
-      dragging: true, tap: true,
+      // tap:false — the legacy Leaflet tap handler swallows touchstart on modern
+      // mobile and blocks finger-drag panning; disabling it restores touch pan.
+      dragging: true, tap: false, touchZoom: true, inertia: true,
     })
     mapRef.current = map
     L.tileLayer(DARK_TILES, { subdomains: 'abcd', maxZoom: 19, attribution: ATTRIBUTION }).addTo(map)
