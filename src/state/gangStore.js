@@ -9,6 +9,7 @@
 // survives even though the browsable AI gangs are regenerated each load.
 
 import { useEffect, useState } from 'react'
+import { supabase, isSupabaseConfigured } from '../supabase'
 
 const KEY = 'pe_gang_v1'
 
@@ -128,6 +129,10 @@ export function gangIdentity(id) {
   }
   const d = GANG_DEFS.find(g => g.id === id)
   if (d) return { id: d.id, name: d.name, tag: d.tag, crest: d.crest, color: d.color, isMine: false }
+  // Real (live) gang the player isn't in — resolved from the cache loaded by the
+  // browse list / turf attribution; colorless gangs get a stable hashed color.
+  const r = realIdentityCache.get(id)
+  if (r) return { id, name: r.name, tag: r.tag || '', crest: r.crest || '🏴', color: r.color || hashColor(id), isMine: false }
   return { id, name: id, tag: '', crest: '🏴', color: '#888', isMine: false }
 }
 export function getMyGangId() { return state.myGang?.id || null }
@@ -163,14 +168,154 @@ function readInitial() {
     const raw = localStorage.getItem(KEY)
     if (raw) {
       const p = JSON.parse(raw)
-      return { myGang: p.myGang || null, applied: p.applied || {} }
+      // `live` flags a server-backed gang; it's re-hydrated from Supabase on boot
+      // (ensureGangs), so the cached copy is just an optimistic first paint.
+      return { myGang: p.myGang || null, applied: p.applied || {}, live: !!p.live }
     }
   } catch {}
-  return { myGang: null, applied: {} }
+  return { myGang: null, applied: {}, live: false }
 }
 
 function persist() { try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }
 function commit(next) { state = next; persist(); listeners.forEach(fn => fn(state)) }
+
+// ====================================================================
+// LIVE (Supabase) backend — real multiplayer gangs. AI gangs (g_*) and any
+// locally-founded gang stay 100% client-side; gangs with a UUID id are real,
+// server-backed, and kept live by realtime. The myGang/member shapes are
+// identical either way, so every consumer is unchanged. All currency/cross-user
+// writes go through SECURITY DEFINER RPCs (see public/gangs_m1.txt).
+// ====================================================================
+
+export function liveGangsEnabled() { return isSupabaseConfigured }
+export function isLiveGang() { return !!state.live }
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function isLiveGangId(id) { return typeof id === 'string' && UUID_RE.test(id) }
+
+const MEMBER_FACES = ['😤', '💀', '🔪', '👊', '🥊', '🧤', '🎭', '🩸', '🐺', '👹']
+function hashOf(s) { let h = 0; const str = String(s || ''); for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0; return h }
+function faceFor(uid) { return MEMBER_FACES[hashOf(uid) % MEMBER_FACES.length] }
+const HASH_COLORS = ['#e74c3c', '#4a9eff', '#9b59b6', '#2ecc71', '#e67e22', '#16a085', '#d35400', '#8e44ad', '#e84393', '#1abc9c']
+function hashColor(id) { return HASH_COLORS[hashOf(id) % HASH_COLORS.length] }
+
+// Real-gang identity cache (id -> {id,name,tag,crest,color}) so gangIdentity()
+// + the turf leaderboard resolve live gangs the player isn't in.
+const realIdentityCache = new Map()
+// userId -> gangId, for attributing a rival's blocks to their gang (turf board).
+const userGangCache = new Map()
+export function gangIdForUser(uid) { return userGangCache.get(uid) || null }
+
+async function getUid() { try { const { data } = await supabase.auth.getUser(); return data?.user?.id || null } catch { return null } }
+
+function toLiveMember(r, myId) {
+  const mine = r.user_id === myId
+  return {
+    id: mine ? PLAYER_MEMBER_ID : r.user_id,   // keep PLAYER_MEMBER_ID for self so myRole/etc. work
+    userId: r.user_id,
+    name: r.name || 'Player', level: r.level || 1, power: r.power || 0,
+    role: r.role || ROLES.MEMBER, emoji: mine ? '🎯' : faceFor(r.user_id), isPlayer: mine,
+  }
+}
+function membersToContrib(rows, myId) {
+  const c = {}; for (const r of rows) c[r.user_id === myId ? PLAYER_MEMBER_ID : r.user_id] = r.contribution || 0; return c
+}
+function buildLiveGang(g, rows, myId) {
+  const members = (rows || []).map(r => toLiveMember(r, myId))
+  return {
+    id: g.id, name: g.name, tag: g.tag || '', crest: g.crest || '🏴', color: g.color || null,
+    enrollment: g.enrollment, minLevel: g.min_level || 0,
+    level: g.level || 1, xp: Number(g.xp || 0), capacity: g.capacity || GANG_BASE_CAPACITY,
+    treasury: Number(g.treasury || 0), perks: g.perks || {},
+    members, power: gangPower(members), contributions: membersToContrib(rows || [], myId),
+    founded: g.founder_id === myId, live: true,
+  }
+}
+function patchLiveGang(prev, g) {
+  return { ...prev,
+    name: g.name, tag: g.tag || '', crest: g.crest || '🏴', color: g.color || null,
+    enrollment: g.enrollment, minLevel: g.min_level || 0,
+    level: g.level || prev.level, xp: Number(g.xp || 0), capacity: g.capacity || prev.capacity,
+    treasury: Number(g.treasury || 0), perks: g.perks || {},
+  }
+}
+
+// ---- realtime ----
+let liveChannels = []
+function teardownLive() { liveChannels.forEach(c => { try { supabase.removeChannel(c) } catch {} }); liveChannels = [] }
+function subscribeLive(gangId, myId) {
+  teardownLive()
+  const cg = supabase.channel(`gang:${gangId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'gangs', filter: `id=eq.${gangId}` }, payload => {
+      if (payload.eventType === 'DELETE') { teardownLive(); commit({ ...state, myGang: null, live: false }); return }
+      if (!state.myGang || state.myGang.id !== gangId) return
+      realIdentityCache.set(gangId, { id: gangId, name: payload.new.name, tag: payload.new.tag, crest: payload.new.crest, color: payload.new.color })
+      commit({ ...state, myGang: patchLiveGang(state.myGang, payload.new) })
+    }).subscribe()
+  const cm = supabase.channel(`gang_members:${gangId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'gang_members', filter: `gang_id=eq.${gangId}` }, async () => {
+      const { data: rows } = await supabase.from('gang_members').select('*').eq('gang_id', gangId)
+      if (!rows || !rows.some(m => m.user_id === myId)) { teardownLive(); commit({ ...state, myGang: null, live: false }); return }
+      if (!state.myGang || state.myGang.id !== gangId) return
+      const members = rows.map(r => toLiveMember(r, myId))
+      commit({ ...state, myGang: { ...state.myGang, members, power: gangPower(members), contributions: membersToContrib(rows, myId) } })
+    }).subscribe()
+  liveChannels = [cg, cm]
+}
+
+// ---- hydration (called from App after auth) ----
+async function hydrateLiveGang(gangId, myId) {
+  const [{ data: g }, { data: rows }] = await Promise.all([
+    supabase.from('gangs').select('*').eq('id', gangId).maybeSingle(),
+    supabase.from('gang_members').select('*').eq('gang_id', gangId),
+  ])
+  if (!g) { teardownLive(); commit({ ...state, myGang: null, live: false }); return null }
+  realIdentityCache.set(g.id, { id: g.id, name: g.name, tag: g.tag, crest: g.crest, color: g.color })
+  commit({ ...state, myGang: buildLiveGang(g, rows || [], myId), live: true, applied: {} })
+  subscribeLive(gangId, myId)
+  return state.myGang
+}
+
+export async function ensureGangs() {
+  if (!isSupabaseConfigured) return
+  loadRealGangs()   // warm the browse + userId->gang caches (turf attribution)
+  const uid = await getUid()
+  if (!uid) return
+  const { data: mem } = await supabase.from('gang_members').select('gang_id').eq('user_id', uid).maybeSingle()
+  if (!mem) {
+    // No server membership. If a stale live gang sits in local state, clear it
+    // (left on another device). A local AI/founded gang is left untouched.
+    if (state.live) { teardownLive(); commit({ ...state, myGang: null, live: false }) }
+    return
+  }
+  await hydrateLiveGang(mem.gang_id, uid)
+}
+
+// ---- browse list (real gangs + the AI browse list) ----
+let realGangs = []
+let realGangsLoaded = false
+const browseListeners = new Set()
+export async function loadRealGangs() {
+  if (!isSupabaseConfigured) return []
+  const [{ data: gangs }, { data: rows }] = await Promise.all([
+    supabase.from('gangs').select('*'),
+    supabase.from('gang_members').select('gang_id, user_id, power'),
+  ])
+  const counts = {}, powers = {}
+  userGangCache.clear()
+  ;(rows || []).forEach(m => { counts[m.gang_id] = (counts[m.gang_id] || 0) + 1; powers[m.gang_id] = (powers[m.gang_id] || 0) + (m.power || 0); userGangCache.set(m.user_id, m.gang_id) })
+  realGangs = (gangs || []).map(g => {
+    realIdentityCache.set(g.id, { id: g.id, name: g.name, tag: g.tag, crest: g.crest, color: g.color })
+    return {
+      id: g.id, name: g.name, tag: g.tag || '', crest: g.crest || '🏴', color: g.color,
+      enrollment: g.enrollment, minLevel: g.min_level || 0, level: g.level || 1,
+      capacity: g.capacity || GANG_BASE_CAPACITY, power: powers[g.id] || 0,
+      members: new Array(counts[g.id] || 0), live: true,
+    }
+  })
+  realGangsLoaded = true
+  browseListeners.forEach(fn => fn())
+  return realGangs
+}
 
 // ---- reads ----------------------------------------------------------
 export function getMyGang() { return state.myGang }
@@ -193,9 +338,24 @@ export function useGang() {
 // Used by the turf map to recolor blocks the moment your gang allegiance shifts.
 export function subscribeGang(fn) { listeners.add(fn); return () => listeners.delete(fn) }
 
-// Browsable gangs = the AI list minus the one you're already in.
+// Browsable gangs = real (live) gangs first, then the AI list — minus the one
+// you're already in. Real gangs carry `live: true` for the LIVE badge.
 export function getBrowseGangs() {
-  return AI_GANGS.filter(g => g.id !== state.myGang?.id)
+  const mine = state.myGang?.id
+  return [...realGangs.filter(g => g.id !== mine), ...AI_GANGS.filter(g => g.id !== mine)]
+}
+
+// Reactive browse list — loads real gangs from Supabase on first use and
+// re-renders when they arrive or when your own gang changes.
+export function useBrowseGangs() {
+  const [, bump] = useState(0)
+  useEffect(() => {
+    const fn = () => bump(v => v + 1)
+    browseListeners.add(fn); listeners.add(fn)
+    if (isSupabaseConfigured && !realGangsLoaded) loadRealGangs()
+    return () => { browseListeners.delete(fn); listeners.delete(fn) }
+  }, [])
+  return getBrowseGangs()
 }
 
 // 'none' | 'pending' | 'accepted' — derived from when you applied.
@@ -222,6 +382,9 @@ export function donateToTreasury(amount, memberId = PLAYER_MEMBER_ID) {
   if (!state.myGang) return
   const amt = Math.max(0, Math.floor(amount || 0))
   if (!amt) return
+  // Live: the RPC debits server Hustle + credits treasury/xp atomically; realtime
+  // echoes it back. The caller must NOT pre-spend Hustle for a live gang.
+  if (state.live) { rpcQuiet('donate_to_gang', { p_gang_id: state.myGang.id, p_amount: amt }, 'donate'); return }
   const treasury = (state.myGang.treasury || 0) + amt
   const contributions = { ...(state.myGang.contributions || {}) }
   contributions[memberId] = (contributions[memberId] || 0) + amt
@@ -238,6 +401,7 @@ export function buyPerk(perkId) {
   if (!state.myGang) return false
   const perk = perkById(perkId)
   if (!perk) return false
+  if (state.live) { rpcQuiet('buy_gang_perk', { p_gang_id: state.myGang.id, p_perk_id: perkId }, 'buyPerk'); return true }
   const level = state.myGang.perks?.[perkId] || 0
   if (level >= perk.maxLevel) return false
   const cost = perkCost(perk, level)
@@ -271,6 +435,9 @@ function playerMember(player, role) {
 // Found your own gang — you become the Boss. Seeds 2 AI lieutenants so the
 // roster doesn't look dead on day one. Caller must pre-check level + Steel.
 export function foundGang({ name, tag, crest, enrollment = ENROLLMENT.APPLY, minLevel = 0 }, player) {
+  // Live: real server gang via RPC (charges Steel server-side — the caller must
+  // NOT pre-spend). Otherwise the local AI-seeded gang below.
+  if (isSupabaseConfigured) { foundGangLive({ name, tag, crest, enrollment, minLevel }, player); return }
   const seed = makeRoster(2, Math.max(1, (player.level || 1) - 1))
     .map(m => ({ ...m, role: ROLES.MEMBER }))
   const members = [playerMember(player, ROLES.BOSS), ...seed]
@@ -293,8 +460,10 @@ export function foundGang({ name, tag, crest, enrollment = ENROLLMENT.APPLY, min
   commit({ ...state, myGang: gang })
 }
 
-// Join an AI gang — snapshot it and add the player as a Member.
+// Join a gang. A UUID id → a real (live) server gang via RPC; a g_* id → snapshot
+// the local AI gang and add the player as a Member.
 export function joinGang(gangId, player) {
+  if (isLiveGangId(gangId)) { joinGangLive(gangId, player); return true }
   const g = AI_GANGS.find(x => x.id === gangId)
   if (!g) return false
   if (g.members.length >= g.capacity) return false
@@ -310,7 +479,36 @@ export function applyToGang(gangId) {
 }
 
 export function leaveGang() {
+  if (state.live) { leaveGangLive(); return }
   commit({ ...state, myGang: null })
+}
+
+// ---- live write helpers (RPCs) ----
+async function foundGangLive({ name, tag, crest, enrollment = ENROLLMENT.APPLY, minLevel = 0 }, player) {
+  const myId = await getUid(); if (!myId) return
+  const { data, error } = await supabase.rpc('found_gang', {
+    p_name: (name || '').trim() || 'My Gang',
+    p_tag: (tag || '').trim().toUpperCase().slice(0, 5),
+    p_crest: crest || '🏴', p_enrollment: enrollment, p_min_level: Math.max(0, minLevel | 0),
+    p_name_snap: player.name || 'You', p_level: player.level || 1, p_power: player.power || 0, p_color: null,
+  })
+  if (error) { console.warn('[gang] found failed:', error.message); return }
+  await hydrateLiveGang(data.id, myId)
+}
+async function joinGangLive(gangId, player) {
+  const myId = await getUid(); if (!myId) return
+  const { error } = await supabase.rpc('join_gang', { p_gang_id: gangId, p_name: player.name || 'You', p_level: player.level || 1, p_power: player.power || 0 })
+  if (error) { console.warn('[gang] join failed:', error.message); return }
+  await hydrateLiveGang(gangId, myId)
+}
+async function leaveGangLive() {
+  const { error } = await supabase.rpc('leave_gang')
+  if (error) console.warn('[gang] leave failed:', error.message)
+  teardownLive()
+  commit({ ...state, myGang: null, live: false })
+}
+function rpcQuiet(fn, args, label) {
+  supabase.rpc(fn, args).then(({ error }) => { if (error) console.warn(`[gang] ${label} failed:`, error.message) })
 }
 
 // ---- OG (boss) roster controls --------------------------------------
@@ -325,6 +523,7 @@ function mutateMembers(fn) {
 // { cardId, name, avatar, emoji, level, power }
 export function addCardMember(card) {
   if (!state.myGang) return false
+  if (state.live) return false   // live rosters are real players only — no card fillers
   if (state.myGang.members.length >= state.myGang.capacity) return false
   const memberId = `card:${card.cardId}`
   if (state.myGang.members.some(m => m.id === memberId)) return false   // no dupes
@@ -344,15 +543,19 @@ export function addCardMember(card) {
 
 export function kickMember(memberId) {
   if (memberId === PLAYER_MEMBER_ID) return
+  // For live gangs, a member's id IS their user_id (see toLiveMember).
+  if (state.live) { rpcQuiet('kick_member', { p_gang_id: state.myGang.id, p_user_id: memberId }, 'kick'); return }
   mutateMembers(ms => ms.filter(m => m.id !== memberId))
 }
 
 export function promoteMember(memberId) {
+  if (state.live) { rpcQuiet('set_member_role', { p_gang_id: state.myGang.id, p_user_id: memberId, p_role: ROLES.OFFICER }, 'promote'); return }
   mutateMembers(ms => ms.map(m =>
     m.id === memberId && m.role === ROLES.MEMBER ? { ...m, role: ROLES.OFFICER } : m))
 }
 
 export function demoteMember(memberId) {
+  if (state.live) { rpcQuiet('set_member_role', { p_gang_id: state.myGang.id, p_user_id: memberId, p_role: ROLES.MEMBER }, 'demote'); return }
   mutateMembers(ms => ms.map(m =>
     m.id === memberId && m.role === ROLES.OFFICER ? { ...m, role: ROLES.MEMBER } : m))
 }
@@ -360,17 +563,28 @@ export function demoteMember(memberId) {
 // ---- OG (boss) gang settings ----------------------------------------
 export function setEnrollment(mode) {
   if (!state.myGang) return
+  if (state.live) { rpcQuiet('set_gang_settings', { p_gang_id: state.myGang.id, p_enrollment: mode, p_min_level: state.myGang.minLevel || 0 }, 'settings'); return }
   commit({ ...state, myGang: { ...state.myGang, enrollment: mode } })
 }
 
 export function setMinLevel(n) {
   if (!state.myGang) return
+  if (state.live) { rpcQuiet('set_gang_settings', { p_gang_id: state.myGang.id, p_enrollment: state.myGang.enrollment, p_min_level: Math.max(0, n | 0) }, 'settings'); return }
   commit({ ...state, myGang: { ...state.myGang, minLevel: Math.max(0, n | 0) } })
 }
 
 // Keep the player's roster row in sync with their live level/power/name.
+let lastSyncKey = ''
+async function syncLiveMember(player) {
+  const key = `${player.name}|${player.level}|${player.power}`
+  if (key === lastSyncKey) return
+  lastSyncKey = key
+  const myId = await getUid(); if (!myId) return
+  await supabase.from('gang_members').update({ name: player.name, level: player.level, power: player.power }).eq('user_id', myId)
+}
 export function syncPlayerMember(player) {
   if (!state.myGang) return
+  if (state.live) { syncLiveMember(player); return }
   const idx = state.myGang.members.findIndex(m => m.id === PLAYER_MEMBER_ID)
   if (idx < 0) return
   const cur = state.myGang.members[idx]

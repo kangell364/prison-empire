@@ -15,6 +15,7 @@ import { useVitals, onOpenNurse } from './state/vitalsStore'
 import { KoOverlay, KO_FILTER } from './components/Avatar'
 import { ensureAuth, onPasswordRecovery, useAuth } from './state/profileStore'
 import { ensureMyHouse } from './state/sharedHousesStore'
+import { ensureGangs } from './state/gangStore'
 import { SetPasswordModal } from './components/SetPasswordModal'
 import { ensureCardsLoaded } from './state/cardsStore'
 import { ensureUpgradesLoaded } from './state/upgradesStore'
@@ -81,7 +82,7 @@ export default function App() {
 
   useEffect(() => subscribeMuted(setMutedState), [])
   useEffect(() => {
-    ensureAuth().then(() => { ensureCardsLoaded(); ensureUpgradesLoaded() })
+    ensureAuth().then(() => { ensureCardsLoaded(); ensureUpgradesLoaded(); ensureGangs() })
   }, [])
   // Any component can call openNurse() (e.g. the fight's "DEFEATED — SEE NURSE"
   // button) to jump straight to the Nurse view.

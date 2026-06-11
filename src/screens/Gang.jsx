@@ -6,7 +6,7 @@ import { baseAtk, baseDef, atkOf, defOf } from '../state/crewStore'
 import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
 import { useCardCounts, getOwnedTuples } from '../state/cardsStore'
 import {
-  useGang, getBrowseGangs, applicationStatus,
+  useGang, useBrowseGangs, applicationStatus, liveGangsEnabled,
   foundGang, joinGang, applyToGang, leaveGang,
   kickMember, promoteMember, demoteMember, addCardMember,
   setEnrollment, setMinLevel, syncPlayerMember,
@@ -64,7 +64,7 @@ export default function Gang({ onBack, onNavigate }) {
 function NotInGang({ player }) {
   const steel = useSteel()
   const [showFound, setShowFound] = useState(false)
-  const browse = getBrowseGangs()
+  const browse = useBrowseGangs()
   const canFound = player.level >= CREATE_MIN_LEVEL && steel >= FOUND_COST_STEEL
   const lockReason = player.level < CREATE_MIN_LEVEL
     ? `Reach Level ${CREATE_MIN_LEVEL} to found a gang`
@@ -116,8 +116,11 @@ function BrowseRow({ gang, player }) {
   if (full) action = { label: 'Full', disabled: true }
   else if (!meetsLevel) action = { label: `Lv ${gang.minLevel}+`, disabled: true }
   else if (gang.enrollment === ENROLLMENT.OPEN) action = { label: 'Join', onClick: () => { joinGang(gang.id, player); sfx.buy?.() } }
+  // Live apply/invite join lands in Phase 5 (applications). For now only OPEN
+  // live gangs are joinable; the local AI gangs keep the simulated apply timer.
+  else if (gang.live) action = { label: 'Soon', disabled: true }
   else if (gang.enrollment === ENROLLMENT.INVITE) action = { label: 'Invite only', disabled: true }
-  else { // apply
+  else { // apply (local AI gangs)
     if (status === 'accepted') action = { label: 'Accepted · Join', onClick: () => { joinGang(gang.id, player); sfx.buy?.() } }
     else if (status === 'pending') action = { label: 'Pending…', disabled: true }
     else action = { label: 'Apply', onClick: () => { applyToGang(gang.id); sfx.tap?.() } }
@@ -129,6 +132,7 @@ function BrowseRow({ gang, player }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ color: '#fff', fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {gang.name} <span style={{ color: DIM, fontSize: 11 }}>[{gang.tag}]</span>
+          {gang.live && <span style={{ marginLeft: 6, fontSize: 8.5, fontWeight: 800, letterSpacing: 0.5, color: '#2ecc71', background: '#2ecc7122', border: '0.5px solid #2ecc7155', borderRadius: 4, padding: '1px 4px', verticalAlign: 'middle' }}>● LIVE</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 3, color: DIM, fontSize: 11 }}>
           <span>Lv {gang.level}</span>
@@ -162,7 +166,10 @@ function FoundGangModal({ player, steel, onClose }) {
 
   const create = () => {
     if (!name.trim()) return
-    if (!spendSteel(FOUND_COST_STEEL)) { sfx.deny?.(); return }
+    // Live gangs: the found_gang RPC charges Steel server-side — don't double-spend.
+    if (liveGangsEnabled()) {
+      if (steel < FOUND_COST_STEEL) { sfx.deny?.(); return }
+    } else if (!spendSteel(FOUND_COST_STEEL)) { sfx.deny?.(); return }
     foundGang({ name, tag, crest, enrollment, minLevel }, player)
     sfx.buy?.()
     onClose()
@@ -276,7 +283,7 @@ function GangHub({ gang, player, onNavigate }) {
         </div>
 
         {/* Open spots — the OG can fill them with his own cards. */}
-        {openSpots > 0 && boss && (
+        {openSpots > 0 && boss && !gang.live && (
           <button className="btn btn-dark" onClick={() => { sfx.tap?.(); setShowPicker(true) }}
             style={{ width: '100%', marginTop: 10, padding: 12, borderStyle: 'dashed' }}>
             <i className="ti ti-plus" /> Fill a spot with your card ({openSpots} open)
@@ -352,7 +359,10 @@ function DonateModal({ hustle, onClose }) {
   const donate = () => {
     const give = Math.min(n, hustle)
     if (give <= 0) { sfx.deny?.(); return }
-    if (!spendHustle(give)) { sfx.deny?.(); return }
+    // Live gangs: donate_to_gang charges Hustle server-side — don't double-spend.
+    if (liveGangsEnabled()) {
+      if (hustle < give) { sfx.deny?.(); return }
+    } else if (!spendHustle(give)) { sfx.deny?.(); return }
     donateToTreasury(give)
     sfx.buy?.()
     onClose()

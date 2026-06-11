@@ -15,7 +15,7 @@
 
 import { geoBounds, geoContains } from 'd3-geo'
 import { GRID, cellCenter, getBlock } from './blocksStore'
-import { gangIdentity, getMyGangId, ALL_GANG_IDS } from './gangStore'
+import { gangIdentity, getMyGangId, ALL_GANG_IDS, gangIdForUser } from './gangStore'
 
 const YOU_SOLO = '__you__'          // player not in a gang
 const INDIE    = '__independents__' // real rival players, no gang yet
@@ -35,7 +35,8 @@ function ambientGangId(gx, gy) {
 function gangIdForBlock(gx, gy, b, myGangId) {
   if (!b || !b.owner) return null
   if (b.owner === 'you')   return myGangId || YOU_SOLO
-  if (b.owner === 'rival') return INDIE
+  // A real rival's block counts for THEIR gang (if they're in one), else Indie.
+  if (b.owner === 'rival') return gangIdForUser(b.owner_id) || INDIE
   // ambient AI crew (red / blue / purple)
   return ambientGangId(gx, gy)
 }

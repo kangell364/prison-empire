@@ -1,0 +1,296 @@
+-- ===================================================================
+-- Prison Empire - MULTIPLAYER GANGS (m1: gangs + members + core RPCs)
+-- Paste this whole thing into the Supabase SQL Editor and press Run.
+-- Safe to run more than once.
+--
+-- Real, server-backed gangs. The 8 simulated AI gangs stay client-side for solo
+-- play; THESE are the live ones (UUID ids). All writes that touch currency, a
+-- another user's row, or roles go through SECURITY DEFINER functions that
+-- validate server-side (the client can't be trusted) — mirrors resolve_raid().
+-- ===================================================================
+
+-- ---- tables --------------------------------------------------------
+create table if not exists public.gangs (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  tag         text,
+  crest       text default '🏴',
+  color       text,
+  enrollment  text not null default 'apply',   -- open | apply | invite
+  min_level   int  not null default 0,
+  level       int  not null default 1,
+  xp          bigint not null default 0,
+  capacity    int  not null default 6,
+  treasury    bigint not null default 0,
+  perks       jsonb not null default '{}'::jsonb,
+  founder_id  uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists gangs_founder_idx on public.gangs (founder_id);
+
+create table if not exists public.gang_members (
+  gang_id      uuid not null references public.gangs(id) on delete cascade,
+  user_id      uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  role         text not null default 'member',   -- boss | officer | member
+  name         text,                             -- snapshot (server has no level/power)
+  level        int  not null default 1,          -- snapshot
+  power        int  not null default 0,          -- snapshot
+  contribution bigint not null default 0,
+  joined_at    timestamptz not null default now(),
+  primary key (gang_id, user_id),
+  unique (user_id)                               -- hard "at most one gang" guarantee
+);
+create index if not exists gang_members_user_idx on public.gang_members (user_id);
+
+-- ---- RLS -----------------------------------------------------------
+alter table public.gangs        enable row level security;
+alter table public.gang_members enable row level security;
+
+drop policy if exists gangs_read          on public.gangs;
+drop policy if exists gang_members_read    on public.gang_members;
+drop policy if exists gang_members_selfupd on public.gang_members;
+
+-- Everyone signed in can browse gangs + read rosters (needed for the browse list,
+-- the userId->gang turf attribution, and chat membership checks).
+create policy gangs_read       on public.gangs        for select to authenticated using (true);
+create policy gang_members_read on public.gang_members for select to authenticated using (true);
+-- A player may self-update only their OWN snapshot row (name/level/power). The
+-- guard trigger below blocks changing role/contribution/gang_id from the client.
+-- All inserts/deletes + all gangs writes happen only via the RPCs (owner bypasses RLS).
+create policy gang_members_selfupd on public.gang_members for update to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- Block protected-column tampering on a direct client self-update. RPCs run as
+-- the function owner (current_user <> 'authenticated'), so they bypass this.
+create or replace function public.gang_members_guard()
+returns trigger language plpgsql as $$
+begin
+  if current_user = 'authenticated' then
+    if new.role         is distinct from old.role
+       or new.contribution is distinct from old.contribution
+       or new.gang_id    is distinct from old.gang_id
+       or new.user_id    is distinct from old.user_id then
+      raise exception 'gang_members: only name/level/power are self-updatable';
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists gang_members_guard_t on public.gang_members;
+create trigger gang_members_guard_t before update on public.gang_members
+  for each row execute function public.gang_members_guard();
+
+-- ---- math helpers (ports of gangStore.js constants) ----------------
+create or replace function public.gang_xp_for_level(l int)
+returns bigint language sql immutable as $$
+  select (5000::bigint * ((greatest(1, l) - 1) * greatest(1, l)) / 2);
+$$;
+
+create or replace function public.gang_level_from_xp(xp bigint)
+returns int language plpgsql immutable as $$
+declare lvl int := 1;
+begin
+  while public.gang_xp_for_level(lvl + 1) <= xp loop lvl := lvl + 1; end loop;
+  return lvl;
+end $$;
+
+create or replace function public.gang_capacity_for_level(l int)
+returns int language sql immutable as $$
+  select least(30, 6 + (greatest(1, l) - 1) * 2);
+$$;
+
+-- perk cost = round(baseCost * growth^level); plug 2000, lawyer 2500, growth 1.8.
+create or replace function public.gang_perk_cost(perk text, lvl int)
+returns bigint language sql immutable as $$
+  select round(
+    (case perk when 'plug' then 2000 when 'lawyer' then 2500 else 999999999 end)
+    * power(1.8, lvl)
+  )::bigint;
+$$;
+
+-- ---- helpers -------------------------------------------------------
+create or replace function public.gang_json(p_gang_id uuid)
+returns jsonb language sql stable as $$
+  select to_jsonb(g.*) from public.gangs g where g.id = p_gang_id;
+$$;
+
+-- ===================================================================
+-- RPCs (SECURITY DEFINER). Each validates auth.uid() + invariants server-side.
+-- ===================================================================
+
+-- FOUND: charge 25 Steel server-side, create gang + boss row. One gang per user.
+create or replace function public.found_gang(
+  p_name text, p_tag text, p_crest text, p_enrollment text, p_min_level int,
+  p_name_snap text, p_level int, p_power int, p_color text default null
+) returns jsonb language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid(); gid uuid; ok int;
+begin
+  if uid is null then raise exception 'not authenticated'; end if;
+  if exists (select 1 from gang_members where user_id = uid) then
+    raise exception 'already in a gang';
+  end if;
+  update profiles set steel = steel - 25 where id = uid and steel >= 25;
+  get diagnostics ok = row_count;
+  if ok = 0 then raise exception 'not enough steel'; end if;
+
+  insert into gangs (name, tag, crest, color, enrollment, min_level, level, xp, capacity, treasury, perks, founder_id)
+  values (btrim(p_name), nullif(btrim(coalesce(p_tag,'')),''), coalesce(nullif(p_crest,''),'🏴'), p_color,
+          coalesce(p_enrollment,'apply'), greatest(0, coalesce(p_min_level,0)), 1, 0, 6, 0, '{}'::jsonb, uid)
+  returning id into gid;
+
+  insert into gang_members (gang_id, user_id, role, name, level, power)
+  values (gid, uid, 'boss', p_name_snap, coalesce(p_level,1), coalesce(p_power,0));
+
+  return gang_json(gid);
+end $$;
+
+-- JOIN an OPEN gang (capacity + one-gang + min-level checked under a row lock).
+create or replace function public.join_gang(p_gang_id uuid, p_name text, p_level int, p_power int)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid(); g record; cnt int;
+begin
+  if uid is null then raise exception 'not authenticated'; end if;
+  if exists (select 1 from gang_members where user_id = uid) then raise exception 'already in a gang'; end if;
+  select * into g from gangs where id = p_gang_id for update;
+  if not found then raise exception 'gang not found'; end if;
+  if g.enrollment <> 'open' then raise exception 'gang is not open to join'; end if;
+  if coalesce(p_level,1) < g.min_level then raise exception 'level too low'; end if;
+  select count(*) into cnt from gang_members where gang_id = p_gang_id;
+  if cnt >= g.capacity then raise exception 'gang is full'; end if;
+  insert into gang_members (gang_id, user_id, role, name, level, power)
+  values (p_gang_id, uid, 'member', p_name, coalesce(p_level,1), coalesce(p_power,0));
+  return gang_json(p_gang_id);
+end $$;
+
+-- LEAVE: a boss with other members must disband or transfer first.
+create or replace function public.leave_gang()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid(); m record; others int;
+begin
+  if uid is null then raise exception 'not authenticated'; end if;
+  select * into m from gang_members where user_id = uid;
+  if not found then return jsonb_build_object('ok', true); end if;
+  if m.role = 'boss' then
+    select count(*) into others from gang_members where gang_id = m.gang_id and user_id <> uid;
+    if others > 0 then raise exception 'boss must disband or transfer first'; end if;
+    delete from gangs where id = m.gang_id;   -- cascade removes the boss row + chat
+  else
+    delete from gang_members where user_id = uid;
+  end if;
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- DISBAND (founder/boss only).
+create or replace function public.disband_gang(p_gang_id uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid();
+begin
+  if uid is null then raise exception 'not authenticated'; end if;
+  if not exists (select 1 from gang_members where gang_id = p_gang_id and user_id = uid and role = 'boss') then
+    raise exception 'only the boss can disband';
+  end if;
+  delete from gangs where id = p_gang_id;
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- KICK (boss only; can't kick the boss).
+create or replace function public.kick_member(p_gang_id uuid, p_user_id uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid();
+begin
+  if not exists (select 1 from gang_members where gang_id = p_gang_id and user_id = uid and role = 'boss') then
+    raise exception 'only the boss can kick'; end if;
+  if exists (select 1 from gang_members where gang_id = p_gang_id and user_id = p_user_id and role = 'boss') then
+    raise exception 'cannot kick the boss'; end if;
+  delete from gang_members where gang_id = p_gang_id and user_id = p_user_id;
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- SET ROLE (boss only; promote/demote between officer/member).
+create or replace function public.set_member_role(p_gang_id uuid, p_user_id uuid, p_role text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid();
+begin
+  if not exists (select 1 from gang_members where gang_id = p_gang_id and user_id = uid and role = 'boss') then
+    raise exception 'only the boss can set roles'; end if;
+  if p_role not in ('officer','member') then raise exception 'bad role'; end if;
+  update gang_members set role = p_role where gang_id = p_gang_id and user_id = p_user_id and role <> 'boss';
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- SETTINGS (boss only).
+create or replace function public.set_gang_settings(p_gang_id uuid, p_enrollment text, p_min_level int)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid();
+begin
+  if not exists (select 1 from gang_members where gang_id = p_gang_id and user_id = uid and role = 'boss') then
+    raise exception 'only the boss can change settings'; end if;
+  if p_enrollment not in ('open','apply','invite') then raise exception 'bad enrollment'; end if;
+  update gangs set enrollment = p_enrollment, min_level = greatest(0, coalesce(p_min_level,0)), updated_at = now()
+   where id = p_gang_id;
+  return gang_json(p_gang_id);
+end $$;
+
+-- DONATE: charge Hustle server-side; treasury+contribution+xp; recompute level/capacity.
+create or replace function public.donate_to_gang(p_gang_id uuid, p_amount bigint)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid(); amt bigint := greatest(0, coalesce(p_amount,0)); ok int; newxp bigint; newlvl int;
+begin
+  if uid is null then raise exception 'not authenticated'; end if;
+  if amt <= 0 then raise exception 'bad amount'; end if;
+  if not exists (select 1 from gang_members where gang_id = p_gang_id and user_id = uid) then
+    raise exception 'not a member'; end if;
+  update profiles set hustle = hustle - amt where id = uid and hustle >= amt;
+  get diagnostics ok = row_count;
+  if ok = 0 then raise exception 'not enough hustle'; end if;
+
+  update gangs set treasury = treasury + amt, xp = xp + amt
+   where id = p_gang_id returning xp into newxp;
+  newlvl := gang_level_from_xp(newxp);
+  update gangs set level = newlvl, capacity = greatest(capacity, gang_capacity_for_level(newlvl)), updated_at = now()
+   where id = p_gang_id;
+  update gang_members set contribution = contribution + amt where gang_id = p_gang_id and user_id = uid;
+  return gang_json(p_gang_id);
+end $$;
+
+-- BUY PERK (boss only; cost computed server-side from the treasury).
+create or replace function public.buy_gang_perk(p_gang_id uuid, p_perk_id text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid(); lvl int; cost bigint; treas bigint;
+begin
+  if not exists (select 1 from gang_members where gang_id = p_gang_id and user_id = uid and role = 'boss') then
+    raise exception 'only the boss can buy perks'; end if;
+  if p_perk_id not in ('plug','lawyer') then raise exception 'bad perk'; end if;
+  select coalesce((perks->>p_perk_id)::int, 0), treasury into lvl, treas from gangs where id = p_gang_id;
+  if lvl >= 5 then raise exception 'perk maxed'; end if;
+  cost := gang_perk_cost(p_perk_id, lvl);
+  if treas < cost then raise exception 'treasury too low'; end if;
+  update gangs set treasury = treasury - cost,
+                   perks = jsonb_set(perks, array[p_perk_id], to_jsonb(lvl + 1)),
+                   updated_at = now()
+   where id = p_gang_id;
+  return gang_json(p_gang_id);
+end $$;
+
+-- ---- grants --------------------------------------------------------
+revoke all on function public.found_gang(text,text,text,text,int,text,int,int,text) from public, anon;
+grant execute on function public.found_gang(text,text,text,text,int,text,int,int,text) to authenticated;
+grant execute on function public.join_gang(uuid,text,int,int)      to authenticated;
+grant execute on function public.leave_gang()                       to authenticated;
+grant execute on function public.disband_gang(uuid)                 to authenticated;
+grant execute on function public.kick_member(uuid,uuid)             to authenticated;
+grant execute on function public.set_member_role(uuid,uuid,text)    to authenticated;
+grant execute on function public.set_gang_settings(uuid,text,int)   to authenticated;
+grant execute on function public.donate_to_gang(uuid,bigint)        to authenticated;
+grant execute on function public.buy_gang_perk(uuid,text)           to authenticated;
+
+-- ---- realtime ------------------------------------------------------
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='gangs') then
+    alter publication supabase_realtime add table public.gangs;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='gang_members') then
+    alter publication supabase_realtime add table public.gang_members;
+  end if;
+end $$;
