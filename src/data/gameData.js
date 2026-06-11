@@ -773,6 +773,7 @@ export const SKILLS = [
     shortName: 'Skull Crusher',
     emoji: '💀',
     avatar: '/skill-skull-crusher.jpg',
+    item: 'Guard’s nightstick / billy club',     // ART: what to draw on the card
     rarity: 'epic',
     description: 'A bone-shattering overhand that caves the skull in. Big bonus damage when it lands.',
     category: 'Brawl',
@@ -820,6 +821,7 @@ export const SKILLS = [
     shortName: 'Shiv',
     emoji: '🔪',
     avatar: '/skill-skull-crusher.jpg',          // TODO art — sharpened-toothbrush shank
+    item: 'Shank — sharpened toothbrush, taped handle',
     rarity: 'uncommon',
     description: 'A sharpened toothbrush. Opens a wound that bleeds them out over the next few rolls — if the shank doesn’t snap first.',
     category: 'Brawl',
@@ -846,6 +848,7 @@ export const SKILLS = [
     shortName: 'The Hole',
     emoji: '🕳️',
     avatar: '/skill-skull-crusher.jpg',          // TODO art — solitary cell door slamming
+    item: 'Solitary cell door — steel hatch with food slot',
     rarity: 'rare',
     description: 'Throw them in solitary — their even slots go dark for 3 rolls. You bleed for the stretch too, but you get every drop back the moment they walk out.',
     category: 'Control',
@@ -872,6 +875,7 @@ export const SKILLS = [
     shortName: 'Shakedown',
     emoji: '🤜',
     avatar: '/skill-skull-crusher.jpg',          // TODO art — cornering a mark in the yard
+    item: 'Brass knuckles',
     rarity: 'rare',
     description: 'Strong-arm the yard. Both of you lose 10% defense for the fight — but every point stripped gets bolted onto YOUR attack. Glass cannon, your way.',
     category: 'Control',
@@ -898,6 +902,7 @@ export const SKILLS = [
     shortName: 'Loaded Dice',
     emoji: '🎲',
     avatar: '/skill-skull-crusher.jpg',          // TODO art — weighted bone dice, contraband glow
+    item: 'Weighted bone dice (contraband)',
     rarity: 'uncommon',
     description: 'Weighted bones smuggled off the yard. Nudge the next 2 rolls toward your slots — but load ’em wrong and the die cracks in your hand.',
     category: 'Hustle',
@@ -924,6 +929,7 @@ export const SKILLS = [
     shortName: 'Contraband',
     emoji: '📦',
     avatar: '/skill-skull-crusher.jpg',          // TODO art — stash of product changing hands
+    item: 'Contraband stash — taped phone, smokes, pruno',
     rarity: 'legendary',
     description: 'You’re moving product mid-fight. Land the KO on this slot and the score pays DOUBLE — but eyes on the prize means slower hands all bout.',
     category: 'Hustle',
@@ -942,6 +948,60 @@ export const SKILLS = [
     upgradeCostFor: (currentLevel) => ({
       knowledge: 40 + currentLevel * 8,
       hustle:    6_000 * (currentLevel + 1),
+    }),
+  },
+
+  {
+    id: 'lights_out',
+    name: 'LIGHTS OUT',
+    shortName: 'Lights Out',
+    emoji: '🧼',
+    avatar: '/skill-skull-crusher.jpg',          // TODO art — bar of soap loaded in a tube sock
+    item: 'Bar of soap in a tube sock (the “slock”)',
+    rarity: 'epic',
+    description: 'Soap loaded in a sock. One clean swing and their lights go out — they skip their next slot cold. Then everyone’s blind for a beat.',
+    category: 'Brawl',
+    minLevel: 1,
+    maxLevel: 100,
+    perLevelAttack: 14,
+    effect: {
+      kind: 'disable', target: 'opponent',
+      slots: 'all', rolls: 1,                     // opponent's whole turn (skill + attack) muted for 1 roll = stun
+      selfCost: { kind: 'disable', target: 'self', slots: 'all', rolls: 1 }, // you skip your attack next roll (recoil)
+      scalePerLevel: { rolls: 0.2 },              // +1 roll of stun per 5 card levels
+      slotBias: 2,                                // rare, heavy
+    },
+    baseLearnCost:    { knowledge: 32, hustle: 4_500 },
+    upgradeCostFor: (currentLevel) => ({
+      knowledge: 32 + currentLevel * 6,
+      hustle:    4_500 * (currentLevel + 1),
+    }),
+  },
+
+  {
+    id: 'the_badge',
+    name: 'THE BADGE',
+    shortName: 'The Badge',
+    emoji: '🛡️',
+    avatar: '/skill-skull-crusher.jpg',          // TODO art — stolen corrections-officer badge
+    item: 'Stolen C.O. (corrections officer) badge',
+    rarity: 'rare',
+    description: 'Flash a stolen C.O. badge and the yard backs off. Defense way up for the fight — but you’re playing the part, not throwing hands.',
+    category: 'Control',
+    minLevel: 1,
+    maxLevel: 100,
+    perLevelAttack: 6,
+    effect: {
+      kind: 'modifier', target: 'self',
+      stat: 'def', pct: 15, duration: 'fight',    // +15% defense for the whole fight
+      selfCost: { stat: 'atk', pct: -5, duration: 'fight' }, // −5% attack while equipped (recoverable cost)
+      scalePerLevel: { pct: 2 },                  // +2% def per card level
+      slotBias: 7,                                // reliable — fires often
+    },
+    baseLearnCost:    { knowledge: 26, hustle: 3_800 },
+    upgradeCostFor: (currentLevel) => ({
+      knowledge: 26 + currentLevel * 5,
+      hustle:    3_800 * (currentLevel + 1),
     }),
   },
 ]

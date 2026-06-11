@@ -190,16 +190,20 @@ In `src/data/gameData.js` → `SKILLS`. **Fixed** affixes (no random roll yet). 
 combat engine does **not** read `effect` yet, so each works as a plain nuke until
 Phase 2 — safe to ship.
 
-| Card | Rarity | Primitive | Effect | Cost | slotBias |
+| Card | Rarity | Primitive | Effect | Cost | ART — item to draw |
 |---|---|---|---|---|---|
-| 💀 Skull Crusher | epic | Nuke | Big bonus damage | — | reliable |
-| 🔪 Shiv | uncommon | DOT | Bleed 2% maxHP/roll × 3 | 20% snaps | 7 |
-| 🕳️ The Hole | rare | Disable | Opp. even slots dark 3 rolls | you bleed — refunded | 3/11 |
-| 🤜 Shakedown | rare | Modifier | Both −10% def; yours → atk (fight) | def loss lasts the fight | 4/10 |
-| 🎲 Loaded Dice | uncommon | Dice | Nudge next 2 sums toward your slots | 15% die cracks | 6/8 |
-| 📦 Contraband | legendary | Modifier | 2× payout if this slot KOs | −10% atk while held | 12 |
+| 💀 Skull Crusher | epic | Nuke | Big bonus damage | — | Guard's nightstick / billy club |
+| 🔪 Shiv | uncommon | DOT | Bleed 2% maxHP/roll × 3 | 20% snaps | Shank — sharpened toothbrush, taped handle |
+| 🕳️ The Hole | rare | Disable | Opp. even slots dark 3 rolls | you bleed — refunded | Solitary cell door — steel hatch w/ food slot |
+| 🤜 Shakedown | rare | Modifier | Both −10% def; yours → atk (fight) | def loss lasts the fight | Brass knuckles |
+| 🎲 Loaded Dice | uncommon | Dice | Nudge next 2 sums toward your slots | 15% die cracks | Weighted bone dice (contraband) |
+| 📦 Contraband | legendary | Modifier | 2× payout if this slot KOs | −10% atk while held | Contraband stash — taped phone, smokes, pruno |
+| 🧼 Lights Out | epic | Disable | Stun — opp. skips their whole next slot | you skip your next attack | Bar of soap in a tube sock (the "slock") |
+| 🛡️ The Badge | rare | Modifier | +15% defense for the fight | −5% atk while held | Stolen C.O. (corrections officer) badge |
 
-Art is a placeholder (all reuse `skill-skull-crusher.jpg`, `// TODO art`).
+Each card carries an `item:` field naming the art subject. Art is still a
+placeholder in code (all reuse `skill-skull-crusher.jpg`, `// TODO art`) — the
+`item:` text is the brief for what to actually draw.
 
 ---
 
