@@ -262,6 +262,13 @@ body {
 }
 .animate-in { animation: slideUp 0.3s ease forwards; }
 
+@keyframes slideDown {
+  from { transform: translateY(-20px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+/* Top-anchored sheets (map tap cards) drop in from the top instead of rising. */
+.animate-in-top { animation: slideDown 0.3s ease forwards; }
+
 /* Expanding halo around the countdown ring when threat is escalating. */
 @keyframes ringHalo {
   0%   { transform: scale(1);    opacity: 0.6; }

@@ -52,8 +52,8 @@ export function BlockSheet({ gx, gy, homeTurf, onClose }) {
   const doCollect = () => { if (collect(gx, gy) > 0) sfx.buy?.() }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 230, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, background: '#13131f', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: '18px 18px 100px', borderTop: `2px solid ${color}` }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 230, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+      <div onClick={e => e.stopPropagation()} className="animate-in-top" style={{ width: '100%', maxWidth: 440, background: '#13131f', borderBottomLeftRadius: 20, borderBottomRightRadius: 20, padding: '18px 18px 22px', borderBottom: `2px solid ${color}` }}>
         {/* Header — the HOLDER's player card (avatar + name) when a real player
             holds it, so you see who you're taking the block from; the NPC working
             the corner sits underneath as secondary detail. */}

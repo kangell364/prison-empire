@@ -1026,8 +1026,8 @@ function RivalHouseSheet({ house, onClose, onLaunch }) {
   const hpPct = Math.max(0, Math.min(100, Math.round((hp / hpMax) * 100)))
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 280 }} onClick={onClose}>
-      <div className="animate-in" style={{ background: '#13131f', borderRadius: 20, padding: 20, width: '100%', maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 'calc(env(safe-area-inset-top, 0px) + 14px) 16px 16px', zIndex: 280 }} onClick={onClose}>
+      <div className="animate-in-top" style={{ background: '#13131f', borderRadius: 20, padding: 20, width: '100%', maxWidth: 440 }} onClick={e => e.stopPropagation()}>
 
         {/* Target header — who + their trap-house HP */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
