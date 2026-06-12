@@ -8,7 +8,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { CountdownRing } from './CountdownRing'
 import { usePlayers } from '../state/playersStore'
 import { useAuth } from '../state/profileStore'
-import { useSharedHouses } from '../state/sharedHousesStore'
+import { useSharedHouses, houseIntegrity } from '../state/sharedHousesStore'
 import { useActiveRaids, useRaidResolver, reinforceMyHouse, REINFORCE_COST } from '../state/raidsStore'
 import { sfx } from '../sounds'
 
@@ -79,9 +79,7 @@ function IncomingBanner({ raid, myHouse, onReinforce, onTap }) {
   const { name } = usePlayers()
   const total = totalOf(raid)
   const remaining = remainingOf(raid)
-  const hp = myHouse?.hp != null ? myHouse.hp : 100
-  const hpMax = myHouse?.hp_max != null ? myHouse.hp_max : 100
-  const full = hp >= hpMax
+  const { hp, hpMax, full } = houseIntegrity(myHouse)
 
   return (
     <div className="attack-banner-in" style={{

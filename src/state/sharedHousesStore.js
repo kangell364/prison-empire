@@ -11,9 +11,92 @@
 import { useEffect, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../supabase'
 import { getUserId } from './profileStore'
+import { spendCash, addCash } from './cashStore'
+
+// Compress all timers ~30× when ?test=1 so the build/upgrade loop is testable.
+const IS_TEST = typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('test') === '1'
 
 // MVP: single open county. When more counties unlock, this becomes per-county.
 const COUNTY_FIPS = '48201'                 // Harris
+
+// ---- house levels --------------------------------------------------
+// Leveling a trap house raises its hp_max (so integrity + regen + raid
+// toughness all scale off the bigger pool — no resolve_raid change needed).
+// Lean MVP: integrity + defense only. Requires the house_levels.txt migration
+// (level + upgrading_until columns); degrades to level 1 if not yet applied.
+export const UPGRADE_MAX_LEVEL = 10
+
+export function houseLevel(house)      { return Math.max(1, house?.level || 1) }
+export function hpMaxForLevel(level)   { return 100 + (Math.max(1, level) - 1) * 40 }   // L1:100 … L10:460
+export function regenPerHrForLevel(lv) { return 10 + (Math.max(1, lv) - 1) * 5 }          // higher level rebuilds faster
+// Cash to go from `level` → level+1, and the build timer (seconds).
+export function upgradeCost(level)     { return 50000 * Math.max(1, level) }              // L1→2:50k … L9→10:450k
+export function upgradeSec(level)      { return Math.round((120 * Math.max(1, level)) / (IS_TEST ? 30 : 1)) }
+
+// ---- house integrity regen -----------------------------------------
+// A damaged trap house slowly rebuilds its integrity on its own, just like the
+// player's health pool. Anchored to the row's `updated_at` (bumped on every hp
+// change — raid resolve / reinforce), so regen is computed client-side on read
+// with no extra writes. Returns the live value + countdowns for the UI counter.
+export function houseIntegrity(house, now = Date.now()) {
+  const hpMax = house?.hp_max != null ? house.hp_max : 100
+  const stored = house?.hp != null ? house.hp : hpMax
+  if (stored >= hpMax) return { hp: hpMax, hpMax, full: true, nextInSec: 0, fullInSec: 0 }
+  const regenPerHr = regenPerHrForLevel(houseLevel(house))
+  const anchor = house?.updated_at ? new Date(house.updated_at).getTime() : now
+  const hours = Math.max(0, (now - anchor) / 3_600_000)
+  const regened = Math.min(hpMax, stored + regenPerHr * hours)
+  const hp = Math.floor(regened)
+  if (hp >= hpMax) return { hp: hpMax, hpMax, full: true, nextInSec: 0, fullInSec: 0 }
+  const msPerPoint = 3_600_000 / regenPerHr
+  return {
+    hp, hpMax, full: false,
+    nextInSec: Math.max(1, Math.ceil(((hp + 1 - regened) * msPerPoint) / 1000)),
+    fullInSec: Math.max(1, Math.ceil(((hpMax - regened) * msPerPoint) / 1000)),
+  }
+}
+
+// ---- upgrade flow --------------------------------------------------
+// Returns true while an upgrade build is in progress.
+export function isUpgrading(house, now = Date.now()) {
+  return !!(house?.upgrading_until && new Date(house.upgrading_until).getTime() > now)
+}
+export function upgradeRemainingSec(house, now = Date.now()) {
+  if (!house?.upgrading_until) return 0
+  return Math.max(0, Math.ceil((new Date(house.upgrading_until).getTime() - now) / 1000))
+}
+
+// Start an upgrade on YOUR OWN house — spend Cash, set the build timer. The
+// owner's RLS lets them update their row directly (same as reinforce).
+export async function upgradeMyHouse(house) {
+  if (!isSupabaseConfigured || !house) return { ok: false, error: 'offline' }
+  const level = houseLevel(house)
+  if (level >= UPGRADE_MAX_LEVEL) return { ok: false, error: 'max' }
+  if (isUpgrading(house)) return { ok: false, error: 'busy' }
+  const cost = upgradeCost(level)
+  if (!spendCash(cost)) return { ok: false, error: 'broke' }
+  const until = new Date(Date.now() + upgradeSec(level) * 1000).toISOString()
+  const { error } = await supabase.from('houses')
+    .update({ upgrading_until: until, updated_at: new Date().toISOString() }).eq('id', house.id)
+  if (error) { addCash(cost); return { ok: false, error: error.message } }
+  loadHouses()
+  return { ok: true, until }
+}
+
+// Finish a completed upgrade: bump level + hp_max, refill integrity, clear the
+// timer. The owner's client calls this once the build timer elapses (idempotent
+// — a no-op if the timer hasn't passed or there's nothing building).
+export async function settleUpgrade(house) {
+  if (!isSupabaseConfigured || !house || !house.upgrading_until) return
+  if (new Date(house.upgrading_until).getTime() > Date.now()) return
+  const newLevel = Math.min(UPGRADE_MAX_LEVEL, houseLevel(house) + 1)
+  const newMax = hpMaxForLevel(newLevel)
+  const { error } = await supabase.from('houses').update({
+    level: newLevel, hp_max: newMax, hp: newMax, upgrading_until: null, updated_at: new Date().toISOString(),
+  }).eq('id', house.id)
+  if (!error) loadHouses()
+}
 const HARRIS = { lat: 29.7604, lng: -95.3698 }
 const SPREAD = 0.18                          // ~12mi box around downtown Houston
 

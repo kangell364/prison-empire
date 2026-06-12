@@ -15,7 +15,9 @@ import { usePlayers } from '../state/playersStore'
 import { useActiveRaids, launchRaid, RAID_HUSTLE_COST } from '../state/raidsStore'
 import { usePlayerStats } from '../state/statsStore'
 import { Avatar } from '../components/Avatar'
-import { ensureMyHouse, useSharedHouses, harrisSpotFor } from '../state/sharedHousesStore'
+import { ensureMyHouse, useSharedHouses, harrisSpotFor, houseIntegrity, houseLevel } from '../state/sharedHousesStore'
+import { HouseIntegrityBar } from '../components/HouseIntegrityBar'
+import { HouseLevelCard } from '../components/HouseLevelCard'
 import { ActivityFeed } from '../components/TurfLeaderboard'
 import { StateTurfAccordion, CountyGangLeaderboard } from '../components/GangLeaderboard'
 import { useTerritories, applyHit, applyRaid, getTerritory } from '../state/territoriesStore'
@@ -707,6 +709,9 @@ export default function MapScreen({ onNavigate }) {
         )}
       </div>
 
+      {/* Trap house level — upgrade it (Cash + build timer) for more integrity */}
+      <HouseLevelCard house={homeHouse} />
+
       {/* Map */}
       <div className="section" style={{ marginTop: 14 }}>
         <div className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1021,9 +1026,9 @@ function RivalHouseSheet({ house, onClose, onLaunch }) {
   // Prefer the house row's name — it updates live via the houses realtime stream
   // on a rename, whereas the players directory (public_profiles) is cached.
   const name = house.name || prof.display_name || 'Rival'
-  const hp = house.hp != null ? house.hp : 100
-  const hpMax = house.hp_max != null ? house.hp_max : 100
-  const hpPct = Math.max(0, Math.min(100, Math.round((hp / hpMax) * 100)))
+  // Integrity regenerates over time (see houseIntegrity) — use the live value so
+  // the attack plan reflects how fortified the house actually is right now.
+  const { hp, hpMax } = houseIntegrity(house)
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 'calc(env(safe-area-inset-top, 0px) + 14px) 16px 16px', zIndex: 280 }} onClick={onClose}>
@@ -1033,20 +1038,15 @@ function RivalHouseSheet({ house, onClose, onLaunch }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Avatar src={look.avatar} emoji={look.emoji} size={52} radius={12} style={{ border: `2px solid ${RED}` }} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: DIM, fontSize: 10, letterSpacing: 1.5, fontWeight: 600 }}>RIVAL TRAP HOUSE</div>
+            <div style={{ color: DIM, fontSize: 10, letterSpacing: 1.5, fontWeight: 600 }}>RIVAL TRAP HOUSE · LV {houseLevel(house)}</div>
             <div style={{ color: '#fff', fontSize: 18, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
           </div>
           <div style={{ fontSize: 30 }}>🏚️</div>
         </div>
 
-        {/* HP bar */}
+        {/* Integrity bar — regenerates over time with a live "full in" counter */}
         <div style={{ marginTop: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: DIM, letterSpacing: 0.5, marginBottom: 4 }}>
-            <span>HOUSE INTEGRITY</span><span style={{ color: hpPct > 33 ? '#2ecc71' : RED }}>{hp} / {hpMax}</span>
-          </div>
-          <div style={{ height: 8, borderRadius: 5, background: '#0a0a12', overflow: 'hidden' }}>
-            <div style={{ width: `${hpPct}%`, height: '100%', background: hpPct > 33 ? 'linear-gradient(90deg,#2ecc71,#27ae60)' : 'linear-gradient(90deg,#e74c3c,#c0392b)', transition: 'width .4s' }} />
-          </div>
+          <HouseIntegrityBar house={house} />
         </div>
 
         {mode === 'menu' ? (

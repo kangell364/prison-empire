@@ -1,0 +1,20 @@
+-- ===================================================================
+-- Prison Empire - HOUSE LEVELS (lean MVP)
+-- Paste this whole thing into the Supabase SQL Editor and press Run.
+-- Safe to run more than once.
+--
+-- Adds a LEVEL to every trap house. Leveling up (client-side: spend Cash +
+-- a build timer) raises the house's hp_max, so integrity + regen + raid
+-- toughness all scale off the bigger pool. No RPC change needed: resolve_raid
+-- still just subtracts damage from hp and busts at <= 0.
+--
+--   level            - current house level (1..N), drives hp_max
+--   upgrading_until   - when an in-progress upgrade finishes (NULL = idle);
+--                       stored server-side so rivals see "under construction"
+-- ===================================================================
+
+alter table public.houses add column if not exists level int not null default 1;
+alter table public.houses add column if not exists upgrading_until timestamptz;
+
+-- Existing rows keep level 1 / hp_max 100. Nothing else to backfill — the
+-- client derives hp_max from level on the next upgrade.

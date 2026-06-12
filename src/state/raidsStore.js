@@ -15,6 +15,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase, isSupabaseConfigured } from '../supabase'
 import { getUserId, useAuth, spendHustle, addHustle } from './profileStore'
 import { spendCash, addCash } from './cashStore'
+import { houseIntegrity } from './sharedHousesStore'
 import { harrisSpotFor } from './sharedHousesStore'
 
 const COUNTY_FIPS = '48201'                       // Harris (MVP single county)
@@ -94,8 +95,9 @@ export async function resolveRaid(id) {
 // their own row directly, so no RPC needed). `house` is your houses row.
 export async function reinforceMyHouse(house) {
   if (!isSupabaseConfigured || !house) return { ok: false, error: 'offline' }
-  const max = house.hp_max != null ? house.hp_max : 100
-  const cur = house.hp != null ? house.hp : max
+  // Base off the regenerated integrity so reinforce stacks on (and banks) the
+  // passive recovery, not the stale stored value.
+  const { hp: cur, hpMax: max } = houseIntegrity(house)
   if (cur >= max) return { ok: false, error: 'full' }
   if (!spendCash(REINFORCE_COST)) return { ok: false, error: 'broke' }
   const next = Math.min(max, cur + REINFORCE_AMOUNT)
