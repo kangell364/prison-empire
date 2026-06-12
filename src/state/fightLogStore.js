@@ -13,6 +13,15 @@ const MAX_LOGS = 200
 // and a `const` is in the temporal dead zone until its own line executes, so
 // state init below MUST come after this. (Reordering these = blank-screen crash.)
 const EMPTY_RECORD = { wins: 0, losses: 0, kos: 0, defeats: 0, jobs: 0 }
+// Daily PvP kills — count + the local calendar day it belongs to, so it rolls
+// over to 0 on a new day. Bumped in recordKo (every PvP KO goes through there).
+const EMPTY_DAILY = { day: '', count: 0 }
+
+// Local-calendar day key (not UTC) so "daily" lines up with the player's clock.
+function todayKey() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 let seq = 0
 let state = readInitial()
@@ -26,10 +35,11 @@ function readInitial() {
       return {
         logs: p.logs || [], revenge: p.revenge || {}, lastReadTs: p.lastReadTs || 0,
         record: { ...EMPTY_RECORD, ...(p.record || {}) },
+        dailyKills: { ...EMPTY_DAILY, ...(p.dailyKills || {}) },
       }
     }
   } catch {}
-  return { logs: [], revenge: {}, lastReadTs: 0, record: { ...EMPTY_RECORD } }
+  return { logs: [], revenge: {}, lastReadTs: 0, record: { ...EMPTY_RECORD }, dailyKills: { ...EMPTY_DAILY } }
 }
 
 function persist() { try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }
@@ -48,6 +58,11 @@ export function unreadCount()      { return state.logs.filter(l => l.ts > state.
 // bounties fulfilled). Starts at zero for a new player.
 export function getRecord()        { return state.record }
 export function useRecord()        { const s = useFightLog(); return s.record }
+
+// Today's PvP kill count — rolls over to 0 once the calendar day changes, even
+// if the stored value is from yesterday (roll-over is applied on read too).
+export function getDailyKills()    { const dk = state.dailyKills; return dk && dk.day === todayKey() ? dk.count : 0 }
+export function useDailyKills()    { const s = useFightLog(); return s.dailyKills && s.dailyKills.day === todayKey() ? s.dailyKills.count : 0 }
 
 export function useFightLog() {
   const [s, setS] = useState(state)
@@ -82,11 +97,16 @@ export function recordKo(opp) {
   if (avenged) delete revenge[opp.id]
   // A PvP win: one fight won + one KO landed on the career record.
   const record = { ...state.record, wins: state.record.wins + 1, kos: state.record.kos + 1 }
+  // Bump today's kill tally, resetting first if the stored day isn't today.
+  const today = todayKey()
+  const prevDaily = state.dailyKills && state.dailyKills.day === today ? state.dailyKills.count : 0
+  const dailyKills = { day: today, count: prevDaily + 1 }
   commit({
     ...state,
     logs: pushLog({ kind: avenged ? 'revenge' : 'ko', oppId: opp.id, oppName: opp.name, oppLevel: opp.level }),
     revenge,
     record,
+    dailyKills,
   })
   return { avenged }
 }
@@ -124,5 +144,5 @@ export function markRead() {
 }
 
 export function clearFightLog() {
-  commit({ logs: [], revenge: {}, lastReadTs: Date.now(), record: { ...EMPTY_RECORD } })
+  commit({ logs: [], revenge: {}, lastReadTs: Date.now(), record: { ...EMPTY_RECORD }, dailyKills: { ...EMPTY_DAILY } })
 }

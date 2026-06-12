@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { PLAYER, PVP_FIGHT_COST } from '../data/gameData'
+import { PVP_FIGHT_COST } from '../data/gameData'
 import { generateOpponents, generateOpponent, opponentFromId } from '../data/pvpLadder'
 import { sfx } from '../sounds'
 import { Avatar } from '../components/Avatar'
@@ -10,7 +10,7 @@ import { usePlayerCard } from '../state/profileStore'
 import { useBounty } from '../state/bountyStore'
 import { useProgress } from '../state/progressionStore'
 import { usePlayerCombat } from '../state/statsStore'
-import { useFightLog } from '../state/fightLogStore'
+import { useFightLog, useDailyKills } from '../state/fightLogStore'
 import { useHitList } from '../state/hitListStore'
 import { BountyModal, formatHustle } from '../components/BountyModal'
 import Battle from './Battle'
@@ -76,7 +76,10 @@ function SubTab({ active, onClick, children }) {
 // =====================================================================
 
 function PlayersScreen() {
-  const [dailyKills, setDailyKills] = useState(PLAYER.dailyKills)
+  // Daily kills come from the persistent fight-log store (bumped centrally in
+  // recordKo for EVERY PvP KO — Players, Hit List, Yard), so the count survives
+  // tab switches / reloads and rolls over each day.
+  const dailyKills = useDailyKills()
   const prog = useProgress()
   const fightLog = useFightLog()
   const playerLevel = prog.level
@@ -203,7 +206,6 @@ function PlayersScreen() {
       {target && (
         <PvpBattleModal
           opponent={target}
-          onKO={() => setDailyKills(k => k + 1)}
           onClose={() => setTarget(null)}
         />
       )}
