@@ -809,31 +809,8 @@ export default function MapScreen({ onNavigate }) {
         </div>
       )}
 
-      {/* Gang turf leaderboards — each active-turf state expands to its gang
-          board, ranked by blocks owned. Country view only. */}
-      {!stateView && (
-        <div className="section">
-          <div className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <i className="ti ti-trophy" style={{ color: GOLD }} /> Gang Turf Leaderboard
-          </div>
-          <StateTurfAccordion
-            mapData={mapData}
-            unlockedFips={UNLOCKED_COUNTY_FIPS}
-            stateNameByFips={stateNameByFips}
-          />
-        </div>
-      )}
-      {!stateView && (
-        <div className="section">
-          <div className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <i className="ti ti-activity" style={{ color: '#4a9eff' }} /> Activity
-          </div>
-          <ActivityFeed />
-        </div>
-      )}
-
       {/* Country view: the states where you hold NPC blocks, with counts. Tap a
-          state to drill into its counties. */}
+          state to drill into its counties. Sits above the gang leaderboard. */}
       {!stateView && (
         <div className="section">
           <div className="section-label">Your Blocks by State</div>
@@ -860,6 +837,29 @@ export default function MapScreen({ onNavigate }) {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Gang turf leaderboards — each active-turf state expands to its gang
+          board, ranked by blocks owned. Country view only. */}
+      {!stateView && (
+        <div className="section">
+          <div className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-trophy" style={{ color: GOLD }} /> Gang Turf Leaderboard
+          </div>
+          <StateTurfAccordion
+            mapData={mapData}
+            unlockedFips={UNLOCKED_COUNTY_FIPS}
+            stateNameByFips={stateNameByFips}
+          />
+        </div>
+      )}
+      {!stateView && (
+        <div className="section">
+          <div className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-activity" style={{ color: '#4a9eff' }} /> Activity
+          </div>
+          <ActivityFeed />
         </div>
       )}
 
