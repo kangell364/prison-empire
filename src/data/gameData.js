@@ -104,7 +104,6 @@ export const TRAITS = [
 
 export const RESOURCES = {
   hustle: { value: 7420, max: 10000, color: '#c9a84c', icon: 'ti-flame' },
-  steel:  { value: 3210, max: 8000,  color: '#4a9eff', icon: 'ti-shield' },
   crew:   { value: 5,    max: 8,     color: '#a855f7', icon: 'ti-users'  },
   snitch: { value: 1,    max: 3,     color: '#e74c3c', icon: 'ti-eye-off'},
 }
@@ -115,7 +114,6 @@ export const CITY = {
   tier: 3,
   tierName: 'Major City',
   hustle_per_hr: 420,
-  steel_per_hr: 180,
   days_held: 3,
   hours_held: 14,
   defense: 68,

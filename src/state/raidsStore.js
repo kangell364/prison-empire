@@ -8,7 +8,7 @@
 // for the attacker (see public/multiplayer_raids.txt).
 //
 // Damage + the steal are server-authoritative (RLS + SECURITY DEFINER), so a
-// client can't fake an outcome. Steel cost + reinforce are still client-trusted
+// client can't fake an outcome. Cash cost + reinforce are still client-trusted
 // for now (consistent with the rest of the economy until the M3 anti-cheat pass).
 
 import { useEffect, useState, useRef } from 'react'

@@ -3,7 +3,7 @@
 ## Commissary pull system (gacha) — card source + currency sink
 **Why:** Closes the front half of the collection loop. Card/skill/plant merging
 already works, but there is no way to *earn* new cards (skills have no source at
-all). A pull system gives merging a purpose, soaks up surplus Hustle/Steel, and
+all). A pull system gives merging a purpose, soaks up surplus Hustle/Cash, and
 adds the most popular mobile-RPG retention mechanic.
 
 **Loop to build:** grind → earn currency → pull a pack → card lands in collection
@@ -18,7 +18,7 @@ adds the most popular mobile-RPG retention mechanic.
 - Reuse existing scaffolding: `src/components/CommissaryPack.jsx`,
   `src/components/StoreModal.jsx`, and the card stores (`cardsStore`,
   `skillCardsStore`, `plantCardsStore`).
-- Spend a currency to pull (Hustle/Steel for standard; a premium tier later for
+- Spend a currency to pull (Hustle/Cash for standard; a premium tier later for
   "watch ad / pay").
 - Rarity-weighted odds (common → epic/legendary), surfaced to the player.
 - Pulled cards write into the relevant collection store at Lvl 1, ready to stack
@@ -35,7 +35,7 @@ bursts → reveals 5 cards). This is a **common crew pack**: 5 fully-random pull
 from `CARDS_COLLECTION.filter(rarity === 'common')` (auto-grows as commons are
 added), landing in `cardsStore`. State in `src/state/packsStore.js`; whole flow
 in `src/components/CommissaryPack.jsx`.
-Still open: **currency-cost pulls** (Hustle/Steel sink), **rarity-weighted odds**
+Still open: **currency-cost pulls** (Hustle/Cash sink), **rarity-weighted odds**
 (uncommon→legendary) with odds surfaced, **skill + plant pack pools**, and a
 premium tier.
 
