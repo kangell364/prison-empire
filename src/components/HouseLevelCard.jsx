@@ -6,7 +6,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
   houseLevel, hpMaxForLevel, upgradeCost, upgradeSec, UPGRADE_MAX_LEVEL,
-  isUpgrading, upgradeRemainingSec, upgradeMyHouse, settleUpgrade,
+  isUpgrading, upgradeRemainingSec, upgradeMyHouse, settleUpgrade, vaultProtected,
 } from '../state/sharedHousesStore'
 import { useCash } from '../state/cashStore'
 import { sfx } from '../sounds'
@@ -76,6 +76,9 @@ export function HouseLevelCard({ house }) {
             <div style={{ color: GOLD, fontSize: 10, letterSpacing: 1, fontWeight: 700 }}>HOUSE LEVEL {level}{maxed ? ' · MAX' : ''}</div>
             <div style={{ color: '#aaa', fontSize: 11, marginTop: 2 }}>
               Max integrity {curMax}{!maxed && <span style={{ color: GREEN }}> → {nextMax}</span>}
+            </div>
+            <div style={{ color: '#888', fontSize: 10, marginTop: 1 }}>
+              <i className="ti ti-lock" style={{ fontSize: 10, marginRight: 3 }} />Vault ${vaultProtected(level).toLocaleString()}{!maxed && <span style={{ color: GREEN }}> → ${vaultProtected(level + 1).toLocaleString()}</span>} shielded from raids
             </div>
           </div>
           {maxed

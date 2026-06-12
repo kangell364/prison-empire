@@ -34,6 +34,14 @@ export function regenPerHrForLevel(lv) { return 10 + (Math.max(1, lv) - 1) * 5 }
 export function upgradeCost(level)     { return 50000 * Math.max(1, level) }              // L1→2:50k … L9→10:450k
 export function upgradeSec(level)      { return Math.round((120 * Math.max(1, level)) / (IS_TEST ? 30 : 1)) }
 
+// Cash a house's VAULT shields from raiders, and the LOOT a successful bust
+// yields — both scale with the house level. (Cash is client-only, so loot can't
+// be a true server transfer: the attacker GAINS raidLootFor(defenderLevel), and
+// the defender LOSES up to that from their UNPROTECTED cash above the vault.
+// Higher level = harder to bust + bigger vault, but a fatter payout if you do.)
+export function vaultProtected(level)  { return 50000 + (Math.max(1, level) - 1) * 30000 }  // L1:50k … L10:320k
+export function raidLootFor(level)     { return 15000 + (Math.max(1, level) - 1) * 10000 }  // L1:15k … L10:105k
+
 // ---- house integrity regen -----------------------------------------
 // A damaged trap house slowly rebuilds its integrity on its own, just like the
 // player's health pool. Anchored to the row's `updated_at` (bumped on every hp

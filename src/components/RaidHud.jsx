@@ -8,8 +8,9 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { CountdownRing } from './CountdownRing'
 import { usePlayers } from '../state/playersStore'
 import { useAuth } from '../state/profileStore'
-import { useSharedHouses, houseIntegrity } from '../state/sharedHousesStore'
+import { useSharedHouses, houseIntegrity, houseLevel, vaultProtected, raidLootFor } from '../state/sharedHousesStore'
 import { useActiveRaids, useRaidResolver, reinforceMyHouse, REINFORCE_COST } from '../state/raidsStore'
+import { getCash, addCash, spendCash } from '../state/cashStore'
 import { sfx } from '../sounds'
 
 const GOLD = '#c9a84c'
@@ -23,7 +24,28 @@ export function RaidHud({ onGoToMap }) {
   const myHouse = useMemo(() => (sharedHouses || []).find(h => h.owner_id === auth.userId) || null, [sharedHouses, auth.userId])
 
   const [landedQ, setLandedQ] = useState([])
-  useRaidResolver(activeRaids, (raid, result) => { setLandedQ(q => [...q, { raid, result }]); sfx.boom?.() })
+  // On a knockover, move CASH: the attacker loots a level-based cut; the defender
+  // loses up to that from cash ABOVE their vault. Runs once per raid (the resolver
+  // fires onResolved a single time), on each participant's own client.
+  useRaidResolver(activeRaids, (raid, result) => {
+    let loot = 0, vault = 0
+    if (result?.outcome === 'knocked_over') {
+      const targetHouse = (sharedHouses || []).find(h => h.id === raid.target_house_id)
+      const dLevel = houseLevel(targetHouse)
+      const gross = raidLootFor(dLevel)
+      vault = vaultProtected(dLevel)
+      if (raid.attacker_id === auth.userId) {
+        loot = gross
+        addCash(loot)
+      } else if (raid.defender_id === auth.userId) {
+        const lootable = Math.max(0, getCash() - vault)
+        loot = Math.min(lootable, gross)
+        if (loot > 0) spendCash(loot)
+      }
+    }
+    setLandedQ(q => [...q, { raid, result, loot, vault }])
+    sfx.boom?.()
+  })
   const landed = landedQ[0] || null
 
   const incoming = activeRaids.incoming || []
@@ -134,7 +156,7 @@ function OutgoingBanner({ raid, onTap }) {
 // Both sides see this when a raid lands.
 function RaidLandedModal({ entry, myUserId, onClose }) {
   const { name } = usePlayers()
-  const { raid, result } = entry
+  const { raid, result, loot = 0, vault = 0 } = entry
   const iAttacked = raid.attacker_id === myUserId
   const other = name(iAttacked ? raid.defender_id : raid.attacker_id)
   const outcome = result?.outcome
@@ -169,6 +191,23 @@ function RaidLandedModal({ entry, myUserId, onClose }) {
         <div style={{ color: accent, fontSize: 11, letterSpacing: 2, fontWeight: 700, marginTop: 8 }}>RAID {iAttacked ? 'OUTGOING' : 'INCOMING'}</div>
         <div style={{ color: '#fff', fontSize: 20, fontWeight: 700, marginTop: 4 }}>{title}</div>
         <div style={{ color: '#aaa', fontSize: 13, lineHeight: 1.55, marginTop: 10 }}>{body}</div>
+
+        {/* Loot line on a knockover — green when you cashed in, red when you got hit */}
+        {outcome === 'knocked_over' && (
+          iAttacked
+            ? <div style={{ marginTop: 12, color: '#2ecc71', fontSize: 18, fontWeight: 800 }}>
+                <i className="ti ti-cash" style={{ marginRight: 6 }} />+${loot.toLocaleString()} looted
+              </div>
+            : <div style={{ marginTop: 12 }}>
+                <div style={{ color: RED, fontSize: 18, fontWeight: 800 }}>
+                  <i className="ti ti-cash" style={{ marginRight: 6 }} />−${loot.toLocaleString()} stolen
+                </div>
+                <div style={{ color: DIM, fontSize: 11, marginTop: 4 }}>
+                  <i className="ti ti-lock" style={{ marginRight: 4 }} />Vault shielded ${vault.toLocaleString()} of your stash
+                </div>
+              </div>
+        )}
+
         <button className="btn btn-gold" style={{ width: '100%', padding: 12, marginTop: 18 }} onClick={onClose}>OK</button>
       </div>
     </div>
