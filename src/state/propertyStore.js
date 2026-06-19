@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from 'react'
 import { PROPERTIES } from '../data/gameData'
-import { addHustle } from './profileStore'
+import { addHustle, ensureAuth } from './profileStore'
 
 const KEY = 'pe_properties_v1'
 
@@ -113,10 +113,23 @@ export function usePropertyPayoutCountdown() {
 
 // Drive the idle income: catch up on mount (covers time spent away) then tick
 // once a second while the app is open. Mirrors useBlockPayoutTicker.
+//
+// CRITICAL: the first catch-up must wait for ensureAuth() to resolve. Otherwise
+// it races the Supabase profile load — the offline Hustle gets added locally,
+// but `userId` is still null so it never pushes to the server, and then
+// loadProfileForSession() overwrites `state.hustle` back to the pre-accrual
+// server value (profileStore: "adopt server state as authoritative"). The
+// payout bucket has already advanced, so the away income is lost for good.
+// Waiting for auth means the catch-up runs on the hydrated balance and pushes.
 export function usePropertyPayoutTicker() {
   useEffect(() => {
-    runDuePropertyPayout()
-    const iv = setInterval(() => runDuePropertyPayout(), 1000)
-    return () => clearInterval(iv)
+    let iv = null
+    let cancelled = false
+    ensureAuth().then(() => {
+      if (cancelled) return
+      runDuePropertyPayout()                       // catch up AFTER the profile is hydrated
+      iv = setInterval(() => runDuePropertyPayout(), 1000)
+    })
+    return () => { cancelled = true; if (iv) clearInterval(iv) }
   }, [])
 }
