@@ -572,6 +572,16 @@ export default function MapScreen({ onNavigate }) {
   const homeCoords = useMemo(() => houseCoords(homeHouse), [homeHouse, mapData])
   const { lost: blockLost, dismiss: dismissBlockLost } = useBlockRaids(homeCoords)
 
+  // Jump straight into the county turf map, opened tight on your house + block —
+  // wired to the "YOUR TRAP HOUSE" buttons on the USA / state map views.
+  const goToMyHouse = useCallback(() => {
+    sfx.tap?.()
+    const ll = myHouseCoords || (homeCoords ? { lat: homeCoords[1], lng: homeCoords[0] } : null)
+    if (!ll) return
+    setRelocating(false)
+    setTurfView({ center: [ll.lat, ll.lng], label: homeFips ? `${countyNameByFips[homeFips] || ''} County`.trim() : '', focusHouse: true })
+  }, [myHouseCoords, homeCoords, homeFips, countyNameByFips])
+
   // Phone's real GPS location → blinking dot on the USA view (the state you're
   // physically in). Falls back to the trap house if GPS is denied/unavailable.
   const deviceCoords = useDeviceLocation()
@@ -730,6 +740,19 @@ export default function MapScreen({ onNavigate }) {
               }}
             >
               <i className="ti ti-arrow-left" /> US
+            </button>
+          )}
+          {/* Jump straight to the county turf map, zoomed in on your house. */}
+          {(myHouseCoords || homeCoords) && (
+            <button
+              onClick={goToMyHouse}
+              style={{
+                background: GOLD, border: 'none', borderRadius: 6,
+                color: '#0a0a0f', padding: '3px 8px', fontSize: 10, fontWeight: 800, letterSpacing: 0.5, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap',
+              }}
+            >
+              🏚️ YOUR TRAP HOUSE
             </button>
           )}
           <span>{stateView ? `${stateView.name} — Facilities` : 'United States — Facilities'}</span>
@@ -947,6 +970,7 @@ export default function MapScreen({ onNavigate }) {
       {turfView && (
         <TurfMap
           center={turfView.center || HARRIS_CENTER}
+          openCloseup={!!turfView.focusHouse}
           label={turfView.label}
           counties={mapData?.counties}
           onBlockTap={(gx, gy) => setBlockSel({ gx, gy })}
