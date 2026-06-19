@@ -21,6 +21,9 @@ const GOLD = '#c9a84c'
 // Zoom the turf map opens at when entering a county — a metro-wide view (your
 // trap house + surrounding turf in frame), NOT street level. Tune to taste.
 const OPEN_ZOOM = 11
+// Tight zoom for "jump to my trap house" — frames the house + its block centered
+// in view (a close-up), not the metro-wide open zoom.
+const CLOSEUP_ZOOM = 16
 
 // --- Block shape -----------------------------------------------------------
 // Prototype: draw each block as a HEXAGON (Million Lords look) instead of the
@@ -96,6 +99,9 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
   // grid — the block grid suppresses its NPC icon there so the trap house REPLACES
   // the NPC. drawRef lets the house layer trigger a block-grid redraw when houses move.
   const occupiedRef = useRef(new Set())
+  // cellKey of the cell YOUR own trap house sits on — the grid paints it GOLD
+  // (your home base) even if the underlying block is vacant or rival-held.
+  const myCellRef = useRef(null)
   const drawRef = useRef(null)
 
   useEffect(() => {
@@ -166,17 +172,21 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
           continue
         }
         const owner = blk.owner
-        const terr = (!owner && TERRAIN) ? terrainOf(gx, gy) : null
+        // The cell your OWN trap house sits on always reads as your turf (GOLD) —
+        // it's your home base, so it shouldn't paint red/neutral under the gold pin.
+        const isMyHouseCell = myCellRef.current && cellKey(gx, gy) === myCellRef.current
+        const terr = (!owner && !isMyHouseCell && TERRAIN) ? terrainOf(gx, gy) : null
         // Relative 3-color allegiance: GOLD = your block, GREEN = your gang's
         // turf, RED = anyone else. Falls back to terrain/neutral when vacant.
-        const color = owner ? blockColor(gx, gy, blk, myGangId) : (terr ? terr.stroke : '#3a3a4a')
+        const color = isMyHouseCell ? GOLD : (owner ? blockColor(gx, gy, blk, myGangId) : (terr ? terr.stroke : '#3a3a4a'))
         const [cy, cx] = blockCenter(gx, gy)
         // Juice: a soft, color-matched glow under owned blocks (a larger blurred
         // tile beneath) so held turf reads as "lit up", Million-Lords style. Works
         // on either shape — a scaled hex on the hex board, a grown square otherwise.
-        const mine = owner === 'you'
-        if (mine) ownedHere.push([gx, gy])
-        if (JUICE && owner) {
+        const mine = owner === 'you' || isMyHouseCell        // GOLD styling (incl. home-base cell)
+        const drawOwned = !!owner || isMyHouseCell           // render with owned-block weight/glow
+        if (owner === 'you') ownedHere.push([gx, gy])        // payout pulse: blocks you actually own
+        if (JUICE && drawOwned) {
           // Slightly richer glow on YOUR turf (bigger, warmer) so it reads as the
           // hero color; rivals get a tighter, dimmer halo. `.pe-mine-glow` is the
           // hook the hourly payout flashes.
@@ -192,9 +202,9 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
           g.addTo(layer)
         }
         const shapeStyle = {
-          color, weight: owner ? 1.5 : 0.5, opacity: owner ? 0.9 : (terr ? 0.45 : 0.3),
-          fillColor: owner ? color : (terr ? terr.fill : '#888'),
-          fillOpacity: owner ? 0.18 : (terr ? terr.opacity : 0.04), interactive: true,
+          color, weight: drawOwned ? 1.5 : 0.5, opacity: drawOwned ? 0.9 : (terr ? 0.45 : 0.3),
+          fillColor: drawOwned ? color : (terr ? terr.fill : '#888'),
+          fillOpacity: drawOwned ? 0.18 : (terr ? terr.opacity : 0.04), interactive: true,
         }
         const shape = HEX
           ? L.polygon(hexCorners(cy, cx), shapeStyle)
@@ -279,9 +289,11 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
   // the grow-and-sell shop. (Phase 2: map presence. Raids land in Phase 3.)
   // Snap the house to the CENTER of the block it sits on — every player trap
   // house is tied to a block cell (and replaces that block's NPC).
-  const tCell = (trapHouse && trapHouse.lat != null) ? blockCenter(...cellOf(trapHouse.lng, trapHouse.lat)) : null
+  const tCellXY = (trapHouse && trapHouse.lat != null) ? cellOf(trapHouse.lng, trapHouse.lat) : null
+  const tCell = tCellXY ? blockCenter(...tCellXY) : null
   const tLat = tCell ? tCell[0] : null
   const tLng = tCell ? tCell[1] : null
+  myCellRef.current = tCellXY ? cellKey(...tCellXY) : null
   useEffect(() => {
     const map = mapRef.current
     if (!map || tLat == null || tLng == null) return
@@ -512,7 +524,14 @@ export function TurfMap({ center, label, counties, onBlockTap, onBack, trapHouse
         {/* Jump to your gang's Trap House on the map. */}
         {trapHouse && (
           <button
-            onClick={() => { const m = mapRef.current; if (m) m.flyTo([trapHouse.lat, trapHouse.lng], 15, { duration: 0.8 }) }}
+            onClick={() => {
+              const m = mapRef.current; if (!m) return
+              // Fly to the BLOCK CENTER the house is snapped to (tLat/tLng), not the
+              // raw coords, so the house + its block land dead-center, zoomed in.
+              const lat = tLat != null ? tLat : trapHouse.lat
+              const lng = tLng != null ? tLng : trapHouse.lng
+              m.flyTo([lat, lng], CLOSEUP_ZOOM, { duration: 0.8 })
+            }}
             style={{
               position: 'absolute', bottom: 16, left: 12, zIndex: 500,
               background: 'rgba(26,21,16,0.92)', border: `0.5px solid ${GOLD}88`, borderRadius: 10,
