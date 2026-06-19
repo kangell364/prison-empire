@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
-import { ALL_CITIES, FACILITIES, AI_GANGS } from '../data/gameData'
+import { ALL_CITIES, FACILITIES, AI_GANGS, CARDS_COLLECTION, RARITY_COLORS } from '../data/gameData'
 import { CountdownRing } from '../components/CountdownRing'
 import { USCountryMap } from '../components/USCountryMap'
 import { USStateMap } from '../components/USStateMap'
@@ -10,7 +10,11 @@ import { cellCenter, cellOf, cellKey, GRID, HOME_RADIUS_DEG, yourBlocks, aiPoach
 import { useMapData, buildCityCountyMap, buildUnlockedCountyTest, UNLOCKED_COUNTY_FIPS, HARRIS_CENTER, STATE_FIPS_TO_CODE, countyForPoint } from '../state/mapData'
 import { knockOut } from '../state/vitalsStore'
 import { getBounty } from '../state/bountyStore'
-import { useDisplayName, useAuth, resolveLook, useHustle } from '../state/profileStore'
+import { useDisplayName, useAuth, resolveLook, useHustle, usePlayerLook } from '../state/profileStore'
+import { useCrew, atkOf, defOf } from '../state/crewStore'
+import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
+import { useCash } from '../state/cashStore'
+import { StoreModal } from '../components/StoreModal'
 import { usePlayers } from '../state/playersStore'
 import { useActiveRaids, launchRaid, RAID_HUSTLE_COST } from '../state/raidsStore'
 import { usePlayerStats } from '../state/statsStore'
@@ -311,6 +315,8 @@ export default function MapScreen({ onNavigate }) {
   const [turfView, setTurfView] = useState(null)            // Map 2 (turf map): { center:[lat,lng], label }
   const [blockSel, setBlockSel] = useState(null)            // tapped block { gx, gy }
   const [houseSel, setHouseSel] = useState(null)            // tapped rival trap house (shared-world house row)
+  const [myHouseOpen, setMyHouseOpen] = useState(false)     // tapped YOUR trap house → overview sheet
+  const [showStore, setShowStore] = useState(false)         // Commissary Store (opened from the overview)
   const [carDrive, setCarDrive] = useState(null)            // attack-car animation { id, from:{lat,lng}, to:{lat,lng}, startedAt, endsAt }
   const carIdRef = useRef(0)
   const [selectedFacility, setSelectedFacility] = useState(null)
@@ -948,7 +954,7 @@ export default function MapScreen({ onNavigate }) {
           mobHouses={reservedSquares.houses}
           trapHouse={myHouseCoords || (homeCoords ? { lat: homeCoords[1], lng: homeCoords[0] } : null)}
           trapHouseName={myName}
-          onTrapHouseTap={() => onNavigate && onNavigate('traphouse')}
+          onTrapHouseTap={() => { sfx.tap?.(); setMyHouseOpen(true) }}
           onHouseTap={(h) => setHouseSel(h)}
           otherHouses={sharedHouses}
           myUserId={auth.userId}
@@ -973,6 +979,22 @@ export default function MapScreen({ onNavigate }) {
           }}
         />
       )}
+
+      {myHouseOpen && (
+        <MyHouseSheet
+          house={homeHouse}
+          name={myName}
+          locationLabel={moving
+            ? `Relocating to ${countyNameByFips[homeHouse.moving_to_fips] || 'destination'} County · ${fmtClock(moveRemaining)}`
+            : (homeFips ? `${countyNameByFips[homeFips] || 'Unknown'} County` : 'Unplaced')}
+          moving={moving}
+          onClose={() => setMyHouseOpen(false)}
+          onOpenStore={() => setShowStore(true)}
+          onRelocate={() => { setMyHouseOpen(false); setRelocating(true); setRelocateErr(null); setTurfView(null) }}
+        />
+      )}
+
+      {showStore && <StoreModal onClose={() => setShowStore(false)} />}
 
       {selectedFacility && (
         <ScoutScreen
@@ -1015,6 +1037,106 @@ export default function MapScreen({ onNavigate }) {
 // Tapping a RIVAL's trap-house pin opens this action sheet. Three plays:
 // Snoop (recon), Attack (the raid), RAT (snitch). Attack is the one we're
 // building out — Snoop/RAT are stubbed until their systems land.
+// Your OWN trap house — the overview you get when tapping your house pin on the
+// map (mirrors the rival-house view, but for you). Shows your name + look, the
+// full house-level card, your Cash BANK, the Commissary Store entry (opens the
+// store), and your crew's combined ATK / DEF. Does NOT drop you straight into
+// the grow-and-sell rooms.
+function MyHouseSheet({ house, name, onClose, onOpenStore, locationLabel, moving, onRelocate }) {
+  const look = resolveLook(usePlayerLook())
+  const cash = useCash()
+  const crew = useCrew()
+  const flat = flatAtLevel(useUpgrades(), 1)               // Level-1 upgrades, same as My Crew
+  const cardById = useMemo(() => new Map(CARDS_COLLECTION.map(c => [c.id, c])), [])
+  const crewCards = [crew.leader, ...crew.members]
+    .map(id => (id != null ? cardById.get(id) : null))
+    .filter(Boolean)
+  const crewAtk = crewCards.reduce((s, c) => s + atkOf(c, flat), 0)
+  const crewDef = crewCards.reduce((s, c) => s + defOf(c, flat), 0)
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 'calc(env(safe-area-inset-top, 0px) + 14px) 16px 16px', zIndex: 280, overflowY: 'auto' }} onClick={onClose}>
+      <div className="animate-in-top" style={{ background: '#13131f', borderRadius: 20, padding: 20, width: '100%', maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+
+        {/* Header — your look + name */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Avatar src={look.avatar} emoji={look.emoji} size={52} radius={12} style={{ border: `2px solid ${GOLD}` }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ color: GOLD, fontSize: 10, letterSpacing: 1.5, fontWeight: 600 }}>YOUR TRAP HOUSE</div>
+            <div style={{ color: '#fff', fontSize: 18, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
+          </div>
+          <div style={{ fontSize: 30 }}>🏚️</div>
+        </div>
+
+        {/* Location + Relocate — same section as the map's YOUR TRAP HOUSE card */}
+        <div style={{ marginTop: 14, background: '#0e0e16', border: `0.5px solid ${moving ? GOLD + '66' : '#22222e'}`, borderRadius: 14, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: `${GOLD}1f`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <i className={`ti ${moving ? 'ti-arrows-move' : 'ti-map-pin'}`} style={{ color: GOLD, fontSize: 16 }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ color: GOLD, fontSize: 10, letterSpacing: 1, fontWeight: 600 }}>LOCATION</div>
+            <div style={{ color: '#fff', fontSize: 13, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{locationLabel}</div>
+          </div>
+          {!moving && (
+            <button className="btn" onClick={() => { sfx.tap?.(); onRelocate && onRelocate() }}
+              style={{ padding: '7px 11px', background: GOLD, color: '#0a0a0f', border: 'none', borderRadius: 9, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>
+              <i className="ti ti-arrows-move" /> Relocate
+            </button>
+          )}
+        </div>
+
+        {/* House level — the same upgrade card shown on the map view */}
+        <div style={{ margin: '12px -16px 0' }}>
+          <HouseLevelCard house={house} />
+        </div>
+
+        {/* BANK — your Cash */}
+        <div style={{ marginTop: 12, background: '#0e1a12', border: `0.5px solid #2ecc7155`, borderRadius: 14, padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <i className="ti ti-building-bank" style={{ color: '#2ecc71', fontSize: 18 }} />
+            <span style={{ color: '#2ecc71', fontSize: 11, letterSpacing: 1, fontWeight: 700 }}>BANK</span>
+          </div>
+          <span style={{ color: '#2ecc71', fontSize: 20, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>${cash.toLocaleString()}</span>
+        </div>
+
+        {/* Commissary Store — same art as Home; tap to open the store */}
+        <div style={{ marginTop: 12 }}>
+          <div style={{ color: DIM, fontSize: 10, letterSpacing: 1.5, fontWeight: 600, marginBottom: 6 }}>COMMISSARY STORE</div>
+          <div onClick={() => { sfx.tap?.(); onOpenStore && onOpenStore() }}
+            style={{ borderRadius: 14, overflow: 'hidden', cursor: 'pointer', position: 'relative', border: '0.5px solid #2a2a3a' }}>
+            <img src="/COMMISSARY.webp" alt="Commissary Store" style={{ display: 'block', width: '100%', height: 'auto' }} />
+          </div>
+        </div>
+
+        {/* Your Crew — combined ATK / DEF */}
+        <div style={{ marginTop: 14 }}>
+          <div style={{ color: DIM, fontSize: 10, letterSpacing: 1.5, fontWeight: 600, marginBottom: 6 }}>YOUR CREW ({crewCards.length})</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ background: '#0e0e16', border: '1px solid #22222e', borderRadius: 12, padding: '12px 6px', textAlign: 'center' }}>
+              <div style={{ color: RED, fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{crewAtk.toLocaleString()}</div>
+              <div style={{ color: DIM, fontSize: 9, marginTop: 5, letterSpacing: 0.8 }}>CREW ATK</div>
+            </div>
+            <div style={{ background: '#0e0e16', border: '1px solid #22222e', borderRadius: 12, padding: '12px 6px', textAlign: 'center' }}>
+              <div style={{ color: '#4a9eff', fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{crewDef.toLocaleString()}</div>
+              <div style={{ color: DIM, fontSize: 9, marginTop: 5, letterSpacing: 0.8 }}>CREW DEF</div>
+            </div>
+          </div>
+          {crewCards.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+              {crewCards.map((c, i) => (
+                <Avatar key={i} src={c.face || c.avatar} emoji={c.emoji} size={38} radius={9}
+                  style={{ border: `1.5px solid ${(RARITY_COLORS[c.rarity] || GOLD)}66` }} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <button className="btn btn-dark" style={{ width: '100%', padding: 12, marginTop: 16 }} onClick={onClose}>Close</button>
+      </div>
+    </div>
+  )
+}
+
 function RivalHouseSheet({ house, onClose, onLaunch }) {
   const [mode, setMode] = useState('menu')          // 'menu' | 'attack'
   const { players } = usePlayers()
