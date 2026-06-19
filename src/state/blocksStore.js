@@ -19,8 +19,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../supabase'
-import { spendHustle, getUserId } from './profileStore'
-import { addCash } from './cashStore'
+import { spendHustle, addHustle, ensureAuth, getUserId } from './profileStore'
 import { gangBlockIncomeMult } from './gangStore'
 import { getProgress } from './progressionStore'
 
@@ -47,7 +46,8 @@ const COOLDOWN_MS      = 60 * 1000     // re-poach lock after a takeover
 // levels are effectively uncapped. Level comes from the live progression store.
 export const BLOCKS_PER_LEVEL = 25
 export function blockCap() { return BLOCKS_PER_LEVEL * Math.max(1, getProgress().level || 1) }
-const INCOME_CAP_HRS   = 24
+// No offline cap — blocks accrue Hustle 24/7 for as long as the player is away.
+// (Was capped at 24h; removed by request so income never stops.)
 export const HOME_RADIUS_DEG = 0.06    // ~4mi home-turf radius
 const HOME_INCOME_MULT = 1.25
 const HOME_COST_MULT   = 0.85
@@ -327,7 +327,7 @@ export function aiPoachBlock(gx, gy, crew) {
   const stake = effectiveLoyalty(b)
   const price = Math.round(stake * POACH_MULT)
   const payout = Math.round(stake + (price - stake) * PAYOUT_CUT)
-  addCash(payout)
+  addHustle(payout)
   overrides[key] = {
     owner: crew, ownerKind: 'ai', npc: b.npc, baseLoyalty: b.baseLoyalty,
     incomePerHr: b.incomePerHr, loyalty: price, basePaid: price,
@@ -349,7 +349,7 @@ export function cooldownLeft(b) { return b.lastPoachAt ? Math.max(0, Math.ceil((
 export function pendingIncome(gx, gy) {
   const b = getBlock(gx, gy)
   if (b.owner !== 'you') return 0
-  const hrs = Math.min(INCOME_CAP_HRS, hoursSince(b.lastCollectedAt || Date.now()))
+  const hrs = hoursSince(b.lastCollectedAt || Date.now())   // uncapped: accrues 24/7 while away
   return Math.floor(b.incomePerHr * hrs)
 }
 
@@ -443,12 +443,12 @@ function claimLanding(gx, gy) {
   return cellCenter(gx, gy)
 }
 
-// Bank a held block's accrued income (paid in Cash — turf is the empire economy).
+// Bank a held block's accrued income (paid in Hustle — the turf grind currency).
 export function collect(gx, gy) {
   const got = pendingIncome(gx, gy)
   const o = overrides[cellKey(gx, gy)]
   if (!o || o.owner !== 'you') return 0
-  if (got > 0) addCash(got)
+  if (got > 0) addHustle(got)
   o.lastCollectedAt = Date.now()
   commit()
   return got
@@ -456,20 +456,20 @@ export function collect(gx, gy) {
 
 // ---- home-screen "Your Turf" aggregates ----------------------------
 
-// Total Cash/hr across every block you hold.
+// Total Hustle/hr across every block you hold.
 export function yourBlockIncomePerHr() {
   const base = yourBlocks().reduce((sum, b) => sum + (b.incomePerHr || 0), 0)
   return Math.round(base * gangBlockIncomeMult())
 }
 
-// Total uncollected (pending) Cash waiting across all your blocks.
+// Total uncollected (pending) Hustle waiting across all your blocks.
 export function yourPendingIncome() {
   const base = yourBlocks().reduce((sum, b) => sum + pendingIncome(b.gx, b.gy), 0)
   return Math.round(base * gangBlockIncomeMult())
 }
 
 // Bank pending income from ALL your blocks in one pass (single credit + commit).
-// Returns the total Cash banked.
+// Returns the total Hustle banked.
 export function collectAllBlocks() {
   let total = 0
   const now = Date.now()
@@ -480,7 +480,7 @@ export function collectAllBlocks() {
     if (got > 0) { total += got; o.lastCollectedAt = now }
   }
   total = Math.round(total * gangBlockIncomeMult())   // gang 'plug' perk boost
-  if (total > 0) { addCash(total); commit() }
+  if (total > 0) { addHustle(total); commit() }
   return total
 }
 
@@ -501,12 +501,12 @@ export function resetTurf() {
 // Block income pays out on a GLOBAL hourly tick — aligned to the top of every
 // UTC hour, so the countdown is identical for every player worldwide (not a
 // per-account timer). When the hour rolls over, accrued income is auto-banked.
-// Income still accrues continuously underneath (capped 24h), so being away just
-// means the next boundary you're present for banks the backlog.
+// Income accrues continuously underneath with no cap (24/7), so being away just
+// means the next boundary you're present for banks the full backlog.
 const PAYOUT_PERIOD_MS  = 3_600_000               // 1 hour
 const PAYOUT_BUCKET_KEY = 'pe_block_payout_bucket_v1'
 
-// Payout event bus — fired with the Cash amount whenever a payout banks, so
+// Payout event bus — fired with the Hustle amount whenever a payout banks, so
 // any screen (e.g. the home card's chime) can react without owning the ticker.
 const payoutListeners = new Set()
 export function subscribePayout(fn) { payoutListeners.add(fn); return () => payoutListeners.delete(fn) }
@@ -517,7 +517,7 @@ export function msToNextPayout() { return PAYOUT_PERIOD_MS - (Date.now() % PAYOU
 function payoutBucket() { return Math.floor(Date.now() / PAYOUT_PERIOD_MS) }
 
 // If the global hour rolled over since our last payout, auto-bank all block
-// income. First ever run just starts the clock (no payout). Returns Cash paid
+// income. First ever run just starts the clock (no payout). Returns Hustle paid
 // and notifies payout subscribers when paid > 0.
 export function runDueBlockPayout() {
   let last = null
@@ -539,9 +539,20 @@ export function runDueBlockPayout() {
 // the UI via the block store's own listeners (commit) + subscribePayout.
 export function useBlockPayoutTicker() {
   useEffect(() => {
-    runDueBlockPayout()                          // catch up on mount (e.g. after being away)
-    const iv = setInterval(runDueBlockPayout, 1000)
-    return () => clearInterval(iv)
+    // The mount catch-up MUST wait for ensureAuth(): block payouts now credit
+    // Hustle, which is server-authoritative. If we banked the away backlog before
+    // the Supabase profile hydrates, the Hustle would be added locally and then
+    // overwritten by loadProfileForSession() ("adopt server state as
+    // authoritative") — silently dropping the income even though the payout
+    // bucket already advanced. Same fix as usePropertyPayoutTicker.
+    let iv = null
+    let cancelled = false
+    ensureAuth().then(() => {
+      if (cancelled) return
+      runDueBlockPayout()                        // catch up AFTER the profile is hydrated
+      iv = setInterval(runDueBlockPayout, 1000)
+    })
+    return () => { cancelled = true; if (iv) clearInterval(iv) }
   }, [])
 }
 

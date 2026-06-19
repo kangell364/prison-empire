@@ -223,14 +223,14 @@ export default function Dashboard({ onNavigate }) {
       <div className="section">
         <div className="section-label">Your Turf</div>
         <div className="card">
-          {/* Live block economy — total Cash/hr from every block you run. */}
+          {/* Live block economy — total Hustle/hr from every block you run. */}
           <div style={{ padding: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
               <div style={{ color: '#fff', fontSize: 16, fontWeight: 500 }}>Block Income</div>
               <div style={{ color: '#666', fontSize: 11 }}>{blocksOwned}/{blockCap()} blocks</div>
             </div>
             <div style={{ color: '#555', fontSize: 11, marginTop: 2 }}>
-              {blocksOwned === 0 ? 'Claim turf on the map to start earning passive Cash.' : 'Auto-pays every hour — same clock for every player'}
+              {blocksOwned === 0 ? 'Claim turf on the map to start earning passive Hustle.' : 'Auto-pays every hour — same clock for every player'}
             </div>
             <div style={{ display: 'flex', gap: 22, marginTop: 12 }}>
               <div>
@@ -239,7 +239,7 @@ export default function Dashboard({ onNavigate }) {
               </div>
               <div>
                 <div style={{ color: '#c9a84c', fontSize: 15, fontWeight: 500 }}>+{blockIncomeHr.toLocaleString()}</div>
-                <div style={{ color: '#444', fontSize: 10 }}>Cash/hr</div>
+                <div style={{ color: '#444', fontSize: 10 }}>Hustle/hr</div>
               </div>
             </div>
             {/* Global hourly payout — same countdown for everyone, auto-banks at 0. */}
