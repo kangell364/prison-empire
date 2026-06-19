@@ -1055,7 +1055,7 @@ function MyHouseSheet({ house, name, onClose, onOpenStore, locationLabel, moving
   const crewDef = crewCards.reduce((s, c) => s + defOf(c, flat), 0)
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 'calc(env(safe-area-inset-top, 0px) + 14px) 16px 16px', zIndex: 280, overflowY: 'auto' }} onClick={onClose}>
+    <div style={{ position: 'fixed', inset: 0, background: '#0a0a0f', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 'calc(env(safe-area-inset-top, 0px) + 14px) 16px 16px', zIndex: 280, overflowY: 'auto' }} onClick={onClose}>
       <div className="animate-in-top" style={{ background: '#13131f', borderRadius: 20, padding: 20, width: '100%', maxWidth: 440 }} onClick={e => e.stopPropagation()}>
 
         {/* Header — your look + name */}
