@@ -83,6 +83,14 @@ export function getPacks() { return state }
 
 export function usePacks() {
   const [s, setS] = useState(state)
-  useEffect(() => { listeners.add(setS); return () => listeners.delete(setS) }, [])
+  useEffect(() => {
+    // Re-sync on subscribe: a commit can land between the first render's snapshot
+    // and this listener registering (e.g. CommissaryPack's useTick fires accrueNow
+    // and deposits a due pack before usePacks' effect runs). Without this catch-up
+    // the banner shows a stale count until a manual refresh.
+    setS(state)
+    listeners.add(setS)
+    return () => listeners.delete(setS)
+  }, [])
   return s
 }
