@@ -766,18 +766,22 @@ export default function MapScreen({ onNavigate }) {
                 if (!unlockedCountySet.has(String(fips).padStart(5, '0'))) return LOCKED_FILL   // locked county → no color
                 const f = facilityByFips[fips]; return f ? facilityControl[f.id].color : '#15151f'
               }}
-              strokeFor={(fips) => facilityByFips[fips] ? '#fff' : `${GOLD}59`}
-              strokeWidthFor={(fips) => facilityByFips[fips] ? 1.5 : 0.7}
+              strokeFor={(fips) => (facilityByFips[fips] && unlockedCountySet.has(String(fips).padStart(5, '0'))) ? '#fff' : `${GOLD}59`}
+              strokeWidthFor={(fips) => (facilityByFips[fips] && unlockedCountySet.has(String(fips).padStart(5, '0'))) ? 1.5 : 0.7}
               onCountyClick={(c) => {
+                const unlocked = unlockedCountySet.has(String(c.fips).padStart(5, '0'))
                 if (relocating) {
                   // Can only relocate into an unlocked county — locked counties
                   // aren't open for view (uncolored), so they can't be a target.
-                  if (!unlockedCountySet.has(String(c.fips).padStart(5, '0'))) {
+                  if (!unlocked) {
                     sfx.lose?.(); setRelocateErr(`${c.name} County is locked — unlock it before moving there.`)
                     return
                   }
                   sfx.tap(); setRelocateErr(null); beginMoveTo(c.fips, c.name); return
                 }
+                // Locked counties stay closed for viewing — only unlocked ones open,
+                // even if they contain a facility city (e.g. Travis/Dallas in TX).
+                if (!unlocked) { sfx.lose?.(); return }
                 const fac = facilityByFips[c.fips]
                 if (fac) {
                   sfx.tap()
