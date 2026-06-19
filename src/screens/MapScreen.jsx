@@ -14,7 +14,6 @@ import { useDisplayName, useAuth, resolveLook, useHustle, usePlayerLook } from '
 import { useCrew, atkOf, defOf } from '../state/crewStore'
 import { useUpgrades, flatAtLevel } from '../state/upgradesStore'
 import { useCash } from '../state/cashStore'
-import { StoreModal } from '../components/StoreModal'
 import { usePlayers } from '../state/playersStore'
 import { useActiveRaids, launchRaid, RAID_HUSTLE_COST } from '../state/raidsStore'
 import { usePlayerStats } from '../state/statsStore'
@@ -316,7 +315,6 @@ export default function MapScreen({ onNavigate }) {
   const [blockSel, setBlockSel] = useState(null)            // tapped block { gx, gy }
   const [houseSel, setHouseSel] = useState(null)            // tapped rival trap house (shared-world house row)
   const [myHouseOpen, setMyHouseOpen] = useState(false)     // tapped YOUR trap house → overview sheet
-  const [showStore, setShowStore] = useState(false)         // Commissary Store (opened from the overview)
   const [carDrive, setCarDrive] = useState(null)            // attack-car animation { id, from:{lat,lng}, to:{lat,lng}, startedAt, endsAt }
   const carIdRef = useRef(0)
   const [selectedFacility, setSelectedFacility] = useState(null)
@@ -601,15 +599,6 @@ export default function MapScreen({ onNavigate }) {
   // moves to its own map tab. (Positioning logic lived here; recover from git
   // history — commit that added block_lat snapping — when building that tab.)
 
-  const summary = useMemo(() => {
-    let yours = 0, enemy = 0, vacant = 0
-    FACILITIES.forEach(f => {
-      const o = territories[f.id]?.owner ?? null
-      if (o === 'you') yours++; else if (o) enemy++; else vacant++
-    })
-    return { yours, enemy, vacant }
-  }, [territories])
-
   // Tick the relocation countdown and land the move when the timer elapses.
   useEffect(() => {
     if (!homeHouse?.moving_until) return
@@ -675,15 +664,6 @@ export default function MapScreen({ onNavigate }) {
           ))}
         </div>
       )}
-
-      {/* Empire summary */}
-      <div style={{ padding: '14px 16px 0' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-          <SummaryStat label="Your Facilities" value={summary.yours} color={GOLD} />
-          <SummaryStat label="Enemy Held"      value={summary.enemy} color={RED} />
-          <SummaryStat label="Vacant"          value={summary.vacant} color="#2ecc71" />
-        </div>
-      </div>
 
       {/* Your trap house — your own grow-and-sell operation (not gang-gated).
           Tap the card to walk the rooms; or relocate it to another county. */}
@@ -755,7 +735,7 @@ export default function MapScreen({ onNavigate }) {
               🏚️ YOUR TRAP HOUSE
             </button>
           )}
-          <span>{stateView ? `${stateView.name} — Facilities` : 'United States — Facilities'}</span>
+          <span>{stateView ? `${stateView.name} — Facilities` : ''}</span>
         </div>
         <div style={{ border: `0.5px solid ${GOLD}33`, borderRadius: 16, overflow: 'hidden', background: '#0d0d15' }}>
           {stateView ? (
@@ -1017,12 +997,10 @@ export default function MapScreen({ onNavigate }) {
             : (homeFips ? `${countyNameByFips[homeFips] || 'Unknown'} County` : 'Unplaced')}
           moving={moving}
           onClose={() => setMyHouseOpen(false)}
-          onOpenStore={() => setShowStore(true)}
+          onEnterTrapHouse={() => { setMyHouseOpen(false); onNavigate && onNavigate('traphouse') }}
           onRelocate={() => { setMyHouseOpen(false); setRelocating(true); setRelocateErr(null); setTurfView(null) }}
         />
       )}
-
-      {showStore && <StoreModal onClose={() => setShowStore(false)} />}
 
       {selectedFacility && (
         <ScoutScreen
@@ -1070,7 +1048,7 @@ export default function MapScreen({ onNavigate }) {
 // full house-level card, your Cash BANK, the Commissary Store entry (opens the
 // store), and your crew's combined ATK / DEF. Does NOT drop you straight into
 // the grow-and-sell rooms.
-function MyHouseSheet({ house, name, onClose, onOpenStore, locationLabel, moving, onRelocate }) {
+function MyHouseSheet({ house, name, onClose, onEnterTrapHouse, locationLabel, moving, onRelocate }) {
   const look = resolveLook(usePlayerLook())
   const cash = useCash()
   const crew = useCrew()
@@ -1127,12 +1105,12 @@ function MyHouseSheet({ house, name, onClose, onOpenStore, locationLabel, moving
           <span style={{ color: '#2ecc71', fontSize: 20, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>${cash.toLocaleString()}</span>
         </div>
 
-        {/* Commissary Store — same art as Home; tap to open the store */}
+        {/* Trap House — same art as Home; tap to walk the rooms (grow & sell) */}
         <div style={{ marginTop: 12 }}>
-          <div style={{ color: DIM, fontSize: 10, letterSpacing: 1.5, fontWeight: 600, marginBottom: 6 }}>COMMISSARY STORE</div>
-          <div onClick={() => { sfx.tap?.(); onOpenStore && onOpenStore() }}
+          <div style={{ color: DIM, fontSize: 10, letterSpacing: 1.5, fontWeight: 600, marginBottom: 6 }}>TRAP HOUSE</div>
+          <div onClick={() => { sfx.tap?.(); onEnterTrapHouse && onEnterTrapHouse() }}
             style={{ borderRadius: 14, overflow: 'hidden', cursor: 'pointer', position: 'relative', border: '0.5px solid #2a2a3a' }}>
-            <img src="/COMMISSARY.webp" alt="Commissary Store" style={{ display: 'block', width: '100%', height: 'auto' }} />
+            <img src="/grow-room.webp" alt="Trap House" style={{ display: 'block', width: '100%', height: 'auto' }} />
           </div>
         </div>
 
@@ -1280,15 +1258,6 @@ function MiniStat({ label, value, color }) {
     <div style={{ flex: 1, background: '#0e0e16', border: '1px solid #22222e', borderRadius: 12, padding: '10px 6px', textAlign: 'center' }}>
       <div style={{ color, fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{value}</div>
       <div style={{ color: DIM, fontSize: 9, marginTop: 5, letterSpacing: 0.8 }}>{label}</div>
-    </div>
-  )
-}
-
-function SummaryStat({ label, value, color }) {
-  return (
-    <div style={{ background: '#13131f', border: '0.5px solid #2a2a3a', borderRadius: 14, padding: '12px 10px', textAlign: 'center' }}>
-      <div style={{ color, fontSize: 22, fontWeight: 500, lineHeight: 1 }}>{value}</div>
-      <div style={{ color: DIM, fontSize: 10, marginTop: 5, letterSpacing: 0.5 }}>{label}</div>
     </div>
   )
 }
